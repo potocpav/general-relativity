@@ -2,11 +2,21 @@
 
 var quality = 2, quality_levels = [1, 2, 4, 8];
 var toolbar, showButton, timeButton, compileButton, fullscreenButton, compileTimer, errorLines = [];
-var code, canvas, gl, buffer, currentProgram, vertexPosition, screenVertexPosition,
-parameters = { startTime: Date.now(), time: 0, mouseX: 0.5, mouseY: 0.5, screenWidth: 0, screenHeight: 0 },
-surface = { centerX: 0, centerY: 0, width: 1, height: 1, isPanning: false, isZooming: false, lastX: 0, lastY: 0 },
-frontTarget, backTarget, screenProgram, getWebGL, compileOnChangeCode = true;
+var code, canvas, gl, buffer, currentProgram, vertexPosition, screenVertexPosition;
+var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
+var frontTarget, backTarget, screenProgram, getWebGL, compileOnChangeCode = true;
 var surfaceVertexShader;
+
+var parameters = {
+  startTime: Date.now(),
+  time: 0,
+  mouseX: 0.5,
+  mouseY: 0.5,
+  screenWidth: 0,
+  screenHeight: 0,
+  obsvX: [0.0, 0.0, 0.0],
+  obsvU: [-1.0, 0.0, 0.0]
+};
 
 init();
 
@@ -290,15 +300,14 @@ function compile() {
   cacheUniformLocation(program, 'resolution');
   cacheUniformLocation(program, 'backbuffer');
   cacheUniformLocation(program, 'surfaceSize');
+  cacheUniformLocation(program, 'obsvX');
+  cacheUniformLocation(program, 'obsvU');
 
   // Load program into GPU
 
   gl.useProgram(currentProgram);
 
   // Set up buffers
-
-  surface.positionAttribute = gl.getAttribLocation(currentProgram, "surfacePosAttrib");
-  gl.enableVertexAttribArray(surface.positionAttribute);
 
   vertexPosition = gl.getAttribLocation(currentProgram, "position");
   gl.enableVertexAttribArray(vertexPosition);
@@ -475,7 +484,9 @@ function animate() {
 function render() {
   if (!currentProgram) return;
 
-  parameters.time = Date.now() - parameters.startTime;
+  parameters.time = (Date.now() - parameters.startTime) / 1000;
+  parameters.obsvX = [parameters.time, 0, 0];
+  parameters.obsvU = [-1, 0, 0];
 
   timeButton.textContent = parseTime(parameters.time);
 
@@ -483,9 +494,11 @@ function render() {
 
   gl.useProgram(currentProgram);
 
-  gl.uniform1f(currentProgram.uniformsCache['time'], parameters.time / 1000);
+  gl.uniform1f(currentProgram.uniformsCache['time'], parameters.time);
   gl.uniform2f(currentProgram.uniformsCache['mouse'], parameters.mouseX, parameters.mouseY);
   gl.uniform2f(currentProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
+  gl.uniform3f(currentProgram.uniformsCache['obsvX'], parameters.obsvX[0], parameters.obsvX[1], parameters.obsvX[2]);
+  gl.uniform3f(currentProgram.uniformsCache['obsvU'], parameters.obsvU[0], parameters.obsvU[1], parameters.obsvU[2]);
   gl.uniform1i(currentProgram.uniformsCache['backbuffer'], 0);
   gl.uniform2f(currentProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
 
@@ -532,8 +545,8 @@ function render() {
   backTarget = tmp;
 }
 
-function parseTime(ms) {
-  const minutes = Math.floor(ms / 60000);
-  const seconds = ((ms % 60000) / 1000).toFixed(2).padStart(5, '0');
+function parseTime(s) {
+  const minutes = Math.floor(s / 60);
+  const seconds = (s % 60).toFixed(2).padStart(5, '0');
   return `${minutes}:${seconds}`;
 }
