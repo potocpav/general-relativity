@@ -5,8 +5,8 @@ precision highp float;
 uniform float time;
 uniform vec2 mouse;
 uniform vec2 resolution;
-uniform vec3 obsvX;
-uniform vec3 obsvY;
+uniform vec3 obsv_x;
+uniform vec3 obsv_u;
 
 vec2 s2w(vec2 screen, vec2 origin, float height) {
 	return (screen / resolution.y - vec2(resolution.x/resolution.y * origin.x, origin.y)) * height / 2.0;
@@ -40,15 +40,11 @@ mat3 metric(vec3 x) {
 // properly
 
 void main( void ) {
-	// observer velocity and position
-	float tau = time * 0.1;
-	vec2 obsv_v = vec2(sin(tau) * 0.7, cos(tau * 1.5) * 0.1);
-
 	// screen to observer space transformation
 	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
 	float screen_height = 20.0;
 
 	vec2 pix_x = s2w(gl_FragCoord.xy, screen_origin, screen_height);
 	vec3 pix_X = vec3(-sqrt(dot(pix_x, pix_x)), pix_x);
-	gl_FragColor = grid(boost(obsv_v) * pix_X + obsvX);
+	gl_FragColor = grid(boost(obsv_u.yz) * pix_X + obsv_x);
 }

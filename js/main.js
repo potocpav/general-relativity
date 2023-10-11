@@ -1,6 +1,6 @@
 // Greetings to Iq/RGBA! ;)
 
-var quality = 2, quality_levels = [1, 2, 4, 8];
+var quality = 4, quality_levels = [1, 2, 4, 8];
 var toolbar, showButton, timeButton, compileButton, fullscreenButton, compileTimer, errorLines = [];
 var code, canvas, gl, buffer, currentProgram, vertexPosition, screenVertexPosition;
 var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
@@ -14,8 +14,8 @@ var parameters = {
   mouseY: 0.5,
   screenWidth: 0,
   screenHeight: 0,
-  obsvX: [0.0, 0.0, 0.0],
-  obsvU: [-1.0, 0.0, 0.0]
+  obsvX: nj.array([0.0, 0.0, 0.0]),
+  obsvU: nj.array([-1.0, 0.0, 0.0])
 };
 
 init();
@@ -300,8 +300,8 @@ function compile() {
   cacheUniformLocation(program, 'resolution');
   cacheUniformLocation(program, 'backbuffer');
   cacheUniformLocation(program, 'surfaceSize');
-  cacheUniformLocation(program, 'obsvX');
-  cacheUniformLocation(program, 'obsvU');
+  cacheUniformLocation(program, 'obsv_x');
+  cacheUniformLocation(program, 'obsv_u');
 
   // Load program into GPU
 
@@ -478,27 +478,36 @@ function onWindowResize(event) {
 
 function animate() {
   requestAnimationFrame(animate);
+  if (!currentProgram) return;
+  update();
   render();
 }
 
+// Minkowski metric tensor
+const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
+
+function update() {
+  // physics
+  const t = (Date.now() - parameters.startTime) / 1000;
+  const dt = Math.max(0.0, Math.min(0.5, t - parameters.time));
+  parameters.time = t;
+
+  const u2 = nj.array([Math.sin(t * 0.2) * 0.8, 0]);
+  parameters.obsvU = nj.array([nj.array([1]).subtract(u2.dot(u2)).sqrt().get(0), u2.get(0), u2.get(1)]);
+  parameters.obsvX = parameters.obsvX.add(parameters.obsvU.multiply(dt));
+}
+
 function render() {
-  if (!currentProgram) return;
-
-  parameters.time = (Date.now() - parameters.startTime) / 1000;
-  parameters.obsvX = [parameters.time, 0, 0];
-  parameters.obsvU = [-1, 0, 0];
-
   timeButton.textContent = parseTime(parameters.time);
 
   // Set uniforms for custom shader
-
   gl.useProgram(currentProgram);
 
   gl.uniform1f(currentProgram.uniformsCache['time'], parameters.time);
   gl.uniform2f(currentProgram.uniformsCache['mouse'], parameters.mouseX, parameters.mouseY);
   gl.uniform2f(currentProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
-  gl.uniform3f(currentProgram.uniformsCache['obsvX'], parameters.obsvX[0], parameters.obsvX[1], parameters.obsvX[2]);
-  gl.uniform3f(currentProgram.uniformsCache['obsvU'], parameters.obsvU[0], parameters.obsvU[1], parameters.obsvU[2]);
+  gl.uniform3f(currentProgram.uniformsCache['obsv_x'], parameters.obsvX.get(0), parameters.obsvX.get(1), parameters.obsvX.get(2));
+  gl.uniform3f(currentProgram.uniformsCache['obsv_u'], parameters.obsvU.get(0), parameters.obsvU.get(1), parameters.obsvU.get(2));
   gl.uniform1i(currentProgram.uniformsCache['backbuffer'], 0);
   gl.uniform2f(currentProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
 
