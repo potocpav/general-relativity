@@ -13,11 +13,8 @@ init();
 if (gl) animate();
 
 function init() {
-
   canvas = document.createElement('canvas');
   document.body.appendChild(canvas);
-
-  //
 
   toolbar = document.createElement('div');
   toolbar.id = 'toolbar';
@@ -36,29 +33,19 @@ function init() {
   fullscreenButton.src = 'img/fullscreen.svg';
   fullscreenButton.title = 'Press F11 to enter or leave fullscreen mode';
   fullscreenButton.addEventListener('click', function (event) {
-
     if (document.fullscreenElement) {
-
       document.exitFullscreen();
       return;
-
     } else if (document.webkitFullscreenElement /* Safari */) {
-
       document.webkitExitFullscreen();
       return;
-
     }
 
     if (document.documentElement.requestFullscreen) {
-
       document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-
     } else if (document.documentElement.webkitRequestFullscreen /* Safari */) {
-
       document.documentElement.webkitRequestFullscreen();
-
     }
-
   }, false);
 
   rightside.appendChild(fullscreenButton);
@@ -66,37 +53,29 @@ function init() {
   showButton = document.createElement('button');
   showButton.textContent = 'show code';
   showButton.addEventListener('click', function () {
-
     isCodeVisible() ? hideCode() : showCode();
-
   }, false);
   toolbar.appendChild(showButton);
 
   timeButton = document.createElement('button');
   timeButton.textContent = '0:00.00';
   timeButton.addEventListener('click', function (event) {
-
     parameters.startTime = Date.now();
-
   }, false);
   toolbar.appendChild(timeButton);
 
   var select = document.createElement('select');
 
   for (var i = 0; i < quality_levels.length; i ++) {
-
     var option = document.createElement('option');
     option.textContent = quality_levels[i] + 'x';
     if (quality_levels[i] == quality) option.selected = true;
     select.appendChild(option);
-
   }
 
   select.addEventListener('change', function (event) {
-
     quality = quality_levels[event.target.selectedIndex];
     onWindowResize();
-
   }, false);
 
   toolbar.appendChild(select);
@@ -112,7 +91,6 @@ function init() {
   } catch(error) { }
 
   if (gl) {
-
     // enable dFdx, dFdy, fwidth
     gl.getExtension('OES_standard_derivatives');
 
@@ -125,7 +103,6 @@ function init() {
     // Create surface buffer (coordinates at screen corners)
 
     surface.buffer = gl.createBuffer();
-
   } else {
     alert('WebGL not supported, but code will be shown.');
   }
@@ -149,7 +126,6 @@ function init() {
   var clientXLast, clientYLast;
 
   document.addEventListener('pointermove', function (event) {
-
     var clientX = event.clientX;
     var clientY = event.clientY;
 
@@ -163,7 +139,6 @@ function init() {
 
     parameters.mouseX = clientX / window.innerWidth;
     parameters.mouseY = 1 - clientY / window.innerHeight;
-
   }, false);
 
   onWindowResize();
@@ -185,46 +160,37 @@ function init() {
     .then((text) => surfaceVertexShader = text);
 
   showCode();
-
 }
 
 function showCode() {
-
   showButton.textContent = 'hide code';
   code.getWrapperElement().style.visibility = 'visible';
   compileButton.style.visibility = 'visible';
-
 }
 
 function hideCode() {
-
   showButton.textContent = 'show code';
   code.getWrapperElement().style.visibility = 'hidden';
   compileButton.style.visibility = 'hidden';
   stopHideUI();
-
 }
 
 function isCodeVisible() {
-
   return code && code.getWrapperElement().style.visibility === 'visible';
-
 }
 
 var hideUITimer;
 var isUIHidden = false;
 
 function startHideUITimer () {
-
   stopHideUITimer();
   if (!isUIHidden && !isCodeVisible())
     hideUITimer = window.setTimeout(onHideUITimer, 1000 * 3);
 
   function onHideUITimer() {
-
     stopHideUITimer();
-    if (!isUIHidden && !isCodeVisible()) {
 
+    if (!isUIHidden && !isCodeVisible()) {
       isUIHidden = true;
       toolbar.style.opacity = '0';
       document.body.style.cursor = 'none';
@@ -232,9 +198,7 @@ function startHideUITimer () {
   }
 
   function stopHideUITimer () {
-
     if (hideUITimer) {
-
       window.clearTimeout(hideUITimer);
       hideUITimer = 0;
     }
@@ -255,7 +219,6 @@ function stopHideUI () {
 
 function computeSurfaceCorners() {
   if (gl) {
-
     surface.width = surface.height * parameters.screenWidth / parameters.screenHeight;
 
     var halfWidth = surface.width * 0.5, halfHeight = surface.height * 0.5;
@@ -272,11 +235,9 @@ function computeSurfaceCorners() {
 }
 
 function resetSurface() {
-
   surface.centerX = surface.centerY = 0;
   surface.height = 1;
   computeSurfaceCorners();
-
 }
 
 function compile() {
@@ -311,13 +272,10 @@ function compile() {
     compileButton.textContent = 'errors';
 
     return;
-
   }
 
   if (currentProgram) {
-
     gl.deleteProgram(currentProgram);
-
   }
 
   currentProgram = program;
@@ -344,11 +302,9 @@ function compile() {
 
   vertexPosition = gl.getAttribLocation(currentProgram, "position");
   gl.enableVertexAttribArray(vertexPosition);
-
 }
 
 function compileScreenProgram(vertex, fragment) {
-
   if (!gl) { return; }
 
   var program = gl.createProgram();
@@ -383,7 +339,6 @@ function compileScreenProgram(vertex, fragment) {
 
   screenVertexPosition = gl.getAttribLocation(screenProgram, "position");
   gl.enableVertexAttribArray(screenVertexPosition);
-
 }
 
 function cacheUniformLocation(program, label) {
@@ -393,10 +348,7 @@ function cacheUniformLocation(program, label) {
   program.uniformsCache[label] = gl.getUniformLocation(program, label);
 }
 
-//
-
 function createTarget(width, height) {
-
   var target = {};
 
   target.framebuffer = gl.createFramebuffer();
@@ -431,38 +383,23 @@ function createTarget(width, height) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   return target;
-
 }
 
 function createRenderTargets() {
-
   frontTarget = createTarget(parameters.screenWidth, parameters.screenHeight);
   backTarget = createTarget(parameters.screenWidth, parameters.screenHeight);
-
 }
 
-//
-
-var dummyFunction = function() {};
-
-
-//
-
 function htmlEncode(str){
-
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-
 }
 
-//
-
 function createShader(src, type) {
-
   var shader = gl.createShader(type);
   var line, lineNum, lineError, index = 0, indexEnd;
 
@@ -478,7 +415,6 @@ function createShader(src, type) {
   compileButton.title = '';
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-
     showCode();
 
     var error = gl.getShaderInfoLog(shader);
@@ -511,19 +447,12 @@ function createShader(src, type) {
         }
       }
     }
-
     return null;
-
   }
-
   return shader;
-
 }
 
-//
-
 function onWindowResize(event) {
-
   canvas.width = window.innerWidth / quality;
   canvas.height = window.innerHeight / quality;
 
@@ -533,26 +462,17 @@ function onWindowResize(event) {
   computeSurfaceCorners();
 
   if (gl) {
-
     gl.viewport(0, 0, canvas.width, canvas.height);
-
     createRenderTargets();
-
   }
-
 }
 
-//
-
 function animate() {
-
   requestAnimationFrame(animate);
   render();
-
 }
 
 function render() {
-
   if (!currentProgram) return;
 
   parameters.time = Date.now() - parameters.startTime;
@@ -610,15 +530,10 @@ function render() {
   var tmp = frontTarget;
   frontTarget = backTarget;
   backTarget = tmp;
-
 }
 
-// utils
-
 function parseTime(ms) {
-
   const minutes = Math.floor(ms / 60000);
   const seconds = ((ms % 60000) / 1000).toFixed(2).padStart(5, '0');
-  return `${ minutes }:${ seconds }`;
-
+  return `${minutes}:${seconds}`;
 }
