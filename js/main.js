@@ -1,6 +1,6 @@
 // Greetings to Iq/RGBA! ;)
 
-var quality = 2, quality_levels = [ 1, 2, 4, 8 ];
+var quality = 2, quality_levels = [1, 2, 4, 8];
 var toolbar, showButton, timeButton, compileButton, fullscreenButton, compileTimer, errorLines = [];
 var code, canvas, gl, buffer, currentProgram, vertexPosition, screenVertexPosition,
 parameters = { startTime: Date.now(), time: 0, mouseX: 0.5, mouseY: 0.5, screenWidth: 0, screenHeight: 0 },
@@ -63,22 +63,6 @@ function init() {
 
   rightside.appendChild(fullscreenButton);
 
-  var button = document.createElement('a');
-  button.style.marginRight = '0px';
-  button.textContent = 'gallery';
-
-  if (document.referrer.startsWith('https://glslsandbox.com/')) {
-
-    button.href = 'javascript:window.history.go(-1)';
-
-  } else {
-
-    button.href = '/';
-
-  }
-
-  rightside.appendChild(button);
-
   showButton = document.createElement('button');
   showButton.textContent = 'show code';
   showButton.addEventListener('click', function () {
@@ -102,15 +86,15 @@ function init() {
   for (var i = 0; i < quality_levels.length; i ++) {
 
     var option = document.createElement('option');
-    option.textContent = quality_levels[ i ] + 'x';
-    if (quality_levels[ i ] == quality) option.selected = true;
+    option.textContent = quality_levels[i] + 'x';
+    if (quality_levels[i] == quality) option.selected = true;
     select.appendChild(option);
 
   }
 
   select.addEventListener('change', function (event) {
 
-    quality = quality_levels[ event.target.selectedIndex ];
+    quality = quality_levels[event.target.selectedIndex];
     onWindowResize();
 
   }, false);
@@ -124,9 +108,7 @@ function init() {
   // Initialise WebGL
 
   try {
-
     gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
-
   } catch(error) { }
 
   if (gl) {
@@ -138,16 +120,14 @@ function init() {
 
     buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([ - 1.0, - 1.0, 1.0, - 1.0, - 1.0, 1.0, 1.0, - 1.0, 1.0, 1.0, - 1.0, 1.0 ]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([- 1.0, - 1.0, 1.0, - 1.0, - 1.0, 1.0, 1.0, - 1.0, 1.0, 1.0, - 1.0, 1.0]), gl.STATIC_DRAW);
 
     // Create surface buffer (coordinates at screen corners)
 
     surface.buffer = gl.createBuffer();
 
   } else {
-
     alert('WebGL not supported, but code will be shown.');
-
   }
 
   // initialize code editor
@@ -287,7 +267,7 @@ function computeSurfaceCorners() {
       surface.centerX - halfWidth, surface.centerY + halfHeight,
       surface.centerX + halfWidth, surface.centerY - halfHeight,
       surface.centerX + halfWidth, surface.centerY + halfHeight,
-      surface.centerX - halfWidth, surface.centerY + halfHeight ]), gl.STATIC_DRAW);
+      surface.centerX - halfWidth, surface.centerY + halfHeight]), gl.STATIC_DRAW);
   }
 }
 
@@ -407,15 +387,10 @@ function compileScreenProgram(vertex, fragment) {
 }
 
 function cacheUniformLocation(program, label) {
-
   if (program.uniformsCache === undefined) {
-
     program.uniformsCache = {};
-
   }
-
-  program.uniformsCache[ label ] = gl.getUniformLocation(program, label);
-
+  program.uniformsCache[label] = gl.getUniformLocation(program, label);
 }
 
 //
@@ -588,11 +563,11 @@ function render() {
 
   gl.useProgram(currentProgram);
 
-  gl.uniform1f(currentProgram.uniformsCache[ 'time' ], parameters.time / 1000);
-  gl.uniform2f(currentProgram.uniformsCache[ 'mouse' ], parameters.mouseX, parameters.mouseY);
-  gl.uniform2f(currentProgram.uniformsCache[ 'resolution' ], parameters.screenWidth, parameters.screenHeight);
-  gl.uniform1i(currentProgram.uniformsCache[ 'backbuffer' ], 0);
-  gl.uniform2f(currentProgram.uniformsCache[ 'surfaceSize' ], surface.width, surface.height);
+  gl.uniform1f(currentProgram.uniformsCache['time'], parameters.time / 1000);
+  gl.uniform2f(currentProgram.uniformsCache['mouse'], parameters.mouseX, parameters.mouseY);
+  gl.uniform2f(currentProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
+  gl.uniform1i(currentProgram.uniformsCache['backbuffer'], 0);
+  gl.uniform2f(currentProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, surface.buffer);
   gl.vertexAttribPointer(surface.positionAttribute, 2, gl.FLOAT, false, 0, 0);
@@ -614,8 +589,8 @@ function render() {
 
   gl.useProgram(screenProgram);
 
-  gl.uniform2f(screenProgram.uniformsCache[ 'resolution' ], parameters.screenWidth, parameters.screenHeight);
-  gl.uniform1i(screenProgram.uniformsCache[ 'texture' ], 1);
+  gl.uniform2f(screenProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
+  gl.uniform1i(screenProgram.uniformsCache['texture'], 1);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(screenVertexPosition, 2, gl.FLOAT, false, 0, 0);
