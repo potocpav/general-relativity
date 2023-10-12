@@ -1,11 +1,39 @@
 // Greetings to Iq/RGBA! ;)
 
 var quality = 4, quality_levels = [1, 2, 4, 8];
-var toolbar, showButton, timeButton, compileButton, fullscreenButton, compileTimer, errorLines = [];
+var toolbar;
+var showButton, timeButton, obsvXButton, obsvUButton;
+var compileButton, fullscreenButton, compileTimer, errorLines = [];
 var code, canvas, gl, buffer, currentProgram, vertexPosition, screenVertexPosition;
 var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
 var frontTarget, backTarget, screenProgram, getWebGL, compileOnChangeCode = true;
 var surfaceVertexShader;
+
+
+// Minkowski metric
+const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
+
+// // Flat spacetime metric tensor and Christoffel symbol
+// const g = (_x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+// const Gamma0 = (_x) => nj.zeros([3,3]);
+// const Gamma1 = (_x) => nj.zeros([3,3]);
+// const Gamma2 = (_x) => nj.zeros([3,3]);
+
+// Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
+const g = (x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, x.get(1) * x.get(1)]]);
+const Gamma0 = (x) => nj.zeros([3,3]);
+const Gamma1 = (x) => nj.array([[0, 0, 0], [0, 0, 0], [0, 0, -x.get(1)]]);
+const Gamma2 = (x) => nj.array([[0, 0, 0], [0, 0, 1 / x.get(1)], [0, 1 / x.get(1), 0]]);
+
+// 3-velocity from 2-velocity (ds = -1)
+// (supposing g_11 = -1)
+const Velocity3 = (x, u2) => {
+  const u3 = nj.array([0, u2.get(0), u2.get(1)]);
+  return nj.array([Math.sqrt(1 + g(x).dot(u3).dot(u3).get(0)), u2.get(0), u2.get(1)]);
+}
+
+const initialObsvX = nj.array([0.0, 3.0, 0.0]);
+const initialObsvU = Velocity3(initialObsvX, nj.array([-0.3, 0.1]));
 
 var parameters = {
   startTime: Date.now(),
@@ -14,9 +42,26 @@ var parameters = {
   mouseY: 0.5,
   screenWidth: 0,
   screenHeight: 0,
-  obsvX: nj.array([0.0, 0.0, 0.0]),
-  obsvU: nj.array([-1.0, 0.0, 0.0])
+  obsvX: initialObsvX,
+  obsvU: initialObsvU
 };
+
+function update() {
+  // physics
+  const t = (Date.now() - parameters.startTime) / 1000;
+  const dt = Math.max(0.0, Math.min(0.5, t - parameters.time));
+  parameters.time = t;
+
+  const X = parameters.obsvX;
+  const U = parameters.obsvU;
+
+  parameters.obsvU = U.subtract(nj.array([
+    Gamma0(X).dot(U).dot(U).get(0),
+    Gamma1(X).dot(U).dot(U).get(0),
+    Gamma2(X).dot(U).dot(U).get(0),
+    ]).multiply(dt));
+    parameters.obsvX = parameters.obsvX.add(parameters.obsvU.multiply(dt));
+}
 
 init();
 
@@ -73,6 +118,18 @@ function init() {
     parameters.startTime = Date.now();
   }, false);
   toolbar.appendChild(timeButton);
+
+  obsvXButton = document.createElement('button');
+  obsvXButton.addEventListener('click', function (event) {
+    parameters.obsvX = initialObsvX;
+  }, false);
+  toolbar.appendChild(obsvXButton);
+
+  obsvUButton = document.createElement('button');
+  obsvUButton.addEventListener('click', function (event) {
+    parameters.obsvV = initialObsvU;
+  }, false);
+  toolbar.appendChild(obsvUButton);
 
   var select = document.createElement('select');
 
@@ -483,22 +540,10 @@ function animate() {
   render();
 }
 
-// Minkowski metric tensor
-const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
-
-function update() {
-  // physics
-  const t = (Date.now() - parameters.startTime) / 1000;
-  const dt = Math.max(0.0, Math.min(0.5, t - parameters.time));
-  parameters.time = t;
-
-  const u2 = nj.array([Math.sin(t * 0.2) * 0.8, 0]);
-  parameters.obsvU = nj.array([nj.array([1]).subtract(u2.dot(u2)).sqrt().get(0), u2.get(0), u2.get(1)]);
-  parameters.obsvX = parameters.obsvX.add(parameters.obsvU.multiply(dt));
-}
-
 function render() {
-  timeButton.textContent = parseTime(parameters.time);
+  timeButton.textContent = printTime(parameters.time);
+  obsvXButton.textContent = "X: " + print3Vec(parameters.obsvX);
+  obsvUButton.textContent = "U: " + print3Vec(parameters.obsvU);
 
   // Set uniforms for custom shader
   gl.useProgram(currentProgram);
@@ -554,8 +599,12 @@ function render() {
   backTarget = tmp;
 }
 
-function parseTime(s) {
+function printTime(s) {
   const minutes = Math.floor(s / 60);
   const seconds = (s % 60).toFixed(2).padStart(5, '0');
   return `${minutes}:${seconds}`;
+}
+
+function print3Vec(x) {
+  return `${x.get(0).toFixed(1)}, ${x.get(1).toFixed(1)}, ${x.get(2).toFixed(1)}`;
 }

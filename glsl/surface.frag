@@ -8,18 +8,76 @@ uniform vec2 resolution;
 uniform vec3 obsv_x;
 uniform vec3 obsv_u;
 
+// Screen-space to world-space
+
+// TODO: don't specify height, specify the (geometric?) mean of screen dimensions
+// to look good on both vertical and horizontal devices
 vec2 s2w(vec2 screen, vec2 origin, float height) {
 	return (screen / resolution.y - vec2(resolution.x/resolution.y * origin.x, origin.y)) * height / 2.0;
 }
+
+// Grid visualization
 
 vec4 grid(vec3 pos) {
 	float grid_ratio = 0.1;
 	vec3 grid_frac = abs(mod(pos + 0.5, 1.0) * 2.0 - 1.0);
 	float grid = float((grid_frac.x > grid_ratio) && (grid_frac.y > grid_ratio) && (grid_frac.z > grid_ratio));
-	float pos_viz = length(pos.yz) * 0.05;
+	float pos_viz = length(pos.yz) * 0.0;
 
 	return vec4(vec3(grid*0.2 + pos_viz), 1.0);
 }
+
+// Minkowski metric
+
+mat3 nu(vec3 x) {
+	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+}
+
+// Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
+
+mat3 g(vec3 x) {
+	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, x.y * x.y);
+}
+
+mat3 Gamma0(vec3 x) {
+	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+}
+
+mat3 Gamma1(vec3 x) {
+	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -x.y);
+}
+
+mat3 Gamma2(vec3 x) {
+	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 1.0 / x.y, 0.0, 1.0 / x.y, 0.0);
+}
+
+// compute 3-vector out of a 2-vector so that ds = 0
+// (supposing g_00 = -1)
+vec3 light_u3(vec3 x, vec2 u2) {
+	float res = dot(g(x) * vec3(0.0, u2), vec3(0.0, u2));
+	return vec3(-sqrt(res), u2);
+}
+
+vec3 geodesic_u(vec3 x, vec3 u, float dl) {
+	return u - dl * vec3(
+		dot(Gamma0(x) * u, u),
+		dot(Gamma1(x) * u, u),
+		dot(Gamma2(x) * u, u));
+}
+
+mat2 inverse(mat2 m) {
+  return mat2(
+		m[1][1], -m[0][1],
+    -m[1][0], m[0][0]
+		) / (m[0][0]*m[1][1] - m[0][1]*m[1][0]);
+}
+
+vec2 cart2polar(float r, float phi, vec2 x) {
+	mat2 A = mat2(cos(phi), -r * sin(phi), sin(phi), r * cos(phi));
+	return x * inverse(A);
+}
+
+// Lorentz boost
 
 mat3 boost(vec2 v) {
 	float g = pow(1.0 - dot(v, v), -0.5);
@@ -31,20 +89,25 @@ mat3 boost(vec2 v) {
 		);
 }
 
-mat3 metric(vec3 x) {
-	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-}
-
-// movement in special relativity observing the square coordinate grid
-// observer time velocity is constant, because I was lazy to compute it
-// properly
+const float max_iters = 1000.0;
 
 void main( void ) {
 	// screen to observer space transformation
 	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
 	float screen_height = 20.0;
 
-	vec2 pix_x = s2w(gl_FragCoord.xy, screen_origin, screen_height);
-	vec3 pix_X = vec3(-sqrt(dot(pix_x, pix_x)), pix_x);
-	gl_FragColor = grid(boost(obsv_u.yz) * pix_X + obsv_x);
+	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_height);
+	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
+
+	vec3 pix_x = obsv_x;
+	vec3 pix_u = boost(obsv_u.yz) * light_u3(pix_x, pix_target);
+
+	float pix_norm = dot(pix_target, pix_target);
+	float dl = 1.0 / max_iters;
+	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
+		pix_u = geodesic_u(pix_x, pix_u, dl);
+		pix_x += pix_u * dl;
+	}
+
+	gl_FragColor = grid(pix_x);
 }
