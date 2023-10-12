@@ -32,8 +32,22 @@ const Velocity3 = (x, u2) => {
   return nj.array([Math.sqrt(1 + g(x).dot(u3).dot(u3).get(0)), u2.get(0), u2.get(1)]);
 }
 
+const inverse = (m) => {
+  var [[a, b], [c, d]] = m.tolist();
+  return nj.array([[d, -b], [-c, a]]).divide(a * d - b * c);
+}
+
+const cart2polar = (r, phi, x) => {
+	const A = nj.array([[Math.cos(phi), -r * Math.sin(phi)], [Math.sin(phi), r * Math.cos(phi)]]);
+	return inverse(A).dot(x);
+}
+
 const initialObsvX = nj.array([0.0, 3.0, 0.0]);
-const initialObsvU = Velocity3(initialObsvX, nj.array([-0.3, 0.1]));
+const initialObsvU = Velocity3(initialObsvX, cart2polar(
+  initialObsvX.get(1),
+  initialObsvX.get(2),
+  nj.array([0.0, 0.0])
+  ));
 
 var parameters = {
   startTime: Date.now(),
@@ -61,6 +75,8 @@ function update() {
     Gamma2(X).dot(U).dot(U).get(0),
     ]).multiply(dt));
     parameters.obsvX = parameters.obsvX.add(parameters.obsvU.multiply(dt));
+
+    // console.log(parameters.mouseX, parameters.mouseY);
 }
 
 init();

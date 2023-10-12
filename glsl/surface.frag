@@ -81,7 +81,7 @@ vec2 cart2polar(float r, float phi, vec2 x) {
 
 mat3 boost(vec2 v) {
 	float g = pow(1.0 - dot(v, v), -0.5);
-	float vv = dot(v, v);
+	float vv = dot(v, v) + 0.0001;
 	return mat3(
 		g, -g * v.x, -g * v.y,
 		-g * v.x, 1.0 + (g - 1.0) * v.x * v.x / vv, (g - 1.0) * v.x * v.y / vv,
