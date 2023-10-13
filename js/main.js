@@ -1,6 +1,6 @@
 // Greetings to Iq/RGBA! ;)
 
-var quality = 4, quality_levels = [1, 2, 4, 8];
+var quality = 2, quality_levels = [1, 2, 4, 8];
 var toolbar;
 var showButton, timeButton, obsvXButton, obsvUButton;
 var compileButton, fullscreenButton, compileTimer, errorLines = [];
@@ -19,11 +19,43 @@ const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
 // const Gamma1 = (_x) => nj.zeros([3,3]);
 // const Gamma2 = (_x) => nj.zeros([3,3]);
 
-// Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
-const g = (x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, x.get(1) * x.get(1)]]);
-const Gamma0 = (x) => nj.zeros([3,3]);
-const Gamma1 = (x) => nj.array([[0, 0, 0], [0, 0, 0], [0, 0, -x.get(1)]]);
-const Gamma2 = (x) => nj.array([[0, 0, 0], [0, 0, 1 / x.get(1)], [0, 1 / x.get(1), 0]]);
+// // Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
+// const g = (x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, x.get(1) * x.get(1)]]);
+// const Gamma0 = (x) => nj.zeros([3,3]);
+// const Gamma1 = (x) => nj.array([[0, 0, 0], [0, 0, 0], [0, 0, -x.get(1)]]);
+// const Gamma2 = (x) => nj.array([[0, 0, 0], [0, 0, 1 / x.get(1)], [0, 1 / x.get(1), 0]]);
+
+// Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
+const rs = 1.0;
+const g = (x) => {
+  r = x.get(1);
+  return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 + rs / r), 0], [0, 0, r * r]]);
+}
+
+const Gamma0 = (x) => {
+  const r = x.get(1);
+  return nj.array([
+    [0.0, rs / (2.0 * r*r * (1.0 - rs / r)), 0.0],
+    [rs / (2.0 * r*r * (1 - rs/r)), 0.0, 0.0],
+    [0.0, 0.0, 0.0]
+  ]);
+}
+const Gamma1 = (x) => {
+  const r = x.get(1);
+  return nj.array([
+    [rs * (0.5 - rs / 2 / r) / (r*r), 0.0, 0.0],
+    [0.0, -rs * (0.5 - rs / 2.0 / r) / (r*r * (1.0 - rs/r)*(1.0 - rs/r)), 0.0],
+    [0.0, 0.0, -2.0 * r * (0.5 - rs / 2.0 / r)]
+  ]);
+}
+const Gamma2 = (x) => {
+  const r = x.get(1);
+  return nj.array([
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0 / r],
+    [0.0, 1.0 / r, 0.0]
+  ]);
+}
 
 // 3-velocity from 2-velocity (ds = -1)
 // (supposing g_11 = -1)
@@ -42,11 +74,11 @@ const cart2polar = (r, phi, x) => {
 	return inverse(A).dot(x);
 }
 
-const initialObsvX = nj.array([0.0, 3.0, 0.0]);
+const initialObsvX = nj.array([0.0, 5.0, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.0])
+  nj.array([0.0, 0.3])
   ));
 
 var parameters = {
@@ -242,7 +274,7 @@ function init() {
     .then((response) => response.text())
     .then((text) => surfaceVertexShader = text);
 
-  showCode();
+  hideCode();
 }
 
 function showCode() {

@@ -16,39 +16,79 @@ vec2 s2w(vec2 screen, vec2 origin, float height) {
 	return (screen / resolution.y - vec2(resolution.x/resolution.y * origin.x, origin.y)) * height / 2.0;
 }
 
-// Grid visualization
-
-vec4 grid(vec3 pos) {
-	float grid_ratio = 0.1;
-	vec3 grid_frac = abs(mod(pos + 0.5, 1.0) * 2.0 - 1.0);
-	float grid = float((grid_frac.x > grid_ratio) && (grid_frac.y > grid_ratio) && (grid_frac.z > grid_ratio));
-	float pos_viz = length(pos.yz) * 0.0;
-
-	return vec4(vec3(grid*0.2 + pos_viz), 1.0);
-}
-
 // Minkowski metric
 
 mat3 nu(vec3 x) {
 	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 }
 
-// Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
+// // Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
 
+// mat3 g(vec3 x) {
+// 	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, x.y * x.y);
+// }
+
+// mat3 Gamma0(vec3 x) {
+// 	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+// }
+
+// mat3 Gamma1(vec3 x) {
+// 	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -x.y);
+// }
+
+// mat3 Gamma2(vec3 x) {
+// 	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 1.0 / x.y, 0.0, 1.0 / x.y, 0.0);
+// }
+
+// Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
+float rs = 1.0;
 mat3 g(vec3 x) {
-	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, x.y * x.y);
+  float r = x.y;
+  return mat3(
+		-(1.0 - rs / r), 0.0, 0.0,
+		0.0, 1.0 / (1.0 + rs / r), 0.0,
+		0.0, 0.0, r * r);
 }
 
 mat3 Gamma0(vec3 x) {
-	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+  float r = x.y;
+  return mat3(
+    0.0, rs / (2.0 * r*r * (1.0 - rs / r)), 0.0,
+    rs / (2.0 * r*r * (1.0 - rs/r)), 0.0, 0.0,
+    0.0, 0.0, 0.0
+  );
 }
-
 mat3 Gamma1(vec3 x) {
-	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -x.y);
+  float r = x.y;
+  return mat3(
+    rs * (0.5 - rs / 2.0 / r) / (r*r), 0.0, 0.0,
+    0.0, -rs * (0.5 - rs / 2.0 / r) / (r*r * (1.0 - rs/r)*(1.0 - rs/r)), 0.0,
+    0.0, 0.0, -2.0 * r * (0.5 - rs / 2.0 / r)
+  );
+}
+mat3 Gamma2(vec3 x) {
+  float r = x.y;
+  return mat3(
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 1.0 / r,
+    0.0, 1.0 / r, 0.0
+  );
 }
 
-mat3 Gamma2(vec3 x) {
-	return mat3(0.0, 0.0, 0.0, 0.0, 0.0, 1.0 / x.y, 0.0, 1.0 / x.y, 0.0);
+// Grid visualization
+
+vec4 grid_color(vec3 pos) {
+	vec3 grid_ratio = vec3(0.02, 0.1, 0.1);
+	vec3 stride = vec3(5.0, 1.0, 0.2);
+	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
+	float grid = float((grid_frac.x > grid_ratio.x) && (grid_frac.y > grid_ratio.y) && (grid_frac.z > grid_ratio.z));
+	float pos_viz = exp((rs - pos.y) * 30.0);
+
+	return vec4(vec3((1.0 - grid)*0.2 - pos_viz), 1.0);
+}
+
+float origin_color(vec2 pos) {
+	return length(pos) < 0.1 ? 1.0 : 0.0;
 }
 
 // compute 3-vector out of a 2-vector so that ds = 0
@@ -89,12 +129,12 @@ mat3 boost(vec2 v) {
 		);
 }
 
-const float max_iters = 1000.0;
+const float max_iters = 100.0;
 
 void main( void ) {
 	// screen to observer space transformation
 	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
-	float screen_height = 20.0;
+	float screen_height = 40.0;
 
 	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_height);
 	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
@@ -107,7 +147,10 @@ void main( void ) {
 	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
 		pix_u = geodesic_u(pix_x, pix_u, dl);
 		pix_x += pix_u * dl;
+		if (pix_x.y < rs * rs)  {
+			break;
+		}
 	}
 
-	gl_FragColor = grid(pix_x);
+	gl_FragColor = mix(grid_color(pix_x), vec4(0.7), origin_color(pix_cartesian));
 }
