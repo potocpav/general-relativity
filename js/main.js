@@ -261,16 +261,16 @@ function init() {
 
   // fetch shaders
 
-  fetch("/glsl/surface.frag")
+  fetch("glsl/surface-frag.glsl.js")
     .then((response) => response.text())
     .then((text) => code.setValue(text));
 
-  const screenVert = fetch("/glsl/screen.vert").then((response) => response.text());
-  const screenFrag = fetch("/glsl/screen.frag").then((response) => response.text());
+  const screenVert = fetch("glsl/screen-vert.glsl.js").then((response) => response.text());
+  const screenFrag = fetch("glsl/screen-frag.glsl.js").then((response) => response.text());
   Promise.all([screenVert, screenFrag])
     .then(([vert, frag]) => compileScreenProgram(vert, frag));
 
-  fetch("/glsl/surface.vert")
+  fetch("glsl/surface-vert.glsl.js")
     .then((response) => response.text())
     .then((text) => surfaceVertexShader = text);
 

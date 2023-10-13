@@ -1,6 +1,6 @@
 # General Relativity Playground
 
-You can play with general relativity here.
+You can play with general relativity [here](https://potocpav.github.io/general-relativity/).
 
 ## Run
 
