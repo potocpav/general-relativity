@@ -124,6 +124,7 @@ function update() {
 
   parameters.obsvU = UX1.slice([0, 3]);
   parameters.obsvX = UX1.slice([3, 6]);
+}
 
 init();
 

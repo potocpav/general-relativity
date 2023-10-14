@@ -98,11 +98,23 @@ vec3 light_u3(vec3 x, vec2 u2) {
 	return vec3(-sqrt(-res), u2);
 }
 
-vec3 geodesic_u(vec3 x, vec3 u, float dl) {
-	return u - dl * vec3(
-		dot(Gamma0(x) * u, u),
-		dot(Gamma1(x) * u, u),
-		dot(Gamma2(x) * u, u));
+vec3 geo_u(vec3 x, vec3 u) {
+	return vec3(
+		-dot(Gamma0(x) * u, u),
+		-dot(Gamma1(x) * u, u),
+		-dot(Gamma2(x) * u, u));
+}
+
+vec3 rk4_u(vec3 x, vec3 u, float h) {
+	vec3 k1 = geo_u(x, u);
+	vec3 k2 = geo_u(x, u + k1 * h / 2.0);
+	vec3 k3 = geo_u(x, u + k2 * h / 2.0);
+	vec3 k4 = geo_u(x, u + k3 * h);
+	return u + h / 6.0 * (k1 + 2.0*k2 + 2.0*k3 + k4);
+}
+
+vec3 rk4_x(vec3 x, vec3 u, float h) {
+	return x + u * h;
 }
 
 mat2 inverse(mat2 m) {
@@ -146,8 +158,10 @@ void main( void ) {
 	float pix_norm = dot(pix_target, pix_target);
 	float dl = 1.0 / max_iters;
 	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
-		pix_u = geodesic_u(pix_x, pix_u, dl);
-		pix_x += pix_u * dl;
+		vec3 pix_u1 = rk4_u(pix_x, pix_u, dl);
+		vec3 pix_x1 = rk4_x(pix_x, pix_u, dl);
+		pix_u = pix_u1;
+		pix_x = pix_x1;
 		if (pix_x.y < rs * rs)  {
 			break;
 		}
