@@ -77,14 +77,17 @@ mat3 Gamma2(vec3 x) {
 
 // Grid visualization
 
-vec4 grid_color(vec3 pos) {
+vec3 grid_color(vec3 pos) {
 	vec3 grid_ratio = vec3(0.01, 0.1, 0.1);
 	vec3 stride = vec3(3.0, 0.1, 0.2);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
 	float grid = float((grid_frac.x > grid_ratio.x) && (grid_frac.y > grid_ratio.y) && (grid_frac.z > grid_ratio.z));
-	float pos_viz = exp((rs - pos.y) * 30.0);
+	return vec3((1.0 - grid)*0.2);
+}
 
-	return vec4(vec3((1.0 - grid)*0.2 - pos_viz), 1.0);
+vec3 black_hole(vec3 pos, vec3 col) {
+	float pos_viz = exp((rs - pos.y) * 50.0);
+	return col - pos_viz;
 }
 
 float origin_color(vec2 pos) {
@@ -141,6 +144,11 @@ mat3 boost(vec2 v) {
 		);
 }
 
+vec3 redshift(float a, vec3 c) {
+	return c;
+	return max(vec3(0.0), min(vec3(1.0), vec3(c.x + a - 1.0, c.y / a, c.z + (1.0 - a))));
+}
+
 const float max_iters = 100.0;
 
 void main( void ) {
@@ -152,8 +160,10 @@ void main( void ) {
 	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
 
 	vec3 pix_x = obsv_x;
-	// vec3 pix_u = boost(obsv_u.yz) * light_u3(pix_x, pix_target);
-	vec3 pix_u = light_u3(pix_x, pix_target);
+	// TODO: Fix Lorentz transformation
+	// vec3 pix_u0 = boost(obsv_u.yz) * light_u3(pix_x, pix_target);
+	vec3 pix_u0 = light_u3(pix_x, pix_target);
+	vec3 pix_u = pix_u0;
 
 	float pix_norm = dot(pix_target, pix_target);
 	float dl = 1.0 / max_iters;
@@ -162,10 +172,10 @@ void main( void ) {
 		vec3 pix_x1 = rk4_x(pix_x, pix_u, dl);
 		pix_u = pix_u1;
 		pix_x = pix_x1;
-		if (pix_x.y < rs * rs)  {
+		if (pix_x.y < rs * rs)
 			break;
-		}
 	}
 
-	gl_FragColor = mix(grid_color(pix_x), vec4(0.7), origin_color(pix_cartesian));
+	float rshift = pix_u.x / pix_u0.x;
+	gl_FragColor = mix(vec4(black_hole(pix_x, redshift(rshift, grid_color(pix_x))), 1.0), vec4(0.7), origin_color(pix_cartesian));
 }

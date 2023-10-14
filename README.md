@@ -23,16 +23,19 @@ Raytracing:
 - [x] Observer motion
 - [x] Geodesics in polar coordinates in Minkowski metric
 - [x] Raytracing in curved coordinates
+- [ ] Fix Lorentz Boost with non-orthonormal local coords
 
 Black hole:
 
 - [x] Schwarzschield metric for observer
 - [x] Schwarzschield metric for light
-- [ ] Orbiting around a black hole
-- [ ] Use a precise solver
+- [x] Use a precise solver for photons
+- [x] Use a precise solver for motion
+- [x] Orbiting around a black hole test
 - [ ] Traversable event horizon
 - [ ] Redshift
 - [ ] Light attenuation
+- [ ] Relativistic beaming
 
 Test objects, interaction:
 

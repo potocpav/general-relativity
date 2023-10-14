@@ -78,7 +78,7 @@ const initialObsvX = nj.array([0.0, 30 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.1])
+  nj.array([0.0, 0.10])
   ));
 
 var parameters = {
@@ -125,7 +125,7 @@ function update() {
   parameters.obsvU = UX1.slice([0, 3]);
   parameters.obsvX = UX1.slice([3, 6]);
 }
-
+1
 init();
 
 if (gl) animate();
