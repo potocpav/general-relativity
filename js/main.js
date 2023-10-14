@@ -92,24 +92,38 @@ var parameters = {
   obsvU: initialObsvU
 };
 
+// Geodesic ODE arount x0, solving for [v^mu, x^mu] 6-vector
+const geo_f = (ux) => {
+  const u = ux.slice([0, 3]), x = ux.slice([3, 6]);
+  return nj.array([
+    -Gamma0(x).dot(u).dot(u).get(0),
+    -Gamma1(x).dot(u).dot(u).get(0),
+    -Gamma2(x).dot(u).dot(u).get(0),
+    u.get(0),
+    u.get(1),
+    u.get(2)
+  ]);
+}
+
+const rk4 = (f, y, h) => {
+  const k1 = f(y);
+  const k2 = f(y.add(k1.multiply(h/2)));
+  const k3 = f(y.add(k2.multiply(h/2)));
+  const k4 = f(y.add(k3.multiply(h)));
+  return y.add(k1.add(k2.multiply(2)).add(k3.multiply(2)).add(k4).multiply((h / 6)));
+}
+
 function update() {
   // physics
   const t = (Date.now() - parameters.startTime) / 1000;
-  const dt = Math.max(0.0, Math.min(0.5, t - parameters.time));
+  const dt = Math.max(0.01, Math.min(0.5, t - parameters.time));
   parameters.time = t;
 
-  const X = parameters.obsvX;
-  const U = parameters.obsvU;
+  const UX = nj.concatenate(parameters.obsvU, parameters.obsvX);
+  const UX1 = rk4(geo_f, UX, dt);
 
-  parameters.obsvU = U.subtract(nj.array([
-    Gamma0(X).dot(U).dot(U).get(0),
-    Gamma1(X).dot(U).dot(U).get(0),
-    Gamma2(X).dot(U).dot(U).get(0),
-    ]).multiply(dt));
-    parameters.obsvX = parameters.obsvX.add(parameters.obsvU.multiply(dt));
-
-    // console.log(parameters.mouseX, parameters.mouseY);
-}
+  parameters.obsvU = UX1.slice([0, 3]);
+  parameters.obsvX = UX1.slice([3, 6]);
 
 init();
 
