@@ -26,7 +26,7 @@ const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
 // const Gamma2 = (x) => nj.array([[0, 0, 0], [0, 0, 1 / x.get(1)], [0, 1 / x.get(1), 0]]);
 
 // Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
-const rs = 1.0;
+const rs = 0.01;
 const g = (x) => {
   r = x.get(1);
   return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 + rs / r), 0], [0, 0, r * r]]);
@@ -35,17 +35,17 @@ const g = (x) => {
 const Gamma0 = (x) => {
   const r = x.get(1);
   return nj.array([
-    [0.0, rs / (2.0 * r*r * (1.0 - rs / r)), 0.0],
-    [rs / (2.0 * r*r * (1 - rs/r)), 0.0, 0.0],
+    [0.0, rs / (2.0 * r * (r - rs)), 0.0],
+    [rs / (2.0 * r * (r - rs)), 0.0, 0.0],
     [0.0, 0.0, 0.0]
   ]);
 }
 const Gamma1 = (x) => {
   const r = x.get(1);
   return nj.array([
-    [rs * (0.5 - rs / 2 / r) / (r*r), 0.0, 0.0],
-    [0.0, -rs * (0.5 - rs / 2.0 / r) / (r*r * (1.0 - rs/r)*(1.0 - rs/r)), 0.0],
-    [0.0, 0.0, -2.0 * r * (0.5 - rs / 2.0 / r)]
+    [rs * (r - rs) / (2.0 * r*r*r), 0.0, 0.0],
+    [0.0, -rs / (2.0 * r * (r - rs)), 0.0],
+    [0.0, 0.0, rs - r]
   ]);
 }
 const Gamma2 = (x) => {
@@ -74,11 +74,11 @@ const cart2polar = (r, phi, x) => {
 	return inverse(A).dot(x);
 }
 
-const initialObsvX = nj.array([0.0, 5.0, 0.0]);
+const initialObsvX = nj.array([0.0, 30 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.3])
+  nj.array([0.0, 0.1])
   ));
 
 var parameters = {

@@ -10,9 +10,15 @@ npx browser-sync start --server
 
 ## Plan
 
-Basic raytracing:
+Infra:
 
 - [x] Find a basis project, clone & adapt it
+- [x] Publish to GH Pages
+- [ ] Link to GitHub
+- [ ] Improve menus
+
+Raytracing:
+
 - [x] Minkowski metric
 - [x] Observer motion
 - [x] Geodesics in polar coordinates in Minkowski metric
@@ -36,6 +42,7 @@ Test objects, interaction:
 - [ ] Interactive object spawning
 - [ ] Time controls
 - [ ] Scenario presets
+- [ ] Automatically generate floaters
 
 ## Acknowledgements
 

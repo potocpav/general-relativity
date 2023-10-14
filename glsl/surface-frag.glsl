@@ -41,7 +41,7 @@ mat3 nu(vec3 x) {
 // }
 
 // Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
-float rs = 1.0;
+float rs = 0.01;
 mat3 g(vec3 x) {
   float r = x.y;
   return mat3(
@@ -53,17 +53,17 @@ mat3 g(vec3 x) {
 mat3 Gamma0(vec3 x) {
   float r = x.y;
   return mat3(
-    0.0, rs / (2.0 * r*r * (1.0 - rs / r)), 0.0,
-    rs / (2.0 * r*r * (1.0 - rs/r)), 0.0, 0.0,
+    0.0, rs / (2.0 * r * (r - rs)), 0.0,
+    rs / (2.0 * r * (r - rs)), 0.0, 0.0,
     0.0, 0.0, 0.0
   );
 }
 mat3 Gamma1(vec3 x) {
   float r = x.y;
   return mat3(
-    rs * (0.5 - rs / 2.0 / r) / (r*r), 0.0, 0.0,
-    0.0, -rs * (0.5 - rs / 2.0 / r) / (r*r * (1.0 - rs/r)*(1.0 - rs/r)), 0.0,
-    0.0, 0.0, -2.0 * r * (0.5 - rs / 2.0 / r)
+    rs * (r - rs) / (2.0 * r*r*r), 0.0, 0.0,
+    0.0, -rs / (2.0 * r * (r - rs)), 0.0,
+    0.0, 0.0, rs - r
   );
 }
 mat3 Gamma2(vec3 x) {
@@ -78,8 +78,8 @@ mat3 Gamma2(vec3 x) {
 // Grid visualization
 
 vec4 grid_color(vec3 pos) {
-	vec3 grid_ratio = vec3(0.02, 0.1, 0.1);
-	vec3 stride = vec3(5.0, 1.0, 0.2);
+	vec3 grid_ratio = vec3(0.01, 0.1, 0.1);
+	vec3 stride = vec3(3.0, 0.1, 0.2);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
 	float grid = float((grid_frac.x > grid_ratio.x) && (grid_frac.y > grid_ratio.y) && (grid_frac.z > grid_ratio.z));
 	float pos_viz = exp((rs - pos.y) * 30.0);
@@ -88,14 +88,14 @@ vec4 grid_color(vec3 pos) {
 }
 
 float origin_color(vec2 pos) {
-	return length(pos) < 0.1 ? 1.0 : 0.0;
+	return length(pos) < 0.01 ? 1.0 : 0.0;
 }
 
 // compute 3-vector out of a 2-vector so that ds = 0
-// (supposing g_00 = -1)
+// (supposing a diagonal metric)
 vec3 light_u3(vec3 x, vec2 u2) {
-	float res = dot(g(x) * vec3(0.0, u2), vec3(0.0, u2));
-	return vec3(-sqrt(res), u2);
+	float res = dot(g(x) * vec3(0.0, u2), vec3(0.0, u2)) / g(x)[0][0];
+	return vec3(-sqrt(-res), u2);
 }
 
 vec3 geodesic_u(vec3 x, vec3 u, float dl) {
@@ -121,7 +121,7 @@ vec2 cart2polar(float r, float phi, vec2 x) {
 
 mat3 boost(vec2 v) {
 	float g = pow(1.0 - dot(v, v), -0.5);
-	float vv = dot(v, v) + 0.0001;
+	float vv = dot(v, v) + 0.0000001;
 	return mat3(
 		g, -g * v.x, -g * v.y,
 		-g * v.x, 1.0 + (g - 1.0) * v.x * v.x / vv, (g - 1.0) * v.x * v.y / vv,
@@ -134,13 +134,14 @@ const float max_iters = 100.0;
 void main( void ) {
 	// screen to observer space transformation
 	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
-	float screen_height = 40.0;
+	float screen_height = 2.0;
 
 	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_height);
 	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
 
 	vec3 pix_x = obsv_x;
-	vec3 pix_u = boost(obsv_u.yz) * light_u3(pix_x, pix_target);
+	// vec3 pix_u = boost(obsv_u.yz) * light_u3(pix_x, pix_target);
+	vec3 pix_u = light_u3(pix_x, pix_target);
 
 	float pix_norm = dot(pix_target, pix_target);
 	float dl = 1.0 / max_iters;
