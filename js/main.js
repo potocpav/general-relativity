@@ -104,12 +104,13 @@ var parameters = {
   obsvU: initialObsvU,
   rs: rs,
   screenSize: 2.5,
+  timeScale: 1.0
 };
 
 function update() {
   // physics
   const t = (Date.now() - parameters.startTime) / 1000;
-  const dt = Math.max(0.01, Math.min(0.1, t - parameters.time));
+  const dt = Math.max(0.01, Math.min(0.1, t - parameters.time)) * parameters.timeScale;
   parameters.time = t;
 
   const UX = nj.concatenate(parameters.obsvU, parameters.obsvX);
@@ -270,6 +271,7 @@ function init() {
 
   document.addEventListener('wheel', (event) => {
     parameters.screenSize *= Math.exp(event.deltaY / 500);
+    // parameters.timeScale *= Math.exp(-event.deltaX / 500);
   }, false);
 
   onWindowResize();

@@ -69,16 +69,24 @@ vec3 grid_color(vec3 pos) {
 	vec3 stride_raw = screen_size / vec3(sqrt(-gx[0][0]), sqrt(gx[1][1]), sqrt(gx[2][2])) / grids_per_screen;
 	vec3 stride_log = log2(stride_raw);
 	vec3 stride_floor = floor(stride_log);
-	vec3 stride_alpha = stride_log - stride_floor;
+	vec3 stride_alpha = 1.0 - (stride_log - stride_floor);
 	vec3 stride = vec3(
 		pow(2.0, stride_floor[0]),
 		pow(2.0, stride_floor[1]),
 		pow(2.0, stride_floor[2]));
 
-	vec3 grid_ratio = vec3(0.0, 0.1, 0.1);
+	// coarse grid which doesn't fade in
+	vec3 grid_ratio = vec3(0.0, 0.1, 0.1) * (1.0 - stride_alpha * 0.5);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
-	float grid = float((grid_frac.x > grid_ratio.x) && (grid_frac.y > grid_ratio.y) && (grid_frac.z > grid_ratio.z));
-	return vec3((1.0 - grid)*0.5);
+	float grid = float((grid_frac.x < grid_ratio.x) || (grid_frac.y < grid_ratio.y) || (grid_frac.z < grid_ratio.z));
+
+	// fine grid which fades in
+	vec3 grid2_ratio = 2.0 * grid_ratio;
+	vec3 grid2_frac = abs(mod(pos / (stride/2.0) + 0.5, 1.0) * 2.0 - 1.0);
+	vec3 on_grid2 = stride_alpha * vec3(
+		float(grid2_frac.x < grid2_ratio.x), float(grid2_frac.y < grid2_ratio.y), float(grid2_frac.z < grid2_ratio.z));
+	float grid2 = max(max(on_grid2.x, on_grid2.y), on_grid2.z);
+	return vec3((0.0 + max(grid, grid2))*0.3);
 }
 
 vec3 black_hole(vec3 pos, vec3 col) {
