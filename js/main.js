@@ -168,15 +168,9 @@ function init() {
   toolbar.appendChild(timeButton);
 
   obsvXButton = document.createElement('button');
-  obsvXButton.addEventListener('click', function (event) {
-    initialize();
-  }, false);
   toolbar.appendChild(obsvXButton);
 
   obsvUButton = document.createElement('button');
-  obsvUButton.addEventListener('click', function (event) {
-    params.obsvV = initialObsvU;
-  }, false);
   toolbar.appendChild(obsvUButton);
 
   var select = document.createElement('select');
@@ -283,9 +277,7 @@ function startHideUITimer () {
 }
 
 function stopHideUI () {
-
   if (isUIHidden) {
-
     isUIHidden = false;
     toolbar.style.opacity = '1';
     document.body.style.cursor = '';
@@ -380,7 +372,6 @@ function compileScreenProgram(vertex, fragment) {
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error('VALIDATE_STATUS: ' + gl.getProgramParameter(program, gl.VALIDATE_STATUS), 'ERROR: ' + gl.getError());
     return;
-
   }
 
   screenProgram = program;
