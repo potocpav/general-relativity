@@ -11,7 +11,7 @@ var surfaceVertexShader;
 
 
 // Minkowski metric
-const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
+const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 
 // // Flat spacetime metric tensor and Christoffel symbol
 // const g = (_x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
@@ -98,11 +98,11 @@ const rk4 = (f, y, h) => {
   return y.add(k1.add(k2.multiply(2)).add(k3.multiply(2)).add(k4).multiply((h / 6)));
 }
 
-const initialObsvX = nj.array([0.0, 10 * rs, 0.0]);
+const initialObsvX = nj.array([0.0, 5 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.9, 0.0])
+  nj.array([0.0, 0.5])
   ));
 
 var parameters = {
@@ -121,17 +121,6 @@ function update() {
   const t = (Date.now() - parameters.startTime) / 1000;
   const dt = Math.max(0.01, Math.min(0.1, t - parameters.time));
   parameters.time = t;
-
-  const u = parameters.obsvU, x = parameters.obsvX;
-  // // console.log(g(x).dot(u).dot(u).get(0));
-  const T = nj.array([
-    [Math.pow(-g(x).get(0,0), 0.5), 0, 0],
-    [0, Math.pow(g(x).get(1,1), 0.5), 0],
-    [0, 0, Math.pow(g(x).get(2,2), 0.5)]]);
-
-  const uMink = T.dot(u);
-
-  console.log(uMink.tolist());
 
   const UX = nj.concatenate(parameters.obsvU, parameters.obsvX);
   const UX1 = rk4(geo_f, UX, dt);

@@ -160,7 +160,7 @@ const float max_iters = 100.0;
 void main( void ) {
 	// screen to observer space transformation
 	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
-	float screen_height = 40.0;
+	float screen_height = 30.0;
 
 	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_height);
 	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
@@ -174,9 +174,10 @@ void main( void ) {
 		sqrt(-gx[0][0]), 0.0, 0.0,
 		0.0, sqrt(gx[1][1]), 0.0,
 		0.0, 0.0, sqrt(gx[2][2]));
-	// vec3 pix_u0 = inverse_diag3(T) * boost(T * obsv_u) * pix_v3;
-	// vec3 pix_u0 = boost(obsv_u) * pix_v3;
-	vec3 pix_u0 = pix_v3;
+	vec3 grid_u = vec3(obsv_u.x, -obsv_u.yz);
+	vec3 pix_u0 = inverse_diag3(T) * boost(T * grid_u) * T * pix_v3;
+	// vec3 pix_u0 = boost(grid_u) * pix_v3;
+	// vec3 pix_u0 = pix_v3;
 
 
 	vec3 pix_x = obsv_x;
