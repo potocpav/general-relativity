@@ -16,7 +16,8 @@ uniform float rs;
 // TODO: don't specify height, specify the (geometric?) mean of screen dimensions
 // to look good on both vertical and horizontal devices
 vec2 s2w(vec2 screen, vec2 origin, float size) {
-	return (screen / resolution.y - vec2(resolution.x/resolution.y * origin.x, origin.y)) * size / 2.0;
+	float meanRes = (resolution.x + resolution.y) / 2.0;
+	return ((screen - resolution / 2.0) / meanRes) * size / 2.0;
 }
 
 // Minkowski metric
@@ -161,7 +162,7 @@ const float max_iters = 100.0;
 
 void main( void ) {
 	// screen to observer space transformation
-	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
+	vec2 screen_origin = vec2(0.5, 0.5);
 
 	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_size);
 	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);

@@ -90,7 +90,7 @@ const initialObsvX = nj.array([0.0, 30 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.1])
+  nj.array([0.0, 0.08])
   ));
 
 var parameters = {
@@ -270,7 +270,6 @@ function init() {
 
   document.addEventListener('wheel', (event) => {
     parameters.screenSize *= Math.exp(event.deltaY / 500);
-    console.log("scroll", Math.exp(event.deltaY));
   }, false);
 
   onWindowResize();
