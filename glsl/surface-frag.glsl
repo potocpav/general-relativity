@@ -41,12 +41,12 @@ mat3 nu(vec3 x) {
 // }
 
 // Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
-float rs = 0.01;
+float rs = 1.0;
 mat3 g(vec3 x) {
   float r = x.y;
   return mat3(
 		-(1.0 - rs / r), 0.0, 0.0,
-		0.0, 1.0 / (1.0 + rs / r), 0.0,
+		0.0, 1.0 / (1.0 - rs / r), 0.0,
 		0.0, 0.0, r * r);
 }
 
@@ -79,7 +79,7 @@ mat3 Gamma2(vec3 x) {
 
 vec3 grid_color(vec3 pos) {
 	vec3 grid_ratio = vec3(0.01, 0.1, 0.1);
-	vec3 stride = vec3(3.0, 0.1, 0.2);
+	vec3 stride = vec3(5.0, 1.0, 0.1);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
 	float grid = float((grid_frac.x > grid_ratio.x) && (grid_frac.y > grid_ratio.y) && (grid_frac.z > grid_ratio.z));
 	return vec3((1.0 - grid)*0.2);
@@ -91,7 +91,7 @@ vec3 black_hole(vec3 pos, vec3 col) {
 }
 
 float origin_color(vec2 pos) {
-	return length(pos) < 0.01 ? 1.0 : 0.0;
+	return length(pos) < 0.1 ? 1.0 : 0.0;
 }
 
 // compute 3-vector out of a 2-vector so that ds = 0
@@ -120,28 +120,34 @@ vec3 rk4_x(vec3 x, vec3 u, float h) {
 	return x + u * h;
 }
 
-mat2 inverse(mat2 m) {
+mat2 inverse2(mat2 m) {
   return mat2(
 		m[1][1], -m[0][1],
     -m[1][0], m[0][0]
 		) / (m[0][0]*m[1][1] - m[0][1]*m[1][0]);
 }
 
+mat3 inverse_diag3(mat3 m) {
+	return mat3(
+		1.0 / m[0][0], 0.0, 0.0,
+		0.0, 1.0 / m[1][1], 0.0,
+		0.0, 0.0, 1.0 / m[2][2]);
+}
+
 vec2 cart2polar(float r, float phi, vec2 x) {
 	mat2 A = mat2(cos(phi), -r * sin(phi), sin(phi), r * cos(phi));
-	return x * inverse(A);
+	return x * inverse2(A);
 }
 
 // Lorentz boost
 
-mat3 boost(vec2 v) {
-	float g = pow(1.0 - dot(v, v), -0.5);
-	float vv = dot(v, v) + 0.0000001;
+mat3 boost(vec3 u) {
+	float fac = (u.x - 1.0) / dot(u.yz, u.yz);
 	return mat3(
-		g, -g * v.x, -g * v.y,
-		-g * v.x, 1.0 + (g - 1.0) * v.x * v.x / vv, (g - 1.0) * v.x * v.y / vv,
-		-g * v.y, (g - 1.0) * v.y * v.x / vv, 1.0 + (g - 1.0) * v.y * v.y / vv
-		);
+		u.x, -u.y, -u.z,
+		-u.y, 1.0 + fac * u.y*u.y, fac * u.y*u.z,
+		-u.z, fac * u.y*u.z, 1.0 + fac * u.z*u.z
+	);
 }
 
 vec3 redshift(float a, vec3 c) {
@@ -154,15 +160,26 @@ const float max_iters = 100.0;
 void main( void ) {
 	// screen to observer space transformation
 	vec2 screen_origin = vec2(0.5, 0.5) + (mouse - 0.5) * 0.0;
-	float screen_height = 2.0;
+	float screen_height = 40.0;
 
 	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_height);
 	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
 
-	vec3 pix_x = obsv_x;
+	vec3 pix_v3 = light_u3(obsv_x, pix_target); // 3-vec pointing at pix
+
 	// TODO: Fix Lorentz transformation
-	// vec3 pix_u0 = boost(obsv_u.yz) * light_u3(pix_x, pix_target);
-	vec3 pix_u0 = light_u3(pix_x, pix_target);
+	mat3 gx = g(obsv_x);
+	// vector transformation to Minkowski metric
+	mat3 T = mat3(
+		sqrt(-gx[0][0]), 0.0, 0.0,
+		0.0, sqrt(gx[1][1]), 0.0,
+		0.0, 0.0, sqrt(gx[2][2]));
+	// vec3 pix_u0 = inverse_diag3(T) * boost(T * obsv_u) * pix_v3;
+	// vec3 pix_u0 = boost(obsv_u) * pix_v3;
+	vec3 pix_u0 = pix_v3;
+
+
+	vec3 pix_x = obsv_x;
 	vec3 pix_u = pix_u0;
 
 	float pix_norm = dot(pix_target, pix_target);

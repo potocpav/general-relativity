@@ -26,10 +26,10 @@ const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 0]]);
 // const Gamma2 = (x) => nj.array([[0, 0, 0], [0, 0, 1 / x.get(1)], [0, 1 / x.get(1), 0]]);
 
 // Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
-const rs = 0.01;
+const rs = 1;
 const g = (x) => {
   r = x.get(1);
-  return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 + rs / r), 0], [0, 0, r * r]]);
+  return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 - rs / r), 0], [0, 0, r * r]]);
 }
 
 const Gamma0 = (x) => {
@@ -58,10 +58,12 @@ const Gamma2 = (x) => {
 }
 
 // 3-velocity from 2-velocity (ds = -1)
-// (supposing g_11 = -1)
+// (supposing diagonal metric tensor)
 const Velocity3 = (x, u2) => {
-  const u3 = nj.array([0, u2.get(0), u2.get(1)]);
-  return nj.array([Math.sqrt(1 + g(x).dot(u3).dot(u3).get(0)), u2.get(0), u2.get(1)]);
+  const [ux, uy] = u2.tolist();
+  const gx = g(x);
+
+  return nj.array([Math.sqrt(-(1 + gx.get(1,1) * ux*ux + gx.get(2,2) * uy*uy) / gx.get(0,0)), ux, uy]);
 }
 
 const inverse = (m) => {
@@ -74,23 +76,6 @@ const cart2polar = (r, phi, x) => {
 	return inverse(A).dot(x);
 }
 
-const initialObsvX = nj.array([0.0, 30 * rs, 0.0]);
-const initialObsvU = Velocity3(initialObsvX, cart2polar(
-  initialObsvX.get(1),
-  initialObsvX.get(2),
-  nj.array([0.0, 0.10])
-  ));
-
-var parameters = {
-  startTime: Date.now(),
-  time: 0,
-  mouseX: 0.5,
-  mouseY: 0.5,
-  screenWidth: 0,
-  screenHeight: 0,
-  obsvX: initialObsvX,
-  obsvU: initialObsvU
-};
 
 // Geodesic ODE arount x0, solving for [v^mu, x^mu] 6-vector
 const geo_f = (ux) => {
@@ -113,22 +98,55 @@ const rk4 = (f, y, h) => {
   return y.add(k1.add(k2.multiply(2)).add(k3.multiply(2)).add(k4).multiply((h / 6)));
 }
 
+const initialObsvX = nj.array([0.0, 10 * rs, 0.0]);
+const initialObsvU = Velocity3(initialObsvX, cart2polar(
+  initialObsvX.get(1),
+  initialObsvX.get(2),
+  nj.array([0.9, 0.0])
+  ));
+
+var parameters = {
+  startTime: Date.now(),
+  time: 0,
+  mouseX: 0.5,
+  mouseY: 0.5,
+  screenWidth: 0,
+  screenHeight: 0,
+  obsvX: initialObsvX,
+  obsvU: initialObsvU
+};
+
 function update() {
   // physics
   const t = (Date.now() - parameters.startTime) / 1000;
-  const dt = Math.max(0.01, Math.min(0.5, t - parameters.time));
+  const dt = Math.max(0.01, Math.min(0.1, t - parameters.time));
   parameters.time = t;
+
+  const u = parameters.obsvU, x = parameters.obsvX;
+  // // console.log(g(x).dot(u).dot(u).get(0));
+  const T = nj.array([
+    [Math.pow(-g(x).get(0,0), 0.5), 0, 0],
+    [0, Math.pow(g(x).get(1,1), 0.5), 0],
+    [0, 0, Math.pow(g(x).get(2,2), 0.5)]]);
+
+  const uMink = T.dot(u);
+
+  console.log(uMink.tolist());
 
   const UX = nj.concatenate(parameters.obsvU, parameters.obsvX);
   const UX1 = rk4(geo_f, UX, dt);
 
   parameters.obsvU = UX1.slice([0, 3]);
   parameters.obsvX = UX1.slice([3, 6]);
+
 }
-1
+
 init();
 
-if (gl) animate();
+if (gl) {
+  parameters.startTime = Date.now();
+  animate();
+}
 
 function init() {
   canvas = document.createElement('canvas');
@@ -598,7 +616,10 @@ function onWindowResize(event) {
 
 function animate() {
   requestAnimationFrame(animate);
-  if (!currentProgram) return;
+  if (!currentProgram) {
+    parameters.startTime = Date.now();
+    return;
+  }
   update();
   render();
 }
@@ -669,5 +690,5 @@ function printTime(s) {
 }
 
 function print3Vec(x) {
-  return `${x.get(0).toFixed(1)}, ${x.get(1).toFixed(1)}, ${x.get(2).toFixed(1)}`;
+  return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
 }
