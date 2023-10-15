@@ -2,12 +2,11 @@
 
 var quality = 2, quality_levels = [1, 2, 4, 8];
 var toolbar;
-var showButton, timeButton, obsvXButton, obsvUButton;
-var fullscreenButton, compileTimer, errorLines = [];
+var timeButton, obsvXButton, obsvUButton;
+var fullscreenButton;
 var canvas, gl, buffer, surfaceProgram, vertexPosition, screenVertexPosition;
+var frontTarget, backTarget, screenProgram;
 var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
-var frontTarget, backTarget, screenProgram, getWebGL, compileOnChangeCode = true;
-var surfaceVertexShader, surfaceFragmentShader;
 
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
@@ -86,28 +85,30 @@ const rk4 = (f, y, h) => {
   return y.add(k1.add(k2.multiply(2)).add(k3.multiply(2)).add(k4).multiply((h / 6)));
 }
 
-const initialObsvX = nj.array([0.0, 30 * rs, 0.0]);
-const initialObsvU = Velocity3(initialObsvX, cart2polar(
-  initialObsvX.get(1),
-  initialObsvX.get(2),
-  nj.array([0.0, 0.08])
-  ));
-
 var params = {
-  startTime: Date.now(),
-  time: 0,
   mouseX: 0.5,
   mouseY: 0.5,
   screenWidth: 0,
   screenHeight: 0,
-  obsvX: initialObsvX,
-  obsvU: initialObsvU,
-  rs: rs,
-  screenSize: 2.5,
-  timeScale: 1.0
 };
 
-function update() {
+function initialize() {
+  const x = nj.array([0, 30 * rs, 0]);
+  const u = nj.array([0, 0.08]);
+
+  params.screenSize = 2.5;
+  params.timeScale = 1.0;
+  params.rs = rs;
+
+  params.startTime = Date.now();
+  params.time = 0;
+  params.obsvX = x;
+  params.obsvU = Velocity3(x, cart2polar(x.get(1), x.get(2), u));
+}
+
+initialize();
+
+function physics() {
   // physics
   const t = (Date.now() - params.startTime) / 1000;
   const dt = Math.max(0.01, Math.min(0.1, t - params.time)) * params.timeScale;
@@ -162,13 +163,13 @@ function init() {
   timeButton = document.createElement('button');
   timeButton.textContent = '0:00.00';
   timeButton.addEventListener('click', function (event) {
-    params.startTime = Date.now();
+    initialize();
   }, false);
   toolbar.appendChild(timeButton);
 
   obsvXButton = document.createElement('button');
   obsvXButton.addEventListener('click', function (event) {
-    params.obsvX = initialObsvX;
+    initialize();
   }, false);
   toolbar.appendChild(obsvXButton);
 
@@ -442,15 +443,6 @@ function createRenderTargets() {
   backTarget = createTarget(params.screenWidth, params.screenHeight);
 }
 
-function htmlEncode(str){
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 function createShader(src, type) {
   var shader = gl.createShader(type);
 
@@ -492,7 +484,7 @@ function animate() {
     params.startTime = Date.now();
     return;
   }
-  update();
+  physics();
   render();
 }
 
