@@ -3,11 +3,11 @@
 var quality = 2, quality_levels = [1, 2, 4, 8];
 var toolbar;
 var showButton, timeButton, obsvXButton, obsvUButton;
-var compileButton, fullscreenButton, compileTimer, errorLines = [];
-var code, canvas, gl, buffer, currentProgram, vertexPosition, screenVertexPosition;
+var fullscreenButton, compileTimer, errorLines = [];
+var canvas, gl, buffer, surfaceProgram, vertexPosition, screenVertexPosition;
 var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
 var frontTarget, backTarget, screenProgram, getWebGL, compileOnChangeCode = true;
-var surfaceVertexShader;
+var surfaceVertexShader, surfaceFragmentShader;
 
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
@@ -93,7 +93,7 @@ const initialObsvU = Velocity3(initialObsvX, cart2polar(
   nj.array([0.0, 0.08])
   ));
 
-var parameters = {
+var params = {
   startTime: Date.now(),
   time: 0,
   mouseX: 0.5,
@@ -109,23 +109,16 @@ var parameters = {
 
 function update() {
   // physics
-  const t = (Date.now() - parameters.startTime) / 1000;
-  const dt = Math.max(0.01, Math.min(0.1, t - parameters.time)) * parameters.timeScale;
-  parameters.time = t;
+  const t = (Date.now() - params.startTime) / 1000;
+  const dt = Math.max(0.01, Math.min(0.1, t - params.time)) * params.timeScale;
+  params.time = t;
 
-  const UX = nj.concatenate(parameters.obsvU, parameters.obsvX);
+  const UX = nj.concatenate(params.obsvU, params.obsvX);
   const UX1 = rk4(geo_f, UX, dt);
 
-  parameters.obsvU = UX1.slice([0, 3]);
-  parameters.obsvX = UX1.slice([3, 6]);
+  params.obsvU = UX1.slice([0, 3]);
+  params.obsvX = UX1.slice([3, 6]);
 
-}
-
-init();
-
-if (gl) {
-  parameters.startTime = Date.now();
-  animate();
 }
 
 function init() {
@@ -166,29 +159,22 @@ function init() {
 
   rightside.appendChild(fullscreenButton);
 
-  showButton = document.createElement('button');
-  showButton.textContent = 'show code';
-  showButton.addEventListener('click', function () {
-    isCodeVisible() ? hideCode() : showCode();
-  }, false);
-  toolbar.appendChild(showButton);
-
   timeButton = document.createElement('button');
   timeButton.textContent = '0:00.00';
   timeButton.addEventListener('click', function (event) {
-    parameters.startTime = Date.now();
+    params.startTime = Date.now();
   }, false);
   toolbar.appendChild(timeButton);
 
   obsvXButton = document.createElement('button');
   obsvXButton.addEventListener('click', function (event) {
-    parameters.obsvX = initialObsvX;
+    params.obsvX = initialObsvX;
   }, false);
   toolbar.appendChild(obsvXButton);
 
   obsvUButton = document.createElement('button');
   obsvUButton.addEventListener('click', function (event) {
-    parameters.obsvV = initialObsvU;
+    params.obsvV = initialObsvU;
   }, false);
   toolbar.appendChild(obsvUButton);
 
@@ -207,10 +193,6 @@ function init() {
   }, false);
 
   toolbar.appendChild(select);
-
-  compileButton = document.createElement('button');
-  compileButton.textContent = 'compiled';
-  toolbar.appendChild(compileButton);
 
   // Initialise WebGL
 
@@ -232,24 +214,8 @@ function init() {
 
     surface.buffer = gl.createBuffer();
   } else {
-    alert('WebGL not supported, but code will be shown.');
+    alert('WebGL not supported.');
   }
-
-  // initialize code editor
-  code = CodeMirror(document.body, {
-    lineNumbers: true,
-    matchBrackets: true,
-    indentWithTabs: true,
-    tabSize: 8,
-    indentUnit: 8,
-    mode: "text/x-glsl",
-    onChange: function () {
-      if (compileOnChangeCode) {
-        clearTimeout(compileTimer);
-        compileTimer = setTimeout(compile, 500);
-      }
-    }
-  });
 
   var clientXLast, clientYLast;
 
@@ -265,51 +231,28 @@ function init() {
 
     stopHideUI();
 
-    parameters.mouseX = clientX / window.innerWidth;
-    parameters.mouseY = 1 - clientY / window.innerHeight;
+    params.mouseX = clientX / window.innerWidth;
+    params.mouseY = 1 - clientY / window.innerHeight;
   }, false);
 
   document.addEventListener('wheel', (event) => {
-    parameters.screenSize *= Math.exp(event.deltaY / 500);
-    // parameters.timeScale *= Math.exp(-event.deltaX / 500);
+    params.screenSize *= Math.exp(event.deltaY / 500);
+    // params.timeScale *= Math.exp(-event.deltaX / 500);
   }, false);
 
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
 
   // fetch shaders
-
-  fetch("glsl/surface-frag.glsl")
-    .then((response) => response.text())
-    .then((text) => code.setValue(text));
-
   const screenVert = fetch("glsl/screen-vert.glsl").then((response) => response.text());
   const screenFrag = fetch("glsl/screen-frag.glsl").then((response) => response.text());
   Promise.all([screenVert, screenFrag])
     .then(([vert, frag]) => compileScreenProgram(vert, frag));
 
-  fetch("glsl/surface-vert.glsl")
-    .then((response) => response.text())
-    .then((text) => surfaceVertexShader = text);
-
-  hideCode();
-}
-
-function showCode() {
-  showButton.textContent = 'hide code';
-  code.getWrapperElement().style.visibility = 'visible';
-  compileButton.style.visibility = 'visible';
-}
-
-function hideCode() {
-  showButton.textContent = 'show code';
-  code.getWrapperElement().style.visibility = 'hidden';
-  compileButton.style.visibility = 'hidden';
-  stopHideUI();
-}
-
-function isCodeVisible() {
-  return code && code.getWrapperElement().style.visibility === 'visible';
+  const surfaceVert = fetch("glsl/surface-vert.glsl").then((response) => response.text());
+  const surfaceFrag = fetch("glsl/surface-frag.glsl").then((response) => response.text());
+  Promise.all([surfaceVert, surfaceFrag])
+    .then(([vert, frag]) => compileSurfaceProgram(vert, frag), 1000);
 }
 
 var hideUITimer;
@@ -317,13 +260,13 @@ var isUIHidden = false;
 
 function startHideUITimer () {
   stopHideUITimer();
-  if (!isUIHidden && !isCodeVisible())
+  if (!isUIHidden)
     hideUITimer = window.setTimeout(onHideUITimer, 1000 * 3);
 
   function onHideUITimer() {
     stopHideUITimer();
 
-    if (!isUIHidden && !isCodeVisible()) {
+    if (!isUIHidden) {
       isUIHidden = true;
       toolbar.style.opacity = '0';
       document.body.style.cursor = 'none';
@@ -352,7 +295,7 @@ function stopHideUI () {
 
 function computeSurfaceCorners() {
   if (gl) {
-    surface.width = surface.height * parameters.screenWidth / parameters.screenHeight;
+    surface.width = surface.height * params.screenWidth / params.screenHeight;
 
     var halfWidth = surface.width * 0.5, halfHeight = surface.height * 0.5;
 
@@ -373,15 +316,13 @@ function resetSurface() {
   computeSurfaceCorners();
 }
 
-function compile() {
+function compileSurfaceProgram(vertex, fragment) {
+  if (!gl) { return; }
+
   var program = gl.createProgram();
-  var fragment = code.getValue();
-  var vertex = surfaceVertexShader;
 
   var vs = createShader(vertex, gl.VERTEX_SHADER);
   var fs = createShader(fragment, gl.FRAGMENT_SHADER);
-
-  if (vs == null || fs == null) return null;
 
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
@@ -392,32 +333,15 @@ function compile() {
   gl.linkProgram(program);
 
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-
-    showCode();
-
     var error = gl.getProgramInfoLog(program);
-
-    compileButton.title = error;
     console.error(error);
-
     console.error('VALIDATE_STATUS: ' + gl.getProgramParameter(program, gl.VALIDATE_STATUS), 'ERROR: ' + gl.getError());
-    compileButton.style.color = '#ff0000';
-    compileButton.textContent = 'errors';
-
     return;
   }
 
-  if (currentProgram) {
-    gl.deleteProgram(currentProgram);
-  }
-
-  currentProgram = program;
-
-  compileButton.style.color = '#00ff00';
-  compileButton.textContent = 'compiled';
+  surfaceProgram = program;
 
   // Cache uniforms
-
   cacheUniformLocation(program, 'time');
   cacheUniformLocation(program, 'mouse');
   cacheUniformLocation(program, 'resolution');
@@ -429,12 +353,10 @@ function compile() {
   cacheUniformLocation(program, 'rs');
 
   // Load program into GPU
-
-  gl.useProgram(currentProgram);
+  gl.useProgram(surfaceProgram);
 
   // Set up buffers
-
-  vertexPosition = gl.getAttribLocation(currentProgram, "position");
+  vertexPosition = gl.getAttribLocation(surfaceProgram, "position");
   gl.enableVertexAttribArray(vertexPosition);
 }
 
@@ -455,11 +377,7 @@ function compileScreenProgram(vertex, fragment) {
   gl.linkProgram(program);
 
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-
-    showCode();
-
     console.error('VALIDATE_STATUS: ' + gl.getProgramParameter(program, gl.VALIDATE_STATUS), 'ERROR: ' + gl.getError());
-
     return;
 
   }
@@ -520,8 +438,8 @@ function createTarget(width, height) {
 }
 
 function createRenderTargets() {
-  frontTarget = createTarget(parameters.screenWidth, parameters.screenHeight);
-  backTarget = createTarget(parameters.screenWidth, parameters.screenHeight);
+  frontTarget = createTarget(params.screenWidth, params.screenHeight);
+  backTarget = createTarget(params.screenWidth, params.screenHeight);
 }
 
 function htmlEncode(str){
@@ -535,22 +453,11 @@ function htmlEncode(str){
 
 function createShader(src, type) {
   var shader = gl.createShader(type);
-  var line, lineNum, lineError, index = 0, indexEnd;
-
-  while (errorLines.length > 0) {
-    line = errorLines.pop();
-    code.setLineClass(line, null);
-    code.clearMarker(line);
-  }
 
   gl.shaderSource(shader, src);
   gl.compileShader(shader);
 
-  compileButton.title = '';
-
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    showCode();
-
     var error = gl.getShaderInfoLog(shader);
 
     // Remove trailing linefeed, for FireFox's benefit.
@@ -558,29 +465,7 @@ function createShader(src, type) {
       error = error.substring(0, error.length - 1);
     }
 
-    compileButton.title = error;
-    console.error(error);
-
-    compileButton.style.color = '#ff0000';
-    compileButton.textContent = 'errors';
-
-    while (index >= 0) {
-      index = error.indexOf("ERROR: 0:", index);
-      if (index < 0) { break; }
-      index += 9;
-      indexEnd = error.indexOf(':', index);
-      if (indexEnd > index) {
-        lineNum = parseInt(error.substring(index, indexEnd));
-        if ((!isNaN(lineNum)) && (lineNum > 0)) {
-          index = indexEnd + 1;
-          indexEnd = error.indexOf("ERROR: 0:", index);
-          lineError = htmlEncode((indexEnd > index) ? error.substring(index, indexEnd) : error.substring(index));
-          line = code.setMarker(lineNum - 1, '<abbr title="' + lineError + '">' + lineNum + '</abbr>', "errorMarker");
-          code.setLineClass(line, "errorLine");
-          errorLines.push(line);
-        }
-      }
-    }
+    console.log(src, error);
     return null;
   }
   return shader;
@@ -590,8 +475,8 @@ function onWindowResize(event) {
   canvas.width = window.innerWidth / quality;
   canvas.height = window.innerHeight / quality;
 
-  parameters.screenWidth = canvas.width;
-  parameters.screenHeight = canvas.height;
+  params.screenWidth = canvas.width;
+  params.screenHeight = canvas.height;
 
   computeSurfaceCorners();
 
@@ -603,8 +488,8 @@ function onWindowResize(event) {
 
 function animate() {
   requestAnimationFrame(animate);
-  if (!currentProgram) {
-    parameters.startTime = Date.now();
+  if (!surfaceProgram) {
+    params.startTime = Date.now();
     return;
   }
   update();
@@ -612,24 +497,24 @@ function animate() {
 }
 
 function render() {
-  timeButton.textContent = printTime(parameters.time);
-  obsvXButton.textContent = "X: " + print3Vec(parameters.obsvX);
-  obsvUButton.textContent = "U: " + print3Vec(parameters.obsvU);
+  timeButton.textContent = printTime(params.time);
+  obsvXButton.textContent = "X: " + print3Vec(params.obsvX);
+  obsvUButton.textContent = "U: " + print3Vec(params.obsvU);
 
   // Set uniforms for custom shader
-  gl.useProgram(currentProgram);
+  gl.useProgram(surfaceProgram);
 
-  gl.uniform1f(currentProgram.uniformsCache['time'], parameters.time);
-  gl.uniform2f(currentProgram.uniformsCache['mouse'], parameters.mouseX, parameters.mouseY);
-  gl.uniform2f(currentProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
-  gl.uniform3f(currentProgram.uniformsCache['obsv_x'], parameters.obsvX.get(0), parameters.obsvX.get(1), parameters.obsvX.get(2));
-  gl.uniform3f(currentProgram.uniformsCache['obsv_u'], parameters.obsvU.get(0), parameters.obsvU.get(1), parameters.obsvU.get(2));
-  gl.uniform1f(currentProgram.uniformsCache['screen_size'], parameters.screenSize);
-  gl.uniform1f(currentProgram.uniformsCache['rs'], parameters.rs);
+  gl.uniform1f(surfaceProgram.uniformsCache['time'], params.time);
+  gl.uniform2f(surfaceProgram.uniformsCache['mouse'], params.mouseX, params.mouseY);
+  gl.uniform2f(surfaceProgram.uniformsCache['resolution'], params.screenWidth, params.screenHeight);
+  gl.uniform3f(surfaceProgram.uniformsCache['obsv_x'], params.obsvX.get(0), params.obsvX.get(1), params.obsvX.get(2));
+  gl.uniform3f(surfaceProgram.uniformsCache['obsv_u'], params.obsvU.get(0), params.obsvU.get(1), params.obsvU.get(2));
+  gl.uniform1f(surfaceProgram.uniformsCache['screen_size'], params.screenSize);
+  gl.uniform1f(surfaceProgram.uniformsCache['rs'], params.rs);
 
 
-  gl.uniform1i(currentProgram.uniformsCache['backbuffer'], 0);
-  gl.uniform2f(currentProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
+  gl.uniform1i(surfaceProgram.uniformsCache['backbuffer'], 0);
+  gl.uniform2f(surfaceProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, surface.buffer);
   gl.vertexAttribPointer(surface.positionAttribute, 2, gl.FLOAT, false, 0, 0);
@@ -651,7 +536,7 @@ function render() {
 
   gl.useProgram(screenProgram);
 
-  gl.uniform2f(screenProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
+  gl.uniform2f(screenProgram.uniformsCache['resolution'], params.screenWidth, params.screenHeight);
   gl.uniform1i(screenProgram.uniformsCache['texture'], 1);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -672,6 +557,7 @@ function render() {
   var tmp = frontTarget;
   frontTarget = backTarget;
   backTarget = tmp;
+
 }
 
 function printTime(s) {
@@ -682,4 +568,12 @@ function printTime(s) {
 
 function print3Vec(x) {
   return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
+}
+
+init();
+
+
+if (gl) {
+  params.startTime = Date.now();
+  animate();
 }
