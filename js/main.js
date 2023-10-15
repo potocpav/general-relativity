@@ -9,24 +9,13 @@ var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
 var frontTarget, backTarget, screenProgram, getWebGL, compileOnChangeCode = true;
 var surfaceVertexShader;
 
-
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 
-// // Flat spacetime metric tensor and Christoffel symbol
-// const g = (_x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
-// const Gamma0 = (_x) => nj.zeros([3,3]);
-// const Gamma1 = (_x) => nj.zeros([3,3]);
-// const Gamma2 = (_x) => nj.zeros([3,3]);
-
-// // Polar coordinate (t, r, phi) metric tensor and Christoffel symbols
-// const g = (x) => nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, x.get(1) * x.get(1)]]);
-// const Gamma0 = (x) => nj.zeros([3,3]);
-// const Gamma1 = (x) => nj.array([[0, 0, 0], [0, 0, 0], [0, 0, -x.get(1)]]);
-// const Gamma2 = (x) => nj.array([[0, 0, 0], [0, 0, 1 / x.get(1)], [0, 1 / x.get(1), 0]]);
-
 // Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
-const rs = 1;
+
+const rs = 0.02;
+
 const g = (x) => {
   r = x.get(1);
   return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 - rs / r), 0], [0, 0, r * r]]);
@@ -76,7 +65,6 @@ const cart2polar = (r, phi, x) => {
 	return inverse(A).dot(x);
 }
 
-
 // Geodesic ODE arount x0, solving for [v^mu, x^mu] 6-vector
 const geo_f = (ux) => {
   const u = ux.slice([0, 3]), x = ux.slice([3, 6]);
@@ -98,11 +86,11 @@ const rk4 = (f, y, h) => {
   return y.add(k1.add(k2.multiply(2)).add(k3.multiply(2)).add(k4).multiply((h / 6)));
 }
 
-const initialObsvX = nj.array([0.0, 5 * rs, 0.0]);
+const initialObsvX = nj.array([0.0, 12 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.5])
+  nj.array([0.0, 0.2])
   ));
 
 var parameters = {
@@ -113,7 +101,9 @@ var parameters = {
   screenWidth: 0,
   screenHeight: 0,
   obsvX: initialObsvX,
-  obsvU: initialObsvU
+  obsvU: initialObsvU,
+  rs: rs,
+  screenSize: 2.5,
 };
 
 function update() {
@@ -429,6 +419,8 @@ function compile() {
   cacheUniformLocation(program, 'surfaceSize');
   cacheUniformLocation(program, 'obsv_x');
   cacheUniformLocation(program, 'obsv_u');
+  cacheUniformLocation(program, 'screen_size');
+  cacheUniformLocation(program, 'rs');
 
   // Load program into GPU
 
@@ -626,6 +618,10 @@ function render() {
   gl.uniform2f(currentProgram.uniformsCache['resolution'], parameters.screenWidth, parameters.screenHeight);
   gl.uniform3f(currentProgram.uniformsCache['obsv_x'], parameters.obsvX.get(0), parameters.obsvX.get(1), parameters.obsvX.get(2));
   gl.uniform3f(currentProgram.uniformsCache['obsv_u'], parameters.obsvU.get(0), parameters.obsvU.get(1), parameters.obsvU.get(2));
+  gl.uniform1f(currentProgram.uniformsCache['screen_size'], parameters.screenSize);
+  gl.uniform1f(currentProgram.uniformsCache['rs'], parameters.rs);
+
+
   gl.uniform1i(currentProgram.uniformsCache['backbuffer'], 0);
   gl.uniform2f(currentProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
 
