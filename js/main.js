@@ -14,7 +14,7 @@ const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 
 // Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
 
-const rs = 0.02;
+const rs = 0.01;
 
 const g = (x) => {
   r = x.get(1);
@@ -86,11 +86,11 @@ const rk4 = (f, y, h) => {
   return y.add(k1.add(k2.multiply(2)).add(k3.multiply(2)).add(k4).multiply((h / 6)));
 }
 
-const initialObsvX = nj.array([0.0, 12 * rs, 0.0]);
+const initialObsvX = nj.array([0.0, 30 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.16])
+  nj.array([0.0, 0.1])
   ));
 
 var parameters = {
@@ -266,6 +266,11 @@ function init() {
 
     parameters.mouseX = clientX / window.innerWidth;
     parameters.mouseY = 1 - clientY / window.innerHeight;
+  }, false);
+
+  document.addEventListener('wheel', (event) => {
+    parameters.screenSize *= Math.exp(event.deltaY / 500);
+    console.log("scroll", Math.exp(event.deltaY));
   }, false);
 
   onWindowResize();

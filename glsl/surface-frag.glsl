@@ -62,6 +62,7 @@ mat3 Gamma2(vec3 x) {
 // Grid visualization
 
 vec3 grid_color(vec3 pos) {
+	// adaptive stride calculation
 	mat3 gx = g(pos);
 	float grids_per_screen = 20.0;
 	vec3 stride_raw = screen_size / vec3(sqrt(-gx[0][0]), sqrt(gx[1][1]), sqrt(gx[2][2])) / grids_per_screen;
@@ -74,10 +75,9 @@ vec3 grid_color(vec3 pos) {
 		pow(2.0, stride_floor[2]));
 
 	vec3 grid_ratio = vec3(0.0, 0.1, 0.1);
-	// vec3 stride = vec3(1.0, 0.05, 0.2);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
 	float grid = float((grid_frac.x > grid_ratio.x) && (grid_frac.y > grid_ratio.y) && (grid_frac.z > grid_ratio.z));
-	return vec3((1.0 - grid)*0.2);
+	return vec3((1.0 - grid)*0.5);
 }
 
 vec3 black_hole(vec3 pos, vec3 col) {
@@ -146,8 +146,15 @@ mat3 boost(vec3 u) {
 }
 
 vec3 redshift(float a, vec3 c) {
-	// return c;
-	return max(vec3(0.0), min(vec3(1.0), vec3(c.x + a - 1.0, c.y / a, c.z + (1.0 - a))));
+	// random functions to make it look sorta good
+	// TODO: make something proper
+	return max(vec3(0.0), min(vec3(1.0),
+		vec3(
+				c.r * min(1.0, pow(a,2.0)),
+				c.g * 0.5,
+				c.b * min(1.0, 1.0 / pow(a,2.0))
+			)
+		));
 }
 
 const float max_iters = 100.0;
@@ -184,7 +191,8 @@ void main( void ) {
 		if (pix_x.y < rs * rs)
 			break;
 	}
-
-	float rshift = sqrt(g(obsv_x)[0][0] / g(pix_x)[0][0]);
+	float lorentz_rshift = pix_u0.x / pix_v3.x;
+	float grav_rshift = sqrt(g(obsv_x)[0][0] / g(pix_x)[0][0]);
+	float rshift = lorentz_rshift * grav_rshift;
 	gl_FragColor = mix(vec4(black_hole(pix_x, redshift(rshift, grid_color(pix_x))), 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 }

@@ -23,7 +23,14 @@ Raytracing:
 - [x] Observer motion
 - [x] Geodesics in polar coordinates in Minkowski metric
 - [x] Raytracing in curved coordinates
-- [ ] Fix Lorentz Boost with non-orthonormal local coords
+- [x] Fix Lorentz Boost with non-orthonormal local coords
+- [x] Gravitational redshift
+- [ ] Doppler redshift
+- [ ] Object redshift
+- [ ] Correct redshift visualization
+- [ ] Light attenuation
+- [ ] Relativistic beaming
+- [ ] Object relativistic beaming
 
 Black hole:
 
@@ -33,9 +40,6 @@ Black hole:
 - [x] Use a precise solver for motion
 - [x] Orbiting around a black hole test
 - [ ] Traversable event horizon
-- [ ] Redshift
-- [ ] Light attenuation
-- [ ] Relativistic beaming
 
 Test objects, interaction:
 
@@ -44,6 +48,7 @@ Test objects, interaction:
 - [ ] Interactive spaceship control
 - [ ] Interactive object spawning
 - [ ] Time controls
+- [ ] Control effects (redshift, beaming, etc.)
 - [ ] Scenario presets
 - [ ] Automatically generate floaters
 
