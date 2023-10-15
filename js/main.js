@@ -90,7 +90,7 @@ const initialObsvX = nj.array([0.0, 12 * rs, 0.0]);
 const initialObsvU = Velocity3(initialObsvX, cart2polar(
   initialObsvX.get(1),
   initialObsvX.get(2),
-  nj.array([0.0, 0.2])
+  nj.array([0.0, 0.16])
   ));
 
 var parameters = {

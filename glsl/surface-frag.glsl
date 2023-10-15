@@ -146,7 +146,7 @@ mat3 boost(vec3 u) {
 }
 
 vec3 redshift(float a, vec3 c) {
-	return c;
+	// return c;
 	return max(vec3(0.0), min(vec3(1.0), vec3(c.x + a - 1.0, c.y / a, c.z + (1.0 - a))));
 }
 
@@ -161,7 +161,6 @@ void main( void ) {
 
 	vec3 pix_v3 = light_u3(obsv_x, pix_target); // 3-vec pointing at pix
 
-	// TODO: Fix Lorentz transformation
 	mat3 gx = g(obsv_x);
 	// vector transformation to Minkowski metric
 	mat3 T = mat3(
@@ -169,14 +168,12 @@ void main( void ) {
 		0.0, sqrt(gx[1][1]), 0.0,
 		0.0, 0.0, sqrt(gx[2][2]));
 	vec3 grid_u = vec3(obsv_u.x, -obsv_u.yz);
-	vec3 pix_u0 = inverse_diag3(T) * boost(T * grid_u) * T * pix_v3;
-	// vec3 pix_u0 = boost(grid_u) * pix_v3;
-	// vec3 pix_u0 = pix_v3;
+	mat3 boostG = inverse_diag3(T) * boost(T * grid_u) * T;
+	vec3 pix_u0 = boostG * pix_v3;
 
-
+	// raytracing along null geodesics
 	vec3 pix_x = obsv_x;
 	vec3 pix_u = pix_u0;
-
 	float pix_norm = dot(pix_target, pix_target);
 	float dl = 1.0 / max_iters;
 	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
@@ -188,6 +185,6 @@ void main( void ) {
 			break;
 	}
 
-	float rshift = pix_u.x / pix_u0.x;
+	float rshift = sqrt(g(obsv_x)[0][0] / g(pix_x)[0][0]);
 	gl_FragColor = mix(vec4(black_hole(pix_x, redshift(rshift, grid_color(pix_x))), 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 }
