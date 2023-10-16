@@ -151,6 +151,13 @@ function createShader(src, type) {
   return shader;
 }
 
+function cacheUniformLocation(program, label) {
+  if (program.uniformsCache === undefined) {
+    program.uniformsCache = {};
+  }
+  program.uniformsCache[label] = gl.getUniformLocation(program, label);
+}
+
 function render(glContext, frontTarget, backTarget) {
   // Set uniforms for custom shader
   gl.useProgram(glContext.surfaceProgram);

@@ -128,6 +128,49 @@ async function init() {
 
   gl = initGl(canvas);
 
+  toolbar = createToolbar();
+
+  var clientXLast, clientYLast;
+
+  document.addEventListener('pointermove', function (event) {
+    var clientX = event.clientX;
+    var clientY = event.clientY;
+
+    if (clientXLast == clientX && clientYLast == clientY)
+      return;
+
+    clientXLast = clientX;
+    clientYLast = clientY;
+
+    stopHideUI();
+
+    params.mouseX = clientX / window.innerWidth;
+    params.mouseY = 1 - clientY / window.innerHeight;
+  }, false);
+
+  document.addEventListener('wheel', (event) => {
+    params.screenSize *= Math.exp(event.deltaY / 500);
+    // params.timeScale *= Math.exp(-event.deltaX / 500);
+  }, false);
+
+  onWindowResize();
+  window.addEventListener('resize', onWindowResize, false);
+
+  // fetch shaders
+  const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
+  const surfaceFrag = await fetch("glsl/surface-frag.glsl").then(r => r.text());
+  const screenVert = await fetch("glsl/screen-vert.glsl").then(r => r.text());
+  const screenFrag = await fetch("glsl/screen-frag.glsl").then(r => r.text());
+
+  glContext = {
+    surfaceProgram: compileSurfaceProgram(surfaceVert, surfaceFrag),
+    screenProgram: compileScreenProgram(screenVert, screenFrag),
+  };
+
+  return glContext;
+}
+
+function createToolbar() {
   toolbar = document.createElement('div');
   toolbar.id = 'toolbar';
   toolbar.style.position = 'absolute';
@@ -190,45 +233,6 @@ async function init() {
   }, false);
 
   toolbar.appendChild(select);
-
-  var clientXLast, clientYLast;
-
-  document.addEventListener('pointermove', function (event) {
-    var clientX = event.clientX;
-    var clientY = event.clientY;
-
-    if (clientXLast == clientX && clientYLast == clientY)
-      return;
-
-    clientXLast = clientX;
-    clientYLast = clientY;
-
-    stopHideUI();
-
-    params.mouseX = clientX / window.innerWidth;
-    params.mouseY = 1 - clientY / window.innerHeight;
-  }, false);
-
-  document.addEventListener('wheel', (event) => {
-    params.screenSize *= Math.exp(event.deltaY / 500);
-    // params.timeScale *= Math.exp(-event.deltaX / 500);
-  }, false);
-
-  onWindowResize();
-  window.addEventListener('resize', onWindowResize, false);
-
-  // fetch shaders
-  const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
-  const surfaceFrag = await fetch("glsl/surface-frag.glsl").then(r => r.text());
-  const screenVert = await fetch("glsl/screen-vert.glsl").then(r => r.text());
-  const screenFrag = await fetch("glsl/screen-frag.glsl").then(r => r.text());
-
-  glContext = {
-    surfaceProgram: compileSurfaceProgram(surfaceVert, surfaceFrag),
-    screenProgram: compileScreenProgram(screenVert, screenFrag),
-  };
-
-  return glContext;
 }
 
 var hideUITimer;
@@ -288,13 +292,6 @@ function resetSurface() {
   surface.centerX = surface.centerY = 0;
   surface.height = 1;
   computeSurfaceCorners();
-}
-
-function cacheUniformLocation(program, label) {
-  if (program.uniformsCache === undefined) {
-    program.uniformsCache = {};
-  }
-  program.uniformsCache[label] = gl.getUniformLocation(program, label);
 }
 
 function onWindowResize(event) {
