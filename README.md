@@ -27,10 +27,12 @@ Raytracing:
 - [x] Gravitational redshift
 - [x] Doppler redshift
 - [ ] Object redshift
-- [ ] Correct redshift visualization
 - [ ] Light attenuation
 - [ ] Relativistic beaming
 - [ ] Object relativistic beaming
+- [ ] Correct redshift visualization
+- [ ] HDR
+- [ ] Bloom
 
 Black hole:
 
@@ -44,6 +46,7 @@ Black hole:
 Test objects, interaction:
 
 - [ ] Display objects
+- [ ] Correct length contractions for objects
 - [ ] Compute object trajectories
 - [ ] Interactive spaceship control
 - [ ] Interactive object spawning
@@ -51,6 +54,7 @@ Test objects, interaction:
 - [ ] Control effects (redshift, beaming, etc.)
 - [ ] Scenario presets
 - [ ] Automatically generate floaters
+- [ ] Spatial indexing
 
 ## Acknowledgements
 
