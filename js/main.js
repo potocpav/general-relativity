@@ -1,6 +1,6 @@
 // Greetings to Iq/RGBA! ;)
 
-var quality = 2, quality_levels = [1, 2, 4, 8];
+var quality = 4, quality_levels = [1, 2, 4, 8];
 var toolbar;
 var timeButton, obsvXButton, obsvUButton;
 var fullscreenButton;

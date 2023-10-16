@@ -25,7 +25,7 @@ Raytracing:
 - [x] Raytracing in curved coordinates
 - [x] Fix Lorentz Boost with non-orthonormal local coords
 - [x] Gravitational redshift
-- [ ] Doppler redshift
+- [x] Doppler redshift
 - [ ] Object redshift
 - [ ] Correct redshift visualization
 - [ ] Light attenuation
