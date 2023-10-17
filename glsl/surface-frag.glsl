@@ -1,6 +1,5 @@
-#extension GL_OES_standard_derivatives : enable
-
 precision highp float;
+
 
 uniform float time;
 uniform vec2 mouse;
@@ -10,6 +9,12 @@ uniform vec3 obsv_u;
 
 uniform float screen_size;
 uniform float rs;
+
+uniform sampler2D asteroid_texture;
+uniform vec3 asteroid_x;
+uniform vec3 asteroid_u;
+uniform float asteroid_tau;
+
 
 // Screen-space to world-space
 
@@ -91,7 +96,7 @@ vec3 grid_color(vec3 pos) {
 
 vec3 black_hole(vec3 pos, vec3 col) {
 	float pos_viz = exp((rs - pos.y) * 500.0);
-	return col - pos_viz;
+	return min(vec3(1.0), max(vec3(0.0), col - pos_viz));
 }
 
 float origin_color(vec2 pos) {
@@ -203,5 +208,12 @@ void main( void ) {
 	float lorentz_rshift = pix_u0.x / pix_v3.x;
 	float grav_rshift = sqrt(g(obsv_x)[0][0] / g(pix_x)[0][0]);
 	float rshift = lorentz_rshift * grav_rshift;
-	gl_FragColor = mix(vec4(black_hole(pix_x, redshift(rshift, grid_color(pix_x))), 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
+
+	// compute output colors
+	vec3 world_color = black_hole(pix_x, redshift(rshift, grid_color(pix_x)));
+	vec4 output_color = mix(vec4(world_color, 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
+
+	vec4 asteroid_color = texture2D(asteroid_texture, gl_FragCoord.xy / vec2(64.0, 64.0 * 60.0) + vec2(0.0, floor(mod(time, 2.0) * 30.0)) / 60.0);
+
+	gl_FragColor = mix(output_color, asteroid_color, asteroid_color.a);
 }

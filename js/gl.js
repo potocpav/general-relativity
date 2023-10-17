@@ -7,13 +7,10 @@ const surfaceCorners = new Float32Array([
 // Initialise WebGL
 function initGl(canvas) {
   try {
-    gl = canvas.getContext('webgl', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
+    gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
   } catch(error) { }
 
   if (gl) {
-    // enable dFdx, dFdy, fwidth
-    gl.getExtension('OES_standard_derivatives');
-
     // Create surface and screen geometry (2 triangles)
     buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -51,11 +48,12 @@ function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'time');
   cacheUniformLocation(program, 'mouse');
   cacheUniformLocation(program, 'resolution');
-  cacheUniformLocation(program, 'backbuffer');
   cacheUniformLocation(program, 'obsv_x');
   cacheUniformLocation(program, 'obsv_u');
   cacheUniformLocation(program, 'screen_size');
   cacheUniformLocation(program, 'rs');
+
+  cacheUniformLocation(program, 'asteroid_texture');
 
   // Load program into GPU
   gl.useProgram(program);
@@ -172,14 +170,16 @@ function render(glContext, frontTarget, backTarget) {
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['screen_size'], params.screenSize);
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
 
-
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['backbuffer'], 0);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['asteroid_texture'], 2);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, backTarget.texture);
+
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, params.asteroidTexture);
 
   // Render custom shader to front buffer
 

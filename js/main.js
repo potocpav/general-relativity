@@ -6,6 +6,7 @@ var timeButton, obsvXButton, obsvUButton;
 var fullscreenButton;
 var canvas, gl, surfaceBuffer, vertexPosition, screenVertexPosition;
 var frontTarget, backTarget;
+
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 
@@ -155,7 +156,7 @@ async function init() {
   window.addEventListener('resize', onWindowResize, false);
 
   tex = await loadTexture("models/render/asteroid.png");
-  console.log(tex);
+  params.asteroidTexture = tex.texture;
 
   // fetch shaders
   const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
@@ -243,7 +244,7 @@ var isUIHidden = false;
 function startHideUITimer (toolbar) {
   stopHideUITimer();
   if (!isUIHidden)
-    hideUITimer = window.setTimeout(onHideUITimer, 1000 * 3);
+    hideUITimer = window.setTimeout(onHideUITimer, 1000 * 2);
 
   function onHideUITimer() {
     stopHideUITimer();
@@ -322,7 +323,6 @@ async function loadTexture(url) {
   img = x = await loadPromise;
 
   var tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
 
   const w = img.width;
   const h = w % img.height;
@@ -330,6 +330,9 @@ async function loadTexture(url) {
 
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   return {
     width: w,
