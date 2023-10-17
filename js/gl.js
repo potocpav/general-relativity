@@ -2,7 +2,8 @@
 // Normalized square with center at origin and size of 1.
 const surfaceCorners = new Float32Array([
   -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
-  1.0, -1.0, 1.0, 1.0, -1.0, 1.0]);
+  1.0, -1.0, 1.0, 1.0, -1.0, 1.0,
+  ]);
 
 // Initialise WebGL
 function initGl(canvas) {
@@ -88,8 +89,7 @@ function compileScreenProgram(vertex, fragment) {
   gl.useProgram(program);
 
   cacheUniformLocation(program, 'resolution');
-  cacheUniformLocation(program, 'texture');
-  cacheUniformLocation(program, 'size');
+  cacheUniformLocation(program, 'color');
 
   screenVertexPosition = gl.getAttribLocation(program, "position");
   gl.enableVertexAttribArray(screenVertexPosition);
@@ -179,7 +179,7 @@ function render(glContext, frontTarget, backTarget) {
   gl.bindTexture(gl.TEXTURE_2D, backTarget.texture);
 
   gl.activeTexture(gl.TEXTURE2);
-  gl.bindTexture(gl.TEXTURE_2D, params.asteroidTexture);
+  gl.bindTexture(gl.TEXTURE_3D, params.asteroidTexture);
 
   // Render custom shader to front buffer
 
@@ -193,7 +193,7 @@ function render(glContext, frontTarget, backTarget) {
   gl.useProgram(glContext.screenProgram);
 
   gl.uniform2f(glContext.screenProgram.uniformsCache['resolution'], params.screenWidth, params.screenHeight);
-  gl.uniform1i(glContext.screenProgram.uniformsCache['texture'], 1);
+  gl.uniform1i(glContext.screenProgram.uniformsCache['color'], 1);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(screenVertexPosition, 2, gl.FLOAT, false, 0, 0);

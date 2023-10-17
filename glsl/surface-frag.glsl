@@ -1,4 +1,6 @@
+# version 300 es
 precision highp float;
+precision mediump sampler3D;
 
 
 uniform float time;
@@ -10,10 +12,18 @@ uniform vec3 obsv_u;
 uniform float screen_size;
 uniform float rs;
 
-uniform sampler2D asteroid_texture;
-uniform vec3 asteroid_x;
-uniform vec3 asteroid_u;
-uniform float asteroid_tau;
+// uniform asteroid {
+// 	vec3 x;
+// 	vec3 u;
+// 	float tau;
+// };
+uniform sampler3D asteroid_texture;
+
+out vec4 out_color;
+
+// uniform vec3 asteroid_x;
+// uniform vec3 asteroid_u;
+// uniform float asteroid_tau;
 
 
 // Screen-space to world-space
@@ -213,7 +223,7 @@ void main( void ) {
 	vec3 world_color = black_hole(pix_x, redshift(rshift, grid_color(pix_x)));
 	vec4 output_color = mix(vec4(world_color, 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 
-	vec4 asteroid_color = texture2D(asteroid_texture, gl_FragCoord.xy / vec2(64.0, 64.0 * 60.0) + vec2(0.0, floor(mod(time, 2.0) * 30.0)) / 60.0);
+	vec4 asteroid_color = texture(asteroid_texture, vec3(gl_FragCoord.xy / vec2(64.0, 64.0), floor(mod(time, 2.0) * 30.0) / 60.0));
 
-	gl_FragColor = mix(output_color, asteroid_color, asteroid_color.a);
+	out_color = mix(output_color, asteroid_color, asteroid_color.a);
 }
