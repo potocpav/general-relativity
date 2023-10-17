@@ -5,6 +5,7 @@ var toolbar;
 var timeButton, obsvXButton, obsvUButton;
 var fullscreenButton;
 var canvas, gl, surfaceBuffer, vertexPosition, screenVertexPosition;
+var objectInfoUboLocation, objectInfoUboBlockSize, objectInfoUboBuffer, objectInfoUboVariableInfo;
 var frontTarget, backTarget;
 
 // Minkowski metric
@@ -155,8 +156,8 @@ async function init() {
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
 
-  tex = await loadTexture("models/render/asteroid.png");
-  params.asteroidTexture = tex.texture;
+  tex = await loadSpriteTexture("models/render/asteroid.png", 64, 64, 60);
+  params.asteroidTexture = tex;
 
   // fetch shaders
   const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
@@ -313,8 +314,8 @@ function print3Vec(x) {
   return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
 }
 
-// creates a texture info { width: w, height: h, frames: f, texture: tex }
-async function loadTexture(url) {
+// creates a 3D texture info from an URL with a given width, height and depth
+async function loadSpriteTexture(url, width, height, depth) {
   const loadPromise = new Promise((resolve) => {
     var img = new Image();
     img.addEventListener('load', () => resolve(img));
@@ -324,24 +325,23 @@ async function loadTexture(url) {
 
   var tex = gl.createTexture();
 
-  const w = img.width;
-  const h = w % img.height;
-  const f = img.height / w;
+  if (img.width * img.height != width * height * depth) {
+    console.error("Image has unexpected number of pixels.", [img.width, img.height], [width, height, depth]);
+  }
 
   gl.bindTexture(gl.TEXTURE_3D, tex);
-  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, 64, 64, 60, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, width, height, depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
 
-  return {
-    width: w,
-    height: h,
-    frames: f,
-    texture: tex,
-  };
+  return tex;
+}
+
+function objectTable() {
+
 }
 
 init().then(glContext => {

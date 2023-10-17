@@ -12,19 +12,18 @@ uniform vec3 obsv_u;
 uniform float screen_size;
 uniform float rs;
 
-// uniform asteroid {
-// 	vec3 x;
-// 	vec3 u;
-// 	float tau;
-// };
-uniform sampler3D asteroid_texture;
+uniform sampler3D sprite_texture;
+
+uniform objectInfo {
+	float objSize[1];
+	vec3 objTexMin[1];
+	vec3 objTexMax[1];
+	float objTexDTau[1];
+};
 
 out vec4 out_color;
 
-// uniform vec3 asteroid_x;
-// uniform vec3 asteroid_u;
-// uniform float asteroid_tau;
-
+#define pi 3.141592653589793
 
 // Screen-space to world-space
 
@@ -104,9 +103,9 @@ vec3 grid_color(vec3 pos) {
 	return vec3((0.0 + max(grid, grid2))*0.3);
 }
 
-vec3 black_hole(vec3 pos, vec3 col) {
-	float pos_viz = exp((rs - pos.y) * 500.0);
-	return min(vec3(1.0), max(vec3(0.0), col - pos_viz));
+float black_hole(vec3 pos) {
+	float pos_viz = (rs - pos.y) * 100.0;
+	return min(1.0, max(0.0, -pos_viz));
 }
 
 float origin_color(vec2 pos) {
@@ -181,6 +180,19 @@ vec3 redshift(float a, vec3 c) {
 		));
 }
 
+// Transform metric at point x to Minkowski metric
+mat3 T(vec3 x) {
+	mat3 gx = g(x);
+	return mat3(
+		sqrt(-gx[0][0]), 0.0, 0.0,
+		0.0, sqrt(gx[1][1]), 0.0,
+		0.0, 0.0, sqrt(gx[2][2]));
+}
+
+vec3 cyclic(vec3 x) {
+	return vec3(x.x, x.y, mod(x.z + pi, pi*2.0) - pi);
+}
+
 const float max_iters = 100.0;
 
 void main( void ) {
@@ -194,12 +206,9 @@ void main( void ) {
 
 	mat3 gx = g(obsv_x);
 	// vector transformation to Minkowski metric
-	mat3 T = mat3(
-		sqrt(-gx[0][0]), 0.0, 0.0,
-		0.0, sqrt(gx[1][1]), 0.0,
-		0.0, 0.0, sqrt(gx[2][2]));
+	mat3 Tx = T(obsv_x);
 	vec3 grid_u = vec3(obsv_u.x, -obsv_u.yz);
-	mat3 boostG = inverse_diag3(T) * boost(T * grid_u) * T;
+	mat3 boostG = inverse_diag3(Tx) * boost(Tx * grid_u) * Tx;
 	vec3 pix_u0 = boostG * pix_v3;
 
 	// raytracing along null geodesics
@@ -220,10 +229,14 @@ void main( void ) {
 	float rshift = lorentz_rshift * grav_rshift;
 
 	// compute output colors
-	vec3 world_color = black_hole(pix_x, redshift(rshift, grid_color(pix_x)));
+	vec3 world_color = redshift(rshift, grid_color(pix_x));
 	vec4 output_color = mix(vec4(world_color, 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 
-	vec4 asteroid_color = texture(asteroid_texture, vec3(gl_FragCoord.xy / vec2(64.0, 64.0), floor(mod(time, 2.0) * 30.0) / 60.0));
+	vec3 asteroid_pos = vec3(time, 0.4, 0.2);
+	vec2 asteroid_coord2 = (T(pix_x) * cyclic(asteroid_pos - pix_x)).yz / objSize[0] + 0.5;
+	vec3 asteroid_coord = vec3(mod(time/objTexDTau[0], 1.0), asteroid_coord2);
+	vec3 asteroid_texcoord = mix(objTexMin[0], objTexMax[0], asteroid_coord.yzx);
+	vec4 asteroid_color = texture(sprite_texture, asteroid_texcoord / vec3(textureSize(sprite_texture, 0)));
 
-	out_color = mix(output_color, asteroid_color, asteroid_color.a);
+	out_color = black_hole(pix_x) * mix(output_color, asteroid_color, asteroid_color.a);
 }

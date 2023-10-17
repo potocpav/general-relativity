@@ -53,8 +53,33 @@ function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'obsv_u');
   cacheUniformLocation(program, 'screen_size');
   cacheUniformLocation(program, 'rs');
+  cacheUniformLocation(program, 'sprite_texture');
 
-  cacheUniformLocation(program, 'asteroid_texture');
+  // set up object info UBO
+  // Described in detail in https://gist.github.com/jialiang/2880d4cc3364df117320e8cb324c2880
+  objectInfoUboLocation = gl.getUniformBlockIndex(program, "objectInfo");
+  objectInfoUboBlockSize = gl.getActiveUniformBlockParameter(program, objectInfoUboLocation, gl.UNIFORM_BLOCK_DATA_SIZE);
+  objectInfoUboBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.UNIFORM_BUFFER, objectInfoUboBuffer);
+  gl.bufferData(gl.UNIFORM_BUFFER, objectInfoUboBlockSize, gl.DYNAMIC_DRAW);
+  gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, objectInfoUboBuffer);
+  const objectInfoVarNames = ["objSize", "objTexMin", "objTexMax", "objTexDTau"];
+  const objectInfoIndices = gl.getUniformIndices(program, objectInfoVarNames);
+  const objectInfoOffsets = gl.getActiveUniforms(program, objectInfoIndices, gl.UNIFORM_OFFSET);
+  objectInfoUboVariableInfo = {};
+  objectInfoVarNames.forEach((name, index) => {
+    objectInfoUboVariableInfo[name] = {
+      index: objectInfoIndices[index],
+      offset: objectInfoOffsets[index],
+    };
+  });
+  gl.uniformBlockBinding(program, objectInfoUboLocation, 0);
+
+  // console.log(objectInfoUboLocation, objectInfoUboBlockSize);
+  // console.log(objectInfoIndices);
+  // console.log(objectInfoOffsets);
+  // console.log(objectInfoUboVariableInfo);
+  // console.log(objectInfoUboLocation);
 
   // Load program into GPU
   gl.useProgram(program);
@@ -127,6 +152,7 @@ function createTarget(width, height) {
   gl.bindTexture(gl.TEXTURE_2D, null);
   gl.bindRenderbuffer(gl.RENDERBUFFER, null);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
   return target;
 }
@@ -159,7 +185,7 @@ function cacheUniformLocation(program, label) {
 }
 
 function render(glContext, frontTarget, backTarget) {
-  // Set uniforms for custom shader
+  // Set uniforms for surface shader
   gl.useProgram(glContext.surfaceProgram);
 
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['time'], params.time);
@@ -170,7 +196,7 @@ function render(glContext, frontTarget, backTarget) {
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['screen_size'], params.screenSize);
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
 
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['asteroid_texture'], 2);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['sprite_texture'], 2);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
@@ -180,6 +206,16 @@ function render(glContext, frontTarget, backTarget) {
 
   gl.activeTexture(gl.TEXTURE2);
   gl.bindTexture(gl.TEXTURE_3D, params.asteroidTexture);
+
+  // Set object info UBO for surface shader
+
+  gl.bindBuffer(gl.UNIFORM_BUFFER, objectInfoUboBuffer);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objSize"].offset, new Float32Array([0.1]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMin"].offset, new Float32Array([0, 0, 0]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMax"].offset, new Float32Array([63, 63, 59]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexDTau"].offset, new Float32Array([5]), 0);
+
+  gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
   // Render custom shader to front buffer
 
