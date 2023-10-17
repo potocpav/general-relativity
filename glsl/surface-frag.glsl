@@ -1,6 +1,7 @@
 # version 300 es
 precision highp float;
 precision mediump sampler3D;
+precision highp sampler2D;
 
 
 uniform float time;
@@ -12,7 +13,11 @@ uniform vec3 obsv_u;
 uniform float screen_size;
 uniform float rs;
 
-uniform sampler3D sprite_texture;
+uniform sampler3D sprites;
+
+uniform sampler2D obj_x;
+uniform sampler2D obj_u;
+uniform sampler2D obj_it;
 
 uniform objectInfo {
 	float objSize[1];
@@ -232,11 +237,16 @@ void main( void ) {
 	vec3 world_color = redshift(rshift, grid_color(pix_x));
 	vec4 output_color = mix(vec4(world_color, 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 
-	vec3 asteroid_pos = vec3(time, 0.4, 0.2);
-	vec2 asteroid_coord2 = (T(pix_x) * cyclic(asteroid_pos - pix_x)).yz / objSize[0] + 0.5;
-	vec3 asteroid_coord = vec3(mod(time/objTexDTau[0], 1.0), asteroid_coord2);
-	vec3 asteroid_texcoord = mix(objTexMin[0], objTexMax[0], asteroid_coord.yzx);
-	vec4 asteroid_color = texture(sprite_texture, asteroid_texcoord / vec3(textureSize(sprite_texture, 0)));
+	// show objects
+	vec4 objects_color = vec4(0.0);
+	for (int i = 0; i < textureSize(obj_it, 0).x; i++) {
+		vec3 asteroid_pos = texelFetch(obj_x, ivec2(i, 0.0), 0).xyz;
+		vec2 asteroid_coord2 = (T(pix_x) * cyclic(asteroid_pos - pix_x)).yz / objSize[0] + 0.5;
+		vec3 asteroid_coord = vec3(mod(time/objTexDTau[0], 1.0), asteroid_coord2);
+		vec3 asteroid_texcoord = mix(objTexMin[0], objTexMax[0], asteroid_coord.yzx);
+		vec4 asteroid_color = texture(sprites, asteroid_texcoord / vec3(textureSize(sprites, 0)));
+		objects_color = mix(objects_color, asteroid_color, asteroid_color.a);
+	}
 
-	out_color = black_hole(pix_x) * mix(output_color, asteroid_color, asteroid_color.a);
+	out_color = black_hole(pix_x) * mix(output_color, objects_color, objects_color.a);
 }

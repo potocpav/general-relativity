@@ -7,6 +7,7 @@ var fullscreenButton;
 var canvas, gl, surfaceBuffer, vertexPosition, screenVertexPosition;
 var objectInfoUboLocation, objectInfoUboBlockSize, objectInfoUboBuffer, objectInfoUboVariableInfo;
 var frontTarget, backTarget;
+var objectTextures;
 
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
@@ -119,7 +120,6 @@ function physics() {
 
   params.obsvU = UX1.slice([0, 3]);
   params.obsvX = UX1.slice([3, 6]);
-
 }
 
 async function init() {
@@ -157,13 +157,16 @@ async function init() {
   window.addEventListener('resize', onWindowResize, false);
 
   tex = await loadSpriteTexture("models/render/asteroid.png", 64, 64, 60);
-  params.asteroidTexture = tex;
+  params.spriteTexture = tex;
 
   // fetch shaders
   const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
   const surfaceFrag = await fetch("glsl/surface-frag.glsl").then(r => r.text());
   const screenVert = await fetch("glsl/screen-vert.glsl").then(r => r.text());
   const screenFrag = await fetch("glsl/screen-frag.glsl").then(r => r.text());
+
+  objectTextures = initObjectSamplers();
+  makeTestObject(objectTextures);
 
   glContext = {
     surfaceProgram: compileSurfaceProgram(surfaceVert, surfaceFrag),
@@ -323,12 +326,11 @@ async function loadSpriteTexture(url, width, height, depth) {
   });
   img = x = await loadPromise;
 
-  var tex = gl.createTexture();
-
   if (img.width * img.height != width * height * depth) {
     console.error("Image has unexpected number of pixels.", [img.width, img.height], [width, height, depth]);
   }
 
+  var tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_3D, tex);
   gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, width, height, depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -336,12 +338,59 @@ async function loadSpriteTexture(url, width, height, depth) {
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-
   return tex;
 }
 
-function objectTable() {
+function initObjectSamplers() {
+  const nObjects = 1;
+  const nPoints = 1;
 
+  var tex_x = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex_x);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+
+  var tex_u = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex_u);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+
+
+  var tex_it = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex_it);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return {
+    tex_x: tex_x,
+    tex_u: tex_u,
+    tex_it: tex_it
+  };
+}
+
+function makeTestObject(objTextures) {
+  const nObjects = 2;
+  const nPoints = 1;
+  gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_x);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
+    new Float32Array([0.0, 0.4, -0.2, 0.0, 0.4, 3.14-0.2]));
+
+  gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_u);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
+    new Float32Array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]));
+
+  gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_it);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, nObjects, nPoints, 0, gl.RG, gl.FLOAT,
+    new Float32Array([0.0, 0.0, 0.0, 0.0]));
+
+  gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 init().then(glContext => {

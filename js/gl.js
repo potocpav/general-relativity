@@ -53,7 +53,10 @@ function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'obsv_u');
   cacheUniformLocation(program, 'screen_size');
   cacheUniformLocation(program, 'rs');
-  cacheUniformLocation(program, 'sprite_texture');
+  cacheUniformLocation(program, 'sprites');
+  cacheUniformLocation(program, 'obj_x');
+  cacheUniformLocation(program, 'obj_u');
+  cacheUniformLocation(program, 'obj_it');
 
   // set up object info UBO
   // Described in detail in https://gist.github.com/jialiang/2880d4cc3364df117320e8cb324c2880
@@ -63,6 +66,7 @@ function compileSurfaceProgram(vertex, fragment) {
   gl.bindBuffer(gl.UNIFORM_BUFFER, objectInfoUboBuffer);
   gl.bufferData(gl.UNIFORM_BUFFER, objectInfoUboBlockSize, gl.DYNAMIC_DRAW);
   gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, objectInfoUboBuffer);
+  // TODO: mirror the pattern of `cacheUniformLocation` here
   const objectInfoVarNames = ["objSize", "objTexMin", "objTexMax", "objTexDTau"];
   const objectInfoIndices = gl.getUniformIndices(program, objectInfoVarNames);
   const objectInfoOffsets = gl.getActiveUniforms(program, objectInfoIndices, gl.UNIFORM_OFFSET);
@@ -135,7 +139,6 @@ function createTarget(width, height) {
 
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 
@@ -196,7 +199,10 @@ function render(glContext, frontTarget, backTarget) {
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['screen_size'], params.screenSize);
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
 
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['sprite_texture'], 2);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['sprites'], 2);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_x'], 3);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_u'], 4);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_it'], 5);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
@@ -205,7 +211,16 @@ function render(glContext, frontTarget, backTarget) {
   gl.bindTexture(gl.TEXTURE_2D, backTarget.texture);
 
   gl.activeTexture(gl.TEXTURE2);
-  gl.bindTexture(gl.TEXTURE_3D, params.asteroidTexture);
+  gl.bindTexture(gl.TEXTURE_3D, params.spriteTexture);
+
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_x);
+
+  gl.activeTexture(gl.TEXTURE4);
+  gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_u);
+
+  gl.activeTexture(gl.TEXTURE5);
+  gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_it);
 
   // Set object info UBO for surface shader
 
