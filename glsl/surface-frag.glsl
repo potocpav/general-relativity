@@ -240,12 +240,12 @@ void main( void ) {
 	// show objects
 	vec4 objects_color = vec4(0.0);
 	for (int i = 0; i < textureSize(obj_it, 0).x; i++) {
-		vec3 asteroid_pos = texelFetch(obj_x, ivec2(i, 0.0), 0).xyz;
-		vec2 asteroid_coord2 = (T(pix_x) * cyclic(asteroid_pos - pix_x)).yz / objSize[0] + 0.5;
-		vec3 asteroid_coord = vec3(mod(time/objTexDTau[0], 1.0), asteroid_coord2);
-		vec3 asteroid_texcoord = mix(objTexMin[0], objTexMax[0], asteroid_coord.yzx);
-		vec4 asteroid_color = texture(sprites, asteroid_texcoord / vec3(textureSize(sprites, 0)));
-		objects_color = mix(objects_color, asteroid_color, asteroid_color.a);
+		vec3 obj_pos = texelFetch(obj_x, ivec2(i, 0.0), 0).xyz;
+		vec2 obj_coord2 = (T(pix_x) * cyclic(obj_pos - pix_x)).yz / objSize[0] + 0.5;
+		vec3 obj_coord = vec3(mod(time/objTexDTau[0], 1.0), obj_coord2);
+		vec3 obj_texcoord = mix(objTexMin[0], objTexMax[0], obj_coord.yzx);
+		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
+		objects_color = mix(objects_color, obj_color, obj_color.a);
 	}
 
 	out_color = black_hole(pix_x) * mix(output_color, objects_color, objects_color.a);

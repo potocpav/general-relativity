@@ -45,7 +45,8 @@ Black hole:
 
 Test objects, interaction:
 
-- [ ] Display objects
+- [x] Display objects
+- [ ] Object dynamics
 - [ ] Correct length contractions for objects
 - [ ] Compute object trajectories
 - [ ] Interactive spaceship control
