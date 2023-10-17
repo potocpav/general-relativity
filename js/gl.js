@@ -1,4 +1,9 @@
 
+// Normalized square with center at origin and size of 1.
+const surfaceCorners = new Float32Array([
+  -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
+  1.0, -1.0, 1.0, 1.0, -1.0, 1.0]);
+
 // Initialise WebGL
 function initGl(canvas) {
   try {
@@ -9,13 +14,10 @@ function initGl(canvas) {
     // enable dFdx, dFdy, fwidth
     gl.getExtension('OES_standard_derivatives');
 
-    // Create vertex buffer (2 triangles)
+    // Create surface and screen geometry (2 triangles)
     buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([- 1.0, - 1.0, 1.0, - 1.0, - 1.0, 1.0, 1.0, - 1.0, 1.0, 1.0, - 1.0, 1.0]), gl.STATIC_DRAW);
-
-    // Create surface buffer (coordinates at screen corners)
-    surface.buffer = gl.createBuffer();
+    gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
   } else {
     alert('WebGL not supported.');
   }
@@ -50,7 +52,6 @@ function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'mouse');
   cacheUniformLocation(program, 'resolution');
   cacheUniformLocation(program, 'backbuffer');
-  cacheUniformLocation(program, 'surfaceSize');
   cacheUniformLocation(program, 'obsv_x');
   cacheUniformLocation(program, 'obsv_u');
   cacheUniformLocation(program, 'screen_size');
@@ -90,6 +91,7 @@ function compileScreenProgram(vertex, fragment) {
 
   cacheUniformLocation(program, 'resolution');
   cacheUniformLocation(program, 'texture');
+  cacheUniformLocation(program, 'size');
 
   screenVertexPosition = gl.getAttribLocation(program, "position");
   gl.enableVertexAttribArray(screenVertexPosition);
@@ -172,10 +174,6 @@ function render(glContext, frontTarget, backTarget) {
 
 
   gl.uniform1i(glContext.surfaceProgram.uniformsCache['backbuffer'], 0);
-  gl.uniform2f(glContext.surfaceProgram.uniformsCache['surfaceSize'], surface.width, surface.height);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, surface.buffer);
-  gl.vertexAttribPointer(surface.positionAttribute, 2, gl.FLOAT, false, 0, 0);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);

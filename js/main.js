@@ -4,10 +4,8 @@ var quality = 4, quality_levels = [1, 2, 4, 8];
 var toolbar;
 var timeButton, obsvXButton, obsvUButton;
 var fullscreenButton;
-var canvas, gl, buffer, vertexPosition, screenVertexPosition;
+var canvas, gl, surfaceBuffer, vertexPosition, screenVertexPosition;
 var frontTarget, backTarget;
-var surface = { centerX: 0, centerY: 0, width: 1, height: 1 };
-
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 
@@ -142,7 +140,7 @@ async function init() {
     clientXLast = clientX;
     clientYLast = clientY;
 
-    stopHideUI();
+    stopHideUI(toolbar);
 
     params.mouseX = clientX / window.innerWidth;
     params.mouseY = 1 - clientY / window.innerHeight;
@@ -155,6 +153,9 @@ async function init() {
 
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
+
+  tex = await loadTexture("models/render/asteroid.png");
+  console.log(tex);
 
   // fetch shaders
   const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
@@ -233,12 +234,13 @@ function createToolbar() {
   }, false);
 
   toolbar.appendChild(select);
+  return toolbar;
 }
 
 var hideUITimer;
 var isUIHidden = false;
 
-function startHideUITimer () {
+function startHideUITimer (toolbar) {
   stopHideUITimer();
   if (!isUIHidden)
     hideUITimer = window.setTimeout(onHideUITimer, 1000 * 3);
@@ -261,37 +263,13 @@ function startHideUITimer () {
   }
 }
 
-function stopHideUI () {
+function stopHideUI (toolbar) {
   if (isUIHidden) {
     isUIHidden = false;
     toolbar.style.opacity = '1';
     document.body.style.cursor = '';
   }
-  startHideUITimer();
-}
-
-
-function computeSurfaceCorners() {
-  if (gl) {
-    surface.width = surface.height * params.screenWidth / params.screenHeight;
-
-    var halfWidth = surface.width * 0.5, halfHeight = surface.height * 0.5;
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, surface.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      surface.centerX - halfWidth, surface.centerY - halfHeight,
-      surface.centerX + halfWidth, surface.centerY - halfHeight,
-      surface.centerX - halfWidth, surface.centerY + halfHeight,
-      surface.centerX + halfWidth, surface.centerY - halfHeight,
-      surface.centerX + halfWidth, surface.centerY + halfHeight,
-      surface.centerX - halfWidth, surface.centerY + halfHeight]), gl.STATIC_DRAW);
-  }
-}
-
-function resetSurface() {
-  surface.centerX = surface.centerY = 0;
-  surface.height = 1;
-  computeSurfaceCorners();
+  startHideUITimer(toolbar);
 }
 
 function onWindowResize(event) {
@@ -300,8 +278,6 @@ function onWindowResize(event) {
 
   params.screenWidth = canvas.width;
   params.screenHeight = canvas.height;
-
-  computeSurfaceCorners();
 
   if (gl) {
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -334,6 +310,33 @@ function printTime(s) {
 
 function print3Vec(x) {
   return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
+}
+
+// creates a texture info { width: w, height: h, frames: f, texture: tex }
+async function loadTexture(url) {
+  const loadPromise = new Promise((resolve) => {
+    var img = new Image();
+    img.addEventListener('load', () => resolve(img));
+    img.src = url;
+  });
+  img = x = await loadPromise;
+
+  var tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+
+  const w = img.width;
+  const h = w % img.height;
+  const f = img.height / w;
+
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+  return {
+    width: w,
+    height: h,
+    frames: f,
+    texture: tex,
+  };
 }
 
 init().then(glContext => {
