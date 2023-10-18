@@ -198,6 +198,13 @@ vec3 cyclic(vec3 x) {
 	return vec3(x.x, x.y, mod(x.z + pi, pi*2.0) - pi);
 }
 
+vec3 sample_linear(sampler2D x, float i, int j) {
+	vec3 p1 = texelFetch(x, ivec2(j, int(i)), 0).xyz;
+	vec3 p2 = texelFetch(x, ivec2(j, int(i) + 1), 0).xyz;
+	float a = i - floor(i);
+	return p1 * (1.0 - a) + p2 * a;
+}
+
 const float max_iters = 100.0;
 
 void main( void ) {
@@ -239,11 +246,26 @@ void main( void ) {
 
 	// show objects
 	vec4 objects_color = vec4(0.0);
-	for (int i = 0; i < textureSize(obj_it, 0).x; i++) {
-		vec3 obj_pos = texelFetch(obj_x, ivec2(i, 0.0), 0).xyz;
-		vec2 obj_coord2 = (T(pix_x) * cyclic(obj_pos - pix_x)).yz / objSize[0] + 0.5;
-		vec3 obj_coord = vec3(mod(time/objTexDTau[0], 1.0), obj_coord2);
-		vec3 obj_texcoord = mix(objTexMin[0], objTexMax[0], obj_coord.yzx);
+	int nPoints = textureSize(obj_it, 0).y;
+	for (int i = 0; i < textureSize(obj_it, 0).x; i++) { // for each object
+		vec3 obj_pos;
+		// bisect time for the object trajectory
+		float j0 = 0.0, j1 = float(nPoints - 1);
+		for (int it = 0; it < int(log2(float(nPoints))+4.0); it++) {
+			float j = (j0 + j1) / 2.0;
+			obj_pos = sample_linear(obj_x, j, i);
+			if (obj_pos.x < pix_x.x) {
+				j0 = j;
+			} else {
+				j1 = j;
+			}
+			// TODO: stop if outside range
+		}
+
+		// obj_pos = sample_linear(obj_x, time*10.0, 0).xyz;
+		vec2 obj_texcoord2 = (T(pix_x) * cyclic(obj_pos - pix_x)).yz / objSize[0] + 0.5;
+		vec3 obj_texcoord3 = vec3(mod(time/objTexDTau[0], 1.0), obj_texcoord2);
+		vec3 obj_texcoord = mix(objTexMin[0], objTexMax[0], obj_texcoord3.yzx);
 		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
 		objects_color = mix(objects_color, obj_color, obj_color.a);
 	}

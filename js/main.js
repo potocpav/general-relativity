@@ -48,7 +48,8 @@ const Gamma2 = (x) => {
 
 // 3-velocity from 2-velocity (ds = -1)
 // (supposing diagonal metric tensor)
-const Velocity3 = (x, u2) => {
+const Velocity3 = (x, u2_cart) => {
+  const u2 = cart2polar(x.get(1), x.get(2), u2_cart);
   const [ux, uy] = u2.tolist();
   const gx = g(x);
 
@@ -95,7 +96,7 @@ var params = {
 
 function initialize() {
   const x = nj.array([0, 30 * rs, 0]);
-  const u = nj.array([0, 0.08]);
+  const u2 = nj.array([0, 0.08]);
 
   params.screenSize = 2.5;
   params.timeScale = 1.0;
@@ -104,7 +105,7 @@ function initialize() {
   params.startTime = Date.now();
   params.time = 0;
   params.obsvX = x;
-  params.obsvU = Velocity3(x, cart2polar(x.get(1), x.get(2), u));
+  params.obsvU = Velocity3(x, u2);
 }
 
 initialize();
@@ -120,6 +121,31 @@ function physics() {
 
   params.obsvU = UX1.slice([0, 3]);
   params.obsvX = UX1.slice([3, 6]);
+}
+
+obj_x = nj.array([0, 30 * rs, 0]);
+asteroid_freefall = sim_freefall(1000, obj_x, Velocity3(obj_x, [0, 0.09]), 0);
+
+function sim_freefall(n, x0, u0, obj_i) {
+  const dt = 0.1;
+  var xs = new Float32Array(n*3), us = new Float32Array(n*3), it = new Float32Array(n*2);
+  var ux = nj.concatenate(u0, x0);
+  var tau = 0.0;
+  for (i = 0; i < n; i++) {
+    if (i > 0) {
+      ux = rk4(geo_f, ux, dt);
+      tau += dt / ux.get(0);
+    }
+    xs[i*3 + 0] = ux.get(3);
+    xs[i*3 + 1] = ux.get(4);
+    xs[i*3 + 2] = ux.get(5);
+    us[i*3 + 0] = ux.get(0);
+    us[i*3 + 1] = ux.get(1);
+    us[i*3 + 2] = ux.get(2);
+    it[i*2 + 0] = obj_i;
+    it[i*2 + 1] = tau;
+  }
+  return {"xs": xs, "us": us, "it": it, "n": n};
 }
 
 async function init() {
@@ -166,7 +192,7 @@ async function init() {
   const screenFrag = await fetch("glsl/screen-frag.glsl").then(r => r.text());
 
   objectTextures = initObjectSamplers();
-  makeTestObject(objectTextures);
+  makeTestObject(objectTextures, asteroid_freefall);
 
   glContext = {
     surfaceProgram: compileSurfaceProgram(surfaceVert, surfaceFrag),
@@ -342,9 +368,6 @@ async function loadSpriteTexture(url, width, height, depth) {
 }
 
 function initObjectSamplers() {
-  const nObjects = 1;
-  const nPoints = 1;
-
   var tex_x = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex_x);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -375,20 +398,21 @@ function initObjectSamplers() {
   };
 }
 
-function makeTestObject(objTextures) {
-  const nObjects = 2;
-  const nPoints = 1;
+function makeTestObject(objTextures, data) {
+  console.log(asteroid_freefall)
+  const nObjects = 1;
+  const nPoints = data.n;
   gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_x);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
-    new Float32Array([0.0, 0.4, -0.2, 0.0, 0.4, 3.14-0.2]));
+    new Float32Array(data.xs));
 
   gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_u);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
-    new Float32Array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]));
+    new Float32Array(data.us));
 
   gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_it);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, nObjects, nPoints, 0, gl.RG, gl.FLOAT,
-    new Float32Array([0.0, 0.0, 0.0, 0.0]));
+    new Float32Array(data.it));
 
   gl.bindTexture(gl.TEXTURE_2D, null);
 }
