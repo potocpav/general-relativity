@@ -54,9 +54,9 @@ function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'screen_size');
   cacheUniformLocation(program, 'rs');
   cacheUniformLocation(program, 'sprites');
-  cacheUniformLocation(program, 'obj_x');
-  cacheUniformLocation(program, 'obj_u');
-  cacheUniformLocation(program, 'obj_it');
+  cacheUniformLocation(program, 'obj_xs');
+  cacheUniformLocation(program, 'obj_us');
+  cacheUniformLocation(program, 'obj_its');
 
   // set up object info UBO
   // Described in detail in https://gist.github.com/jialiang/2880d4cc3364df117320e8cb324c2880
@@ -200,9 +200,9 @@ function render(glContext, frontTarget, backTarget) {
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
 
   gl.uniform1i(glContext.surfaceProgram.uniformsCache['sprites'], 2);
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_x'], 3);
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_u'], 4);
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_it'], 5);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_xs'], 3);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_us'], 4);
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_its'], 5);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);

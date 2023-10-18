@@ -15,9 +15,9 @@ uniform float rs;
 
 uniform sampler3D sprites;
 
-uniform sampler2D obj_x;
-uniform sampler2D obj_u;
-uniform sampler2D obj_it;
+uniform sampler2D obj_xs;
+uniform sampler2D obj_us;
+uniform sampler2D obj_its;
 
 uniform objectInfo {
 	float objSize[1];
@@ -173,6 +173,10 @@ mat3 boost(vec3 u) {
 	);
 }
 
+mat3 inv_boost(vec3 u) {
+	return boost(vec3(u.x, -u.yz));
+}
+
 vec3 redshift(float a, vec3 c) {
 	// random functions to make it look sorta good
 	// TODO: make something proper
@@ -217,10 +221,10 @@ void main( void ) {
 	vec3 pix_v3 = light_u3(obsv_x, pix_target); // 3-vec pointing at pix
 
 	mat3 gx = g(obsv_x);
-	// vector transformation to Minkowski metric
-	mat3 Tx = T(obsv_x);
-	vec3 grid_u = vec3(obsv_u.x, -obsv_u.yz);
-	mat3 boostG = inverse_diag3(Tx) * boost(Tx * grid_u) * Tx;
+
+	// boost the grid
+	mat3 T_obsv_x = T(obsv_x);
+	mat3 boostG = inverse_diag3(T_obsv_x) * inv_boost(T_obsv_x * obsv_u) * T_obsv_x;
 	vec3 pix_u0 = boostG * pix_v3;
 
 	// raytracing along null geodesics
@@ -245,25 +249,35 @@ void main( void ) {
 	vec4 output_color = mix(vec4(world_color, 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 
 	// show objects
+	mat3 T_pix_x = T(pix_x);
+	// mat3 invT_pix_x = inverse_diag3(T_pix_x);
 	vec4 objects_color = vec4(0.0);
-	int nPoints = textureSize(obj_it, 0).y;
-	for (int i = 0; i < textureSize(obj_it, 0).x; i++) { // for each object
-		vec3 obj_pos;
+	int nPoints = textureSize(obj_its, 0).y;
+	vec3 obj_deltax;
+	for (int i = 0; i < textureSize(obj_its, 0).x; i++) { // for each object
+		vec3 obj_x;
+		vec3 obj_u;
 		// bisect time for the object trajectory
 		float j0 = 0.0, j1 = float(nPoints - 1);
-		for (int it = 0; it < int(log2(float(nPoints))+4.0); it++) {
-			float j = (j0 + j1) / 2.0;
-			obj_pos = sample_linear(obj_x, j, i);
-			if (obj_pos.x < pix_x.x) {
-				j0 = j;
-			} else {
-				j1 = j;
-			}
+		for (int it = 0; it < int(log2(float(nPoints))+7.0); it++) {
 			// TODO: stop if outside range
-		}
+			float j = (j0 + j1) / 2.0;
+			obj_x = sample_linear(obj_xs, j, i);
+			obj_u = sample_linear(obj_us, j, i);
 
-		// obj_pos = sample_linear(obj_x, time*10.0, 0).xyz;
-		vec2 obj_texcoord2 = (T(pix_x) * cyclic(obj_pos - pix_x)).yz / objSize[0] + 0.5;
+			mat3 obj_boost = inverse_diag3(T_pix_x) * boost(T_pix_x * obj_u) * T_pix_x;
+			// obj_deltax = obj_boost * (obj_x - pix_x);
+			obj_deltax = (obj_x - pix_x);
+
+			if (obj_deltax.x < 0.0)
+				j0 = j;
+			else
+				j1 = j;
+		}
+		// vec3 obj_us =
+
+		// obj_x = sample_linear(obj_xs, time*10.0, 0).xyz;
+		vec2 obj_texcoord2 = (T_pix_x * cyclic(obj_deltax)).yz / objSize[0] + 0.5;
 		vec3 obj_texcoord3 = vec3(mod(time/objTexDTau[0], 1.0), obj_texcoord2);
 		vec3 obj_texcoord = mix(objTexMin[0], objTexMax[0], obj_texcoord3.yzx);
 		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
