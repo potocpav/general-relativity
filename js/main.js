@@ -67,15 +67,15 @@ const cart2polar = (r, phi, x) => {
 }
 
 // Geodesic ODE arount x0, solving for [v^mu, x^mu] 6-vector
-const geo_f = (ux) => {
-  const u = ux.slice([0, 3]), x = ux.slice([3, 6]);
+const geo_f = (accel) => (xu) => {
+  const x = xu.slice([0, 3]), u = xu.slice([3, 6]);
   return nj.array([
-    -Gamma0(x).dot(u).dot(u).get(0),
-    -Gamma1(x).dot(u).dot(u).get(0),
-    -Gamma2(x).dot(u).dot(u).get(0),
     u.get(0),
     u.get(1),
-    u.get(2)
+    u.get(2),
+    -Gamma0(x).dot(u).dot(u).get(0) - accel.get(0),
+    -Gamma1(x).dot(u).dot(u).get(0) - accel.get(1),
+    -Gamma2(x).dot(u).dot(u).get(0) - accel.get(2),
   ]);
 }
 
@@ -90,6 +90,7 @@ const rk4 = (f, y, h) => {
 var params = {
   mouseX: 0.5,
   mouseY: 0.5,
+  pointerDn: false,
   screenWidth: 0,
   screenHeight: 0,
 };
@@ -116,11 +117,20 @@ function physics() {
   const dt = Math.max(0.01, Math.min(0.1, t - params.time)) * params.timeScale;
   params.time = t;
 
-  const UX = nj.concatenate(params.obsvU, params.obsvX);
-  const UX1 = rk4(geo_f, UX, dt);
+  // rocket motor
+  // TODO: properly calculate acceleration, it needs to be orthogonal to velocity
+  var polar_accel = nj.array([0,0]);
+  if (params.pointerDn) {
+    const accel2 = nj.array([params.mouseX - 0.5, params.mouseY - 0.5]);
+    polar_accel = cart2polar(params.obsvX.get(1), params.obsvX.get(2), accel2)
+    console.log("u norm", g(params.obsvX).dot(params.obsvU).dot(params.obsvU).get(0));
+  }
 
-  params.obsvU = UX1.slice([0, 3]);
-  params.obsvX = UX1.slice([3, 6]);
+  const XU = nj.concatenate(params.obsvX, params.obsvU);
+  const XU1 = rk4(geo_f(nj.array([0,polar_accel.get(0),polar_accel.get(1)])), XU, dt);
+
+  params.obsvX = XU1.slice([0, 3]);
+  params.obsvU = XU1.slice([3, 6]);
 }
 
 obj_xs = nj.array([0, 25 * rs, 0.0]);
@@ -129,19 +139,19 @@ asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0.0, -0.12]), 
 function sim_freefall(n, x0, u0, obj_i) {
   const dt = 0.1;
   var xs = new Float32Array(n*3), us = new Float32Array(n*3), it = new Float32Array(n*2);
-  var ux = nj.concatenate(u0, x0);
+  var xu = nj.concatenate(x0, u0);
   var tau = 0.0;
   for (i = 0; i < n; i++) {
     if (i > 0) {
-      ux = rk4(geo_f, ux, dt);
+      xu = rk4(geo_f(nj.array([0,0,0])), xu, dt);
       tau += dt;
     }
-    xs[i*3 + 0] = ux.get(3);
-    xs[i*3 + 1] = ux.get(4);
-    xs[i*3 + 2] = ux.get(5);
-    us[i*3 + 0] = ux.get(0);
-    us[i*3 + 1] = ux.get(1);
-    us[i*3 + 2] = ux.get(2);
+    xs[i*3 + 0] = xu.get(0);
+    xs[i*3 + 1] = xu.get(1);
+    xs[i*3 + 2] = xu.get(2);
+    us[i*3 + 0] = xu.get(3);
+    us[i*3 + 1] = xu.get(4);
+    us[i*3 + 2] = xu.get(5);
     it[i*2 + 0] = obj_i;
     it[i*2 + 1] = tau;
   }
@@ -173,6 +183,14 @@ async function init() {
     params.mouseX = clientX / window.innerWidth;
     params.mouseY = 1 - clientY / window.innerHeight;
   }, false);
+
+  document.addEventListener('pointerdown', (event) => {
+    params.pointerDn = true;
+  });
+
+  document.addEventListener('pointerup', (event) => {
+    params.pointerDn = false;
+  });
 
   document.addEventListener('wheel', (event) => {
     params.screenSize *= Math.exp(event.deltaY / 500);
