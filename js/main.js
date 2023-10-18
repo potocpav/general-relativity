@@ -123,8 +123,8 @@ function physics() {
   params.obsvX = UX1.slice([3, 6]);
 }
 
-obj_xs = nj.array([0, 40 * rs, 0.0]);
-asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0, -0.07]), 0);
+obj_xs = nj.array([0, 25 * rs, 0.0]);
+asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0.0, -0.12]), 0);
 
 function sim_freefall(n, x0, u0, obj_i) {
   const dt = 0.1;
@@ -134,7 +134,7 @@ function sim_freefall(n, x0, u0, obj_i) {
   for (i = 0; i < n; i++) {
     if (i > 0) {
       ux = rk4(geo_f, ux, dt);
-      tau += dt / ux.get(0);
+      tau += dt;
     }
     xs[i*3 + 0] = ux.get(3);
     xs[i*3 + 1] = ux.get(4);

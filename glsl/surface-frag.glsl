@@ -253,35 +253,39 @@ void main( void ) {
 	// mat3 invT_pix_x = inverse_diag3(T_pix_x);
 	vec4 objects_color = vec4(0.0);
 	int nPoints = textureSize(obj_its, 0).y;
+	mat3 obj_boost;
 	vec3 obj_deltax;
 	for (int i = 0; i < textureSize(obj_its, 0).x; i++) { // for each object
 		vec3 obj_x;
 		vec3 obj_u;
 		// bisect time for the object trajectory
 		float j0 = 0.0, j1 = float(nPoints - 1);
+		float j;
 		for (int it = 0; it < int(log2(float(nPoints))+7.0); it++) {
+			j = (j0 + j1) / 2.0;
 			// TODO: stop if outside range
-			float j = (j0 + j1) / 2.0;
 			obj_x = sample_linear(obj_xs, j, i);
 			obj_u = sample_linear(obj_us, j, i);
 
-			mat3 obj_boost = inverse_diag3(T_pix_x) * boost(T_pix_x * obj_u) * T_pix_x;
-			// obj_deltax = obj_boost * (obj_x - pix_x);
-			obj_deltax = (obj_x - pix_x);
+			obj_boost = inverse_diag3(T_pix_x) * boost(T_pix_x * obj_u) * T_pix_x;
+			obj_deltax = obj_boost * cyclic(obj_x - pix_x);
 
 			if (obj_deltax.x < 0.0)
 				j0 = j;
 			else
 				j1 = j;
 		}
+		float obj_tau = sample_linear(obj_its, j, i).y;
 		// vec3 obj_us =
 
 		// obj_x = sample_linear(obj_xs, time*10.0, 0).xyz;
-		vec2 obj_texcoord2 = (T_pix_x * cyclic(obj_deltax)).yz / objSize[0] + 0.5;
-		vec3 obj_texcoord3 = vec3(mod(time/objTexDTau[0], 1.0), obj_texcoord2);
+		vec2 obj_texcoord2 = (T_pix_x * obj_deltax).yz / objSize[0] + 0.5;
+		vec3 obj_texcoord3 = vec3(mod(obj_tau/objTexDTau[0], 1.0), obj_texcoord2);
 		vec3 obj_texcoord = mix(objTexMin[0], objTexMax[0], obj_texcoord3.yzx);
 		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
-		objects_color = mix(objects_color, obj_color, obj_color.a);
+		float obj_rshift = rshift * (obj_boost * pix_u).x / pix_u.x;
+		vec4 rshifted_obj_color = vec4(redshift(obj_rshift, obj_color.xyz), obj_color.a);
+		objects_color = mix(objects_color, rshifted_obj_color, obj_color.a);
 	}
 
 	out_color = black_hole(pix_x) * mix(output_color, objects_color, objects_color.a);
