@@ -9,6 +9,8 @@ uniform vec2 mouse;
 uniform vec2 resolution;
 uniform vec3 obsv_x;
 uniform vec3 obsv_u;
+uniform vec2 obsv_o; // orientation vector
+uniform int obsv_sprite;
 
 uniform float screen_size;
 uniform float rs;
@@ -20,10 +22,10 @@ uniform sampler2D obj_us;
 uniform sampler2D obj_its;
 
 uniform objectInfo {
-	float objSize[1];
-	vec3 objTexMin[1];
-	vec3 objTexMax[1];
-	float objTexDTau[1];
+	float objSize[3];
+	vec3 objTexMin[3];
+	vec3 objTexMax[3];
+	float objTexDTau[3];
 };
 
 out vec4 out_color;
@@ -113,10 +115,6 @@ float black_hole(vec3 pos) {
 	return min(1.0, max(0.0, -pos_viz));
 }
 
-float origin_color(vec2 pos) {
-	return length(pos) < 0.005 ? 1.0 : 0.0;
-}
-
 // compute 3-vector out of a 2-vector so that ds = 0
 // (supposing a diagonal metric)
 vec3 light_u3(vec3 x, vec2 u2) {
@@ -155,6 +153,12 @@ mat3 inverse_diag3(mat3 m) {
 		1.0 / m[0][0], 0.0, 0.0,
 		0.0, 1.0 / m[1][1], 0.0,
 		0.0, 0.0, 1.0 / m[2][2]);
+}
+
+ // a must be a heading vector, not necessarily normalized
+mat2 rot(vec2 a) {
+	a /= length(a);
+	return mat2(a.y, a.x, -a.x, a.y);
 }
 
 vec2 cart2polar(float r, float phi, vec2 x) {
@@ -217,6 +221,20 @@ vec3 sample_linear(sampler2D x, float i, int j) {
 	return p1 * (1.0 - a) + p2 * a;
 }
 
+vec4 render_obj(vec3 pix_x, int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
+	mat3 T_pix_x = T(pix_x);
+	vec2 obj_texcoord2 = rot(orientation) * (T_pix_x * deltax).yz / objSize[sprite_i];
+	if (max(abs(obj_texcoord2.x), abs(obj_texcoord2.y)) < 0.5) {
+		vec3 obj_texcoord3 = vec3(mod(tau/objTexDTau[sprite_i], 1.0), obj_texcoord2 + 0.5);
+		vec3 obj_texcoord = mix(objTexMin[sprite_i], objTexMax[sprite_i], obj_texcoord3.yzx);
+		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
+		vec4 rshifted_obj_color = vec4(redshift(rshift, obj_color.xyz), obj_color.a);
+		return rshifted_obj_color;
+	} else {
+		return vec4(0.0);
+	}
+}
+
 const float max_iters = 100.0;
 
 void main( void ) {
@@ -252,7 +270,6 @@ void main( void ) {
 
 	// compute output colors
 	vec3 world_color = redshift(rshift, grid_color(pix_x));
-	vec4 output_color = mix(vec4(world_color, 1.0), vec4(0.7), origin_color(pix_cartesian / screen_size));
 
 	// show objects
 	mat3 T_pix_x = T(pix_x);
@@ -281,17 +298,21 @@ void main( void ) {
 			else
 				j1 = j;
 		}
-		float obj_tau = sample_linear(obj_its, j, i).y;
 
-		// obj_x = sample_linear(obj_xs, time*10.0, 0).xyz;
-		vec2 obj_texcoord2 = (T_pix_x * obj_deltax).yz / objSize[0] + 0.5;
-		vec3 obj_texcoord3 = vec3(mod(obj_tau/objTexDTau[0], 1.0), obj_texcoord2);
-		vec3 obj_texcoord = mix(objTexMin[0], objTexMax[0], obj_texcoord3.yzx);
-		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
-		float obj_rshift = rshift * (obj_boost * pix_u).x / pix_u.x;
-		vec4 rshifted_obj_color = vec4(redshift(obj_rshift, obj_color.xyz), obj_color.a);
-		objects_color = mix(objects_color, rshifted_obj_color, obj_color.a);
+		vec4 obj_color = render_obj(
+			pix_x,
+			int(texelFetch(obj_its, ivec2(i, int(j)), 0).x),
+			rshift * (obj_boost * pix_u).x / pix_u.x,
+			sample_linear(obj_its, j, i).y,
+			obj_deltax,
+			vec2(0.0, 1.0)
+			);
+		objects_color = mix(objects_color, obj_color, obj_color.a);
 	}
 
-	out_color = black_hole(pix_x) * mix(output_color, objects_color, objects_color.a);
+	vec4 obsv_color = render_obj(
+		obsv_x, obsv_sprite, 1.0, time, vec3(0.0, cyclic(obsv_x-pix_x).yz/1.0), obsv_o);
+	objects_color = mix(objects_color, obsv_color, obsv_color.a);
+
+	out_color = black_hole(pix_x) * mix(vec4(world_color, 1.0), objects_color, objects_color.a);
 }

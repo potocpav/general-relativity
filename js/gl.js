@@ -51,6 +51,8 @@ function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'resolution');
   cacheUniformLocation(program, 'obsv_x');
   cacheUniformLocation(program, 'obsv_u');
+  cacheUniformLocation(program, 'obsv_o');
+  cacheUniformLocation(program, 'obsv_sprite');
   cacheUniformLocation(program, 'screen_size');
   cacheUniformLocation(program, 'rs');
   cacheUniformLocation(program, 'sprites');
@@ -78,12 +80,6 @@ function compileSurfaceProgram(vertex, fragment) {
     };
   });
   gl.uniformBlockBinding(program, objectInfoUboLocation, 0);
-
-  // console.log(objectInfoUboLocation, objectInfoUboBlockSize);
-  // console.log(objectInfoIndices);
-  // console.log(objectInfoOffsets);
-  // console.log(objectInfoUboVariableInfo);
-  // console.log(objectInfoUboLocation);
 
   // Load program into GPU
   gl.useProgram(program);
@@ -196,6 +192,8 @@ function render(glContext, frontTarget, backTarget) {
   gl.uniform2f(glContext.surfaceProgram.uniformsCache['resolution'], params.screenWidth, params.screenHeight);
   gl.uniform3f(glContext.surfaceProgram.uniformsCache['obsv_x'], params.obsvX.get(0), params.obsvX.get(1), params.obsvX.get(2));
   gl.uniform3f(glContext.surfaceProgram.uniformsCache['obsv_u'], params.obsvU.get(0), params.obsvU.get(1), params.obsvU.get(2));
+  gl.uniform2f(glContext.surfaceProgram.uniformsCache['obsv_o'], params.obsvO.get(0), params.obsvO.get(1));
+  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obsv_sprite'], params.pointerDn ? 1 : 0);
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['screen_size'], params.screenSize);
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
 
@@ -224,11 +222,29 @@ function render(glContext, frontTarget, backTarget) {
 
   // Set object info UBO for surface shader
 
+  // padding values are -1
+  // TODO: ensure that this padding is portable
   gl.bindBuffer(gl.UNIFORM_BUFFER, objectInfoUboBuffer);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objSize"].offset, new Float32Array([0.1]), 0);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMin"].offset, new Float32Array([0, 0, 0]), 0);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMax"].offset, new Float32Array([63, 63, 59]), 0);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexDTau"].offset, new Float32Array([5]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objSize"].offset, new Float32Array([
+    0.1, -1, -1, -1,
+    0.1, -1, -1, -1,
+    0.1, -1, -1, -1,
+    ]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMin"].offset, new Float32Array([
+    64, 0, 0, -1,
+    64, 0, 31, -1,
+    0, 0, 0, -1,
+    ]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMax"].offset, new Float32Array([
+    127, 63, 29, -1,
+    127, 63, 59, -1,
+    63, 63, 59, -1,
+    ]), 0);
+  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexDTau"].offset, new Float32Array([
+    2, -1, -1, -1,
+    2, -1, -1, -1,
+    5, -1, -1, -1,
+    ]), 0);
 
   gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 

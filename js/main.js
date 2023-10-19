@@ -143,6 +143,7 @@ function initialize() {
   params.time = 0;
   params.obsvX = x;
   params.obsvU = Velocity3(x, u2);
+  params.obsvO = nj.array([0.0, 1.0]);
 }
 
 initialize();
@@ -156,11 +157,14 @@ function physics() {
   // rocket motor
   var accel3_rest = nj.array([0,0,0]);
   const acceleration = 0.5;
-  if (params.mouseX !== undefined && params.pointerDn) {
+  if (params.mouseX !== undefined) {
+    params.obsvO = nj.array([0.0, 1.0]);
     const mouse_rel = nj.array([0.5 - params.mouseX, 0.5 - params.mouseY]);
     const accel2 = mouse_rel.multiply(acceleration/Math.sqrt(mouse_rel.dot(mouse_rel).get(0)));
     const accelPolar = cart2polar(params.obsvX.get(1), params.obsvX.get(2), accel2);
-    accel3_rest = nj.array([0, accelPolar.get(0), accelPolar.get(1)]);
+    params.obsvO = accelPolar;
+    if (params.pointerDn)
+      accel3_rest = nj.array([0, accelPolar.get(0), accelPolar.get(1)]);
   }
 
   const XU = nj.concatenate(params.obsvX, params.obsvU);
@@ -171,7 +175,7 @@ function physics() {
 }
 
 obj_xs = nj.array([0, 25 * rs, 0.0]);
-asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0.0, -0.12]), 0);
+asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0.0, -0.12]), 2);
 
 function sim_freefall(n, x0, u0, obj_i) {
   const dt = 0.1;
@@ -221,6 +225,8 @@ async function init() {
 
   document.addEventListener('pointerdown', (event) => {
     params.pointerDn = true;
+    params.mouseX = event.clientX / window.innerWidth;
+    params.mouseY = 1 - event.clientY / window.innerHeight;
   });
 
   document.addEventListener('pointerup', (event) => {
@@ -235,7 +241,7 @@ async function init() {
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
 
-  tex = await loadSpriteTexture("models/render/asteroid.png", 64, 64, 60);
+  tex = await loadSpriteTexture("models/sprites.png", 64*2, 64, 60);
   params.spriteTexture = tex;
 
   // fetch shaders
