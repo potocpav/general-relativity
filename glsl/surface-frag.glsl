@@ -162,7 +162,7 @@ vec2 cart2polar(float r, float phi, vec2 x) {
 	return x * inverse2(A);
 }
 
-// Lorentz boost
+// Lorentz boost matrix
 
 mat3 boost(vec3 u) {
 	float fac = (u.x - 1.0) / dot(u.yz, u.yz);
@@ -173,8 +173,9 @@ mat3 boost(vec3 u) {
 	);
 }
 
-mat3 inv_boost(vec3 u) {
-	return boost(vec3(u.x, -u.yz));
+// negate space coordinates of 3-velocity
+vec3 neg_u(vec3 u) {
+	return vec3(u.x, -u.yz);
 }
 
 vec3 redshift(float a, vec3 c) {
@@ -198,10 +199,17 @@ mat3 T(vec3 x) {
 		0.0, 0.0, sqrt(gx[2][2]));
 }
 
+// Lorentz boost in arbitrary metric
+mat3 general_boost(mat3 Tx, vec3 u) {
+	return inverse_diag3(Tx) * boost(Tx * u) * Tx;
+}
+
+// normalize duplicate coordinate points
 vec3 cyclic(vec3 x) {
 	return vec3(x.x, x.y, mod(x.z + pi, pi*2.0) - pi);
 }
 
+// sample from x point [i,j] where i dimension is linearly interpolated
 vec3 sample_linear(sampler2D x, float i, int j) {
 	vec3 p1 = texelFetch(x, ivec2(j, int(i)), 0).xyz;
 	vec3 p2 = texelFetch(x, ivec2(j, int(i) + 1), 0).xyz;
@@ -223,9 +231,7 @@ void main( void ) {
 	mat3 gx = g(obsv_x);
 
 	// boost the grid
-	mat3 T_obsv_x = T(obsv_x);
-	mat3 boostG = inverse_diag3(T_obsv_x) * inv_boost(T_obsv_x * obsv_u) * T_obsv_x;
-	vec3 pix_u0 = boostG * pix_v3;
+	vec3 pix_u0 = general_boost(T(obsv_x), neg_u(obsv_u)) * pix_v3;
 
 	// raytracing along null geodesics
 	vec3 pix_x = obsv_x;
@@ -267,7 +273,7 @@ void main( void ) {
 			obj_x = sample_linear(obj_xs, j, i);
 			obj_u = sample_linear(obj_us, j, i);
 
-			obj_boost = inverse_diag3(T_pix_x) * boost(T_pix_x * obj_u) * T_pix_x;
+			obj_boost = general_boost(T_pix_x, obj_u);
 			obj_deltax = obj_boost * cyclic(obj_x - pix_x);
 
 			if (obj_deltax.x < 0.0)
@@ -276,7 +282,6 @@ void main( void ) {
 				j1 = j;
 		}
 		float obj_tau = sample_linear(obj_its, j, i).y;
-		// vec3 obj_us =
 
 		// obj_x = sample_linear(obj_xs, time*10.0, 0).xyz;
 		vec2 obj_texcoord2 = (T_pix_x * obj_deltax).yz / objSize[0] + 0.5;

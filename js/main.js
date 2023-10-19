@@ -46,6 +46,41 @@ const Gamma2 = (x) => {
   ]);
 }
 
+// Transform metric at point x to Minkowski metric
+function T(x) {
+	gx = g(x);
+	return nj.array([
+		[Math.sqrt(-gx.get(0,0)), 0.0, 0.0],
+		[0.0, Math.sqrt(gx.get(1,1)), 0.0],
+		[0.0, 0.0, Math.sqrt(gx.get(2,2))],
+  ]);
+}
+
+function inverse_diag3(m) {
+	return nj.array([
+		[1 / m.get(0,0), 0, 0],
+		[0, 1 / m.get(1,1), 0],
+		[0, 0, 1 / m.get(2,2)]]);
+}
+
+// Lorentz boost
+function boost(u) {
+	const fac = (u.get(0) - 1.0) / (u.get(1)*u.get(1) + u.get(2)*u.get(2));
+	return nj.array([
+		[u.get(0), -u.get(1), -u.get(2)],
+		[-u.get(1), 1.0 + fac * u.get(1)*u.get(1), fac * u.get(1)*u.get(2)],
+		[-u.get(2), fac * u.get(1)*u.get(2), 1.0 + fac * u.get(2)*u.get(2)],
+  ]);
+}
+
+function neg_u(u) {
+	return nj.array([u.get(0), -u.get(1), -u.get(2)]);
+}
+
+function general_boost(Tx, u) {
+  return inverse_diag3(Tx).dot(boost(Tx.dot(u))).dot(Tx);
+}
+
 // 3-velocity from 2-velocity (ds = -1)
 // (supposing diagonal metric tensor)
 const Velocity3 = (x, u2_cart) => {
@@ -67,15 +102,16 @@ const cart2polar = (r, phi, x) => {
 }
 
 // Geodesic ODE arount x0, solving for [v^mu, x^mu] 6-vector
-const geo_f = (accel) => (xu) => {
+const geo_f = (accel_rest) => (xu) => {
   const x = xu.slice([0, 3]), u = xu.slice([3, 6]);
+  const accel = general_boost(T(x), neg_u(u)).dot(accel_rest);
   return nj.array([
     u.get(0),
     u.get(1),
     u.get(2),
-    -Gamma0(x).dot(u).dot(u).get(0) - accel.get(0),
-    -Gamma1(x).dot(u).dot(u).get(0) - accel.get(1),
-    -Gamma2(x).dot(u).dot(u).get(0) - accel.get(2),
+    -Gamma0(x).dot(u).dot(u).get(0) + accel.get(0),
+    -Gamma1(x).dot(u).dot(u).get(0) + accel.get(1),
+    -Gamma2(x).dot(u).dot(u).get(0) + accel.get(2),
   ]);
 }
 
@@ -88,8 +124,8 @@ const rk4 = (f, y, h) => {
 }
 
 var params = {
-  mouseX: 0.5,
-  mouseY: 0.5,
+  mouseX: undefined,
+  mouseY: undefined,
   pointerDn: false,
   screenWidth: 0,
   screenHeight: 0,
@@ -118,16 +154,17 @@ function physics() {
   params.time = t;
 
   // rocket motor
-  // TODO: properly calculate acceleration, it needs to be orthogonal to velocity
-  var polar_accel = nj.array([0,0]);
-  if (params.pointerDn) {
-    const accel2 = nj.array([params.mouseX - 0.5, params.mouseY - 0.5]);
-    polar_accel = cart2polar(params.obsvX.get(1), params.obsvX.get(2), accel2)
-    console.log("u norm", g(params.obsvX).dot(params.obsvU).dot(params.obsvU).get(0));
+  var accel3_rest = nj.array([0,0,0]);
+  const acceleration = 0.5;
+  if (params.mouseX !== undefined && params.pointerDn) {
+    const mouse_rel = nj.array([0.5 - params.mouseX, 0.5 - params.mouseY]);
+    const accel2 = mouse_rel.multiply(acceleration/Math.sqrt(mouse_rel.dot(mouse_rel).get(0)));
+    const accelPolar = cart2polar(params.obsvX.get(1), params.obsvX.get(2), accel2);
+    accel3_rest = nj.array([0, accelPolar.get(0), accelPolar.get(1)]);
   }
 
   const XU = nj.concatenate(params.obsvX, params.obsvU);
-  const XU1 = rk4(geo_f(nj.array([0,polar_accel.get(0),polar_accel.get(1)])), XU, dt);
+  const XU1 = rk4(geo_f(accel3_rest), XU, dt);
 
   params.obsvX = XU1.slice([0, 3]);
   params.obsvU = XU1.slice([3, 6]);
@@ -172,13 +209,11 @@ async function init() {
     var clientX = event.clientX;
     var clientY = event.clientY;
 
-    if (clientXLast == clientX && clientYLast == clientY)
-      return;
+    if (clientXLast != clientX || clientYLast != clientY)
+      stopHideUI(toolbar);
 
     clientXLast = clientX;
     clientYLast = clientY;
-
-    stopHideUI(toolbar);
 
     params.mouseX = clientX / window.innerWidth;
     params.mouseY = 1 - clientY / window.innerHeight;
@@ -417,7 +452,6 @@ function initObjectSamplers() {
 }
 
 function makeTestObject(objTextures, data) {
-  console.log(asteroid_freefall)
   const nObjects = 1;
   const nPoints = data.n;
   gl.bindTexture(gl.TEXTURE_2D, objTextures.tex_x);
