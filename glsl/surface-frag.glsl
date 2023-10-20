@@ -22,10 +22,9 @@ uniform sampler2D obj_us;
 uniform sampler2D obj_its;
 
 uniform objectInfo {
-	float objSize[3];
+	vec3 objSize[3];
 	vec3 objTexMin[3];
 	vec3 objTexMax[3];
-	float objTexDTau[3];
 };
 
 out vec4 out_color;
@@ -223,9 +222,9 @@ vec3 sample_linear(sampler2D x, float i, int j) {
 
 vec4 render_obj(vec3 pix_x, int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
 	mat3 T_pix_x = T(pix_x);
-	vec2 obj_texcoord2 = rot(orientation) * (T_pix_x * deltax).yz / objSize[sprite_i];
+	vec2 obj_texcoord2 = rot(orientation) * (T_pix_x * deltax).yz / objSize[sprite_i].yz;
 	if (max(abs(obj_texcoord2.x), abs(obj_texcoord2.y)) < 0.5) {
-		vec3 obj_texcoord3 = vec3(mod(tau/objTexDTau[sprite_i], 1.0), obj_texcoord2 + 0.5);
+		vec3 obj_texcoord3 = vec3(mod(tau/objSize[sprite_i].x, 1.0), obj_texcoord2 + 0.5);
 		vec3 obj_texcoord = mix(objTexMin[sprite_i], objTexMax[sprite_i], obj_texcoord3.yzx);
 		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
 		vec4 rshifted_obj_color = vec4(redshift(rshift, obj_color.xyz), obj_color.a);

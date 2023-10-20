@@ -18,7 +18,7 @@ export class ObjectInfo {
     gl.bufferData(gl.UNIFORM_BUFFER, blockSize, gl.DYNAMIC_DRAW);
     gl.bindBufferBase(gl.UNIFORM_BUFFER, uniformBlockBinding, this.buffer);
     // TODO: mirror the pattern of `cacheUniformLocation` here
-    const varNames = ["objSize", "objTexMin", "objTexMax", "objTexDTau"];
+    const varNames = ["objSize", "objTexMin", "objTexMax"];
     const indices = gl.getUniformIndices(program, varNames);
     const offsets = gl.getActiveUniforms(program, indices, gl.UNIFORM_OFFSET);
     this.variableInfo = {};
@@ -37,9 +37,9 @@ export class ObjectInfo {
     // TODO: ensure that this padding is portable
     gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffer);
     gl.bufferSubData(gl.UNIFORM_BUFFER, this.variableInfo["objSize"].offset, new Float32Array([
-      0.1, -1, -1, -1,
-      0.1, -1, -1, -1,
-      0.1, -1, -1, -1,
+      2, 0.1, 0.1, -1,
+      2, 0.1, 0.1, -1,
+      5, 0.1, 0.1, -1,
       ]), 0);
     gl.bufferSubData(gl.UNIFORM_BUFFER, this.variableInfo["objTexMin"].offset, new Float32Array([
       64, 0, 0, -1,
@@ -50,11 +50,6 @@ export class ObjectInfo {
       127, 63, 29, -1,
       127, 63, 59, -1,
       63, 63, 59, -1,
-      ]), 0);
-    gl.bufferSubData(gl.UNIFORM_BUFFER, this.variableInfo["objTexDTau"].offset, new Float32Array([
-      2, -1, -1, -1,
-      2, -1, -1, -1,
-      5, -1, -1, -1,
       ]), 0);
   }
 }
