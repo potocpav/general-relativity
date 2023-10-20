@@ -36,8 +36,8 @@ Raytracing:
 
 Black hole:
 
-- [x] Schwarzschield metric for observer
-- [x] Schwarzschield metric for light
+- [x] Schwarzschild metric for observer
+- [x] Schwarzschild metric for light
 - [x] Use a precise solver for photons
 - [x] Use a precise solver for motion
 - [x] Orbiting around a black hole test

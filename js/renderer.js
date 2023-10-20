@@ -1,28 +1,58 @@
 
-// import {ObjectInfo} from './object-info.js';
-
 var gl;
-var objectInfo;
-var buffer;
 
+var world;
+var objectInfo;
+var trajectories;
+
+var surfaceProgram, screenProgram;
+var vertexBuffer;
 var vertexPosition;
 var screenVertexPosition;
 
-export function init(gl_, objectInfo_) {
+var screenWidth, screenHeight;
+var frontTarget, backTarget;
+
+export function initGl (canvas) {
+  var gl;
+  try {
+    gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
+  } catch(error) { }
+
+  if (gl) {
+
+  } else {
+    alert('WebGL not supported.');
+  }
+  return gl;
+}
+
+export async function init(gl_, world_, objectInfo_, trajectories_) {
   gl = gl_;
+  world = world_;
   objectInfo = objectInfo_;
+  trajectories = trajectories_;
 
   const surfaceCorners = new Float32Array([
     -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
     1.0, -1.0, 1.0, 1.0, -1.0, 1.0,
     ]);
 
-  buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  vertexBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
+
+  // fetch shaders
+  const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
+  const surfaceFrag = await fetch("glsl/surface-frag.glsl").then(r => r.text());
+  const screenVert = await fetch("glsl/screen-vert.glsl").then(r => r.text());
+  const screenFrag = await fetch("glsl/screen-frag.glsl").then(r => r.text());
+
+  surfaceProgram = compileSurfaceProgram(surfaceVert, surfaceFrag);
+  screenProgram = compileScreenProgram(screenVert, screenFrag);
 }
 
-export function compileSurfaceProgram(vertex, fragment) {
+function compileSurfaceProgram(vertex, fragment) {
   if (!gl) { return; }
 
   var program = gl.createProgram();
@@ -46,19 +76,11 @@ export function compileSurfaceProgram(vertex, fragment) {
   }
 
   // Cache uniforms
-  cacheUniformLocation(program, 'time');
-  cacheUniformLocation(program, 'mouse');
   cacheUniformLocation(program, 'resolution');
-  cacheUniformLocation(program, 'obsv_x');
-  cacheUniformLocation(program, 'obsv_u');
-  cacheUniformLocation(program, 'obsv_o');
-  cacheUniformLocation(program, 'obsv_sprite');
   cacheUniformLocation(program, 'screen_size');
-  cacheUniformLocation(program, 'rs');
-  cacheUniformLocation(program, 'obj_xs');
-  cacheUniformLocation(program, 'obj_us');
-  cacheUniformLocation(program, 'obj_its');
 
+  world.compile(program);
+  trajectories.compile(program);
   objectInfo.compile(program);
 
   // Load program into GPU
@@ -70,7 +92,7 @@ export function compileSurfaceProgram(vertex, fragment) {
   return program;
 }
 
-export function compileScreenProgram(vertex, fragment) {
+function compileScreenProgram(vertex, fragment) {
   if (!gl) { return; }
 
   var program = gl.createProgram();
@@ -102,7 +124,16 @@ export function compileScreenProgram(vertex, fragment) {
   return program;
 }
 
-export function createTarget(width, height) {
+export function initializeWindow(width, height) {
+  console.assert(gl);
+  screenWidth = width;
+  screenHeight = height;
+  gl.viewport(0, 0, width, height);
+  frontTarget = createTarget(width, height);
+  backTarget = createTarget(width, height);
+}
+
+function createTarget(width, height) {
   var target = {};
 
   target.framebuffer = gl.createFramebuffer();
@@ -163,39 +194,20 @@ function cacheUniformLocation(program, label) {
   program.uniformsCache[label] = gl.getUniformLocation(program, label);
 }
 
-export function render(glContext, frontTarget, backTarget, params, objectTextures) {
+export function render() {
   // Set uniforms for surface shader
-  gl.useProgram(glContext.surfaceProgram);
+  gl.useProgram(surfaceProgram);
 
-  gl.uniform1f(glContext.surfaceProgram.uniformsCache['time'], params.time);
-  gl.uniform2f(glContext.surfaceProgram.uniformsCache['mouse'], params.mouseX, params.mouseY);
-  gl.uniform2f(glContext.surfaceProgram.uniformsCache['resolution'], params.screenWidth, params.screenHeight);
-  gl.uniform3f(glContext.surfaceProgram.uniformsCache['obsv_x'], params.obsvX.get(0), params.obsvX.get(1), params.obsvX.get(2));
-  gl.uniform3f(glContext.surfaceProgram.uniformsCache['obsv_u'], params.obsvU.get(0), params.obsvU.get(1), params.obsvU.get(2));
-  gl.uniform2f(glContext.surfaceProgram.uniformsCache['obsv_o'], params.obsvO.get(0), params.obsvO.get(1));
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obsv_sprite'], params.pointerDn ? 1 : 0);
-  gl.uniform1f(glContext.surfaceProgram.uniformsCache['screen_size'], params.screenSize);
-  gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
+  gl.uniform2f(surfaceProgram.uniformsCache['resolution'], screenWidth, screenHeight);
 
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_xs'], 3);
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_us'], 4);
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_its'], 5);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, backTarget.texture);
 
-  gl.activeTexture(gl.TEXTURE3);
-  gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_x);
-
-  gl.activeTexture(gl.TEXTURE4);
-  gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_u);
-
-  gl.activeTexture(gl.TEXTURE5);
-  gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_it);
-
+  world.render();
+  trajectories.render();
   objectInfo.render();
 
   gl.bindBuffer(gl.UNIFORM_BUFFER, null);
@@ -209,12 +221,12 @@ export function render(glContext, frontTarget, backTarget, params, objectTexture
 
   // Set uniforms for screen shader
 
-  gl.useProgram(glContext.screenProgram);
+  gl.useProgram(screenProgram);
 
-  gl.uniform2f(glContext.screenProgram.uniformsCache['resolution'], params.screenWidth, params.screenHeight);
-  gl.uniform1i(glContext.screenProgram.uniformsCache['color'], 1);
+  gl.uniform2f(screenProgram.uniformsCache['resolution'], screenWidth, screenHeight);
+  gl.uniform1i(screenProgram.uniformsCache['color'], 1);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.vertexAttribPointer(screenVertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE1);
@@ -226,4 +238,6 @@ export function render(glContext, frontTarget, backTarget, params, objectTexture
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  [frontTarget, backTarget] = [backTarget, frontTarget];
 }

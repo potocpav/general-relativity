@@ -3,6 +3,10 @@ var gl;
 
 const spritesFile = "models/sprites.png";
 const spritesShape = [64*2, 64, 60]; // x, y, d
+export const
+  shipId = 0,
+  shipThrustingId = 1,
+  asteroidId = 2;
 
 // Sprite extents in world coordinates, including time coordinate.
 const objSize = new Float32Array([

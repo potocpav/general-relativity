@@ -14,7 +14,7 @@ print(Gamma)
 
 print("--------------------------------")
 
-print("-- Schwarzschield metric")
+print("-- Schwarzschild metric")
 
 rs = symbols('rs')
 t, r, phi = symbols('t,r,phi')

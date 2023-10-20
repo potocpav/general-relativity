@@ -5,7 +5,6 @@ precision highp sampler2D;
 
 
 uniform float time;
-uniform vec2 mouse;
 uniform vec2 resolution;
 uniform vec3 obsv_x;
 uniform vec3 obsv_u;
@@ -46,7 +45,7 @@ mat3 nu(vec3 x) {
 	return mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 }
 
-// Schwarzschield (t, r, phi) metric tensor and Christoffel symbols
+// Schwarzschild (t, r, phi) metric tensor and Christoffel symbols
 mat3 g(vec3 x) {
   float r = x.y;
   return mat3(
