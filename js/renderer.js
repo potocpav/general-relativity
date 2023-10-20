@@ -1,19 +1,16 @@
-var gl;
-var buffer;
 
-var objectInfoUboLocation;
-var objectInfoUboBlockSize;
-var objectInfoUboBuffer;
-var objectInfoVarNames;
-var objectInfoIndices;
-var objectInfoOffsets;
-var objectInfoUboVariableInfo;
+// import {ObjectInfo} from './object-info.js';
+
+var gl;
+var objectInfo;
+var buffer;
 
 var vertexPosition;
 var screenVertexPosition;
 
-export function init(gl_) {
+export function init(gl_, objectInfo_) {
   gl = gl_;
+  objectInfo = objectInfo_;
 
   const surfaceCorners = new Float32Array([
     -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
@@ -63,26 +60,7 @@ export function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'obj_us');
   cacheUniformLocation(program, 'obj_its');
 
-  // set up object info UBO
-  // Described in detail in https://gist.github.com/jialiang/2880d4cc3364df117320e8cb324c2880
-  objectInfoUboLocation = gl.getUniformBlockIndex(program, "objectInfo");
-  objectInfoUboBlockSize = gl.getActiveUniformBlockParameter(program, objectInfoUboLocation, gl.UNIFORM_BLOCK_DATA_SIZE);
-  objectInfoUboBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.UNIFORM_BUFFER, objectInfoUboBuffer);
-  gl.bufferData(gl.UNIFORM_BUFFER, objectInfoUboBlockSize, gl.DYNAMIC_DRAW);
-  gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, objectInfoUboBuffer);
-  // TODO: mirror the pattern of `cacheUniformLocation` here
-  objectInfoVarNames = ["objSize", "objTexMin", "objTexMax", "objTexDTau"];
-  objectInfoIndices = gl.getUniformIndices(program, objectInfoVarNames);
-  objectInfoOffsets = gl.getActiveUniforms(program, objectInfoIndices, gl.UNIFORM_OFFSET);
-  objectInfoUboVariableInfo = {};
-  objectInfoVarNames.forEach((name, index) => {
-    objectInfoUboVariableInfo[name] = {
-      index: objectInfoIndices[index],
-      offset: objectInfoOffsets[index],
-    };
-  });
-  gl.uniformBlockBinding(program, objectInfoUboLocation, 0);
+  objectInfo.compile(program);
 
   // Load program into GPU
   gl.useProgram(program);
@@ -223,31 +201,7 @@ export function render(glContext, frontTarget, backTarget, params, objectTexture
   gl.activeTexture(gl.TEXTURE5);
   gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_it);
 
-  // Set object info UBO for surface shader
-
-  // padding values are -1
-  // TODO: ensure that this padding is portable
-  gl.bindBuffer(gl.UNIFORM_BUFFER, objectInfoUboBuffer);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objSize"].offset, new Float32Array([
-    0.1, -1, -1, -1,
-    0.1, -1, -1, -1,
-    0.1, -1, -1, -1,
-    ]), 0);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMin"].offset, new Float32Array([
-    64, 0, 0, -1,
-    64, 0, 31, -1,
-    0, 0, 0, -1,
-    ]), 0);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexMax"].offset, new Float32Array([
-    127, 63, 29, -1,
-    127, 63, 59, -1,
-    63, 63, 59, -1,
-    ]), 0);
-  gl.bufferSubData(gl.UNIFORM_BUFFER, objectInfoUboVariableInfo["objTexDTau"].offset, new Float32Array([
-    2, -1, -1, -1,
-    2, -1, -1, -1,
-    5, -1, -1, -1,
-    ]), 0);
+  objectInfo.render();
 
   gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 

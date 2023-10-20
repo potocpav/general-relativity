@@ -1,6 +1,7 @@
 // Greetings to Iq/RGBA! ;)
 
 import * as renderer from './renderer.js';
+import {ObjectInfo} from './object-info.js';
 
 var quality = 4, quality_levels = [1, 2, 4, 8];
 var toolbar;
@@ -11,6 +12,7 @@ var objectTextures;
 
 var canvas; // , surfaceBuffer, vertexPosition, screenVertexPosition;
 var gl;
+var objectInfo;
 
 // class ObjectInfo {
 //   constructor() {
@@ -170,13 +172,13 @@ function physics() {
   var accel3_rest = nj.array([0,0,0]);
   const acceleration = 0.5;
   if (params.mouseX !== undefined) {
-    params.obsvO = nj.array([0.0, 1.0]);
     const mouse_rel = nj.array([0.5 - params.mouseX, 0.5 - params.mouseY]);
     const accel2 = mouse_rel.multiply(acceleration/Math.sqrt(mouse_rel.dot(mouse_rel).get(0)));
     const accelPolar = cart2polar(params.obsvX.get(1), params.obsvX.get(2), accel2);
-    params.obsvO = accelPolar;
-    if (params.pointerDn)
+    if (params.pointerDn) {
+      params.obsvO = accelPolar;
       accel3_rest = nj.array([0, accelPolar.get(0), accelPolar.get(1)]);
+    }
   }
 
   const XU = nj.concatenate(params.obsvX, params.obsvU);
@@ -216,7 +218,8 @@ async function init() {
   document.body.appendChild(canvas);
 
   gl = initGl(canvas);
-  renderer.init(gl);
+  objectInfo = new ObjectInfo(gl);
+  renderer.init(gl, objectInfo);
 
   toolbar = createToolbar();
 
