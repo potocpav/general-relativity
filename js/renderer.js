@@ -1,28 +1,31 @@
+var gl;
+var buffer;
 
-// Normalized square with center at origin and size of 1.
-const surfaceCorners = new Float32Array([
-  -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
-  1.0, -1.0, 1.0, 1.0, -1.0, 1.0,
-  ]);
+var objectInfoUboLocation;
+var objectInfoUboBlockSize;
+var objectInfoUboBuffer;
+var objectInfoVarNames;
+var objectInfoIndices;
+var objectInfoOffsets;
+var objectInfoUboVariableInfo;
 
-// Initialise WebGL
-function initGl(canvas) {
-  try {
-    gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
-  } catch(error) { }
+var vertexPosition;
+var screenVertexPosition;
 
-  if (gl) {
-    // Create surface and screen geometry (2 triangles)
-    buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
-  } else {
-    alert('WebGL not supported.');
-  }
-  return gl;
+export function init(gl_) {
+  gl = gl_;
+
+  const surfaceCorners = new Float32Array([
+    -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
+    1.0, -1.0, 1.0, 1.0, -1.0, 1.0,
+    ]);
+
+  buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
 }
 
-function compileSurfaceProgram(vertex, fragment) {
+export function compileSurfaceProgram(vertex, fragment) {
   if (!gl) { return; }
 
   var program = gl.createProgram();
@@ -69,9 +72,9 @@ function compileSurfaceProgram(vertex, fragment) {
   gl.bufferData(gl.UNIFORM_BUFFER, objectInfoUboBlockSize, gl.DYNAMIC_DRAW);
   gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, objectInfoUboBuffer);
   // TODO: mirror the pattern of `cacheUniformLocation` here
-  const objectInfoVarNames = ["objSize", "objTexMin", "objTexMax", "objTexDTau"];
-  const objectInfoIndices = gl.getUniformIndices(program, objectInfoVarNames);
-  const objectInfoOffsets = gl.getActiveUniforms(program, objectInfoIndices, gl.UNIFORM_OFFSET);
+  objectInfoVarNames = ["objSize", "objTexMin", "objTexMax", "objTexDTau"];
+  objectInfoIndices = gl.getUniformIndices(program, objectInfoVarNames);
+  objectInfoOffsets = gl.getActiveUniforms(program, objectInfoIndices, gl.UNIFORM_OFFSET);
   objectInfoUboVariableInfo = {};
   objectInfoVarNames.forEach((name, index) => {
     objectInfoUboVariableInfo[name] = {
@@ -90,7 +93,7 @@ function compileSurfaceProgram(vertex, fragment) {
   return program;
 }
 
-function compileScreenProgram(vertex, fragment) {
+export function compileScreenProgram(vertex, fragment) {
   if (!gl) { return; }
 
   var program = gl.createProgram();
@@ -122,7 +125,7 @@ function compileScreenProgram(vertex, fragment) {
   return program;
 }
 
-function createTarget(width, height) {
+export function createTarget(width, height) {
   var target = {};
 
   target.framebuffer = gl.createFramebuffer();
@@ -183,7 +186,7 @@ function cacheUniformLocation(program, label) {
   program.uniformsCache[label] = gl.getUniformLocation(program, label);
 }
 
-function render(glContext, frontTarget, backTarget) {
+export function render(glContext, frontTarget, backTarget, params, objectTextures) {
   // Set uniforms for surface shader
   gl.useProgram(glContext.surfaceProgram);
 

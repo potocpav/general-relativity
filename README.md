@@ -26,7 +26,7 @@ Raytracing:
 - [x] Fix Lorentz Boost with non-orthonormal local coords
 - [x] Gravitational redshift
 - [x] Doppler redshift
-- [ ] Object redshift
+- [x] Object redshift
 - [ ] Light attenuation
 - [ ] Relativistic beaming
 - [ ] Object relativistic beaming
@@ -46,10 +46,10 @@ Black hole:
 Test objects, interaction:
 
 - [x] Display objects
-- [ ] Object dynamics
-- [ ] Correct length contractions for objects
-- [ ] Compute object trajectories
-- [ ] Interactive spaceship control
+- [x] Object dynamics
+- [x] Correct length contractions for objects
+- [x] Compute object trajectories
+- [x] Interactive spaceship control
 - [ ] Interactive object spawning
 - [ ] Time controls
 - [ ] Control effects (redshift, beaming, etc.)

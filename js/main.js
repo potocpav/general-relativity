@@ -1,13 +1,25 @@
 // Greetings to Iq/RGBA! ;)
 
+import * as renderer from './renderer.js';
+
 var quality = 4, quality_levels = [1, 2, 4, 8];
 var toolbar;
 var timeButton, obsvXButton, obsvUButton;
 var fullscreenButton;
-var canvas, gl, surfaceBuffer, vertexPosition, screenVertexPosition;
-var objectInfoUboLocation, objectInfoUboBlockSize, objectInfoUboBuffer, objectInfoUboVariableInfo;
 var frontTarget, backTarget;
 var objectTextures;
+
+var canvas; // , surfaceBuffer, vertexPosition, screenVertexPosition;
+var gl;
+
+// class ObjectInfo {
+//   constructor() {
+//     uboLocation = undefined;
+//     uboBlockSize = undefined;
+//     uboBuffer = undefined;
+//     uboVariableInfo = undefined;
+//   }
+// }
 
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
@@ -17,7 +29,7 @@ const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 const rs = 0.01;
 
 const g = (x) => {
-  r = x.get(1);
+  const r = x.get(1);
   return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 - rs / r), 0], [0, 0, r * r]]);
 }
 
@@ -48,7 +60,7 @@ const Gamma2 = (x) => {
 
 // Transform metric at point x to Minkowski metric
 function T(x) {
-	gx = g(x);
+	const gx = g(x);
 	return nj.array([
 		[Math.sqrt(-gx.get(0,0)), 0.0, 0.0],
 		[0.0, Math.sqrt(gx.get(1,1)), 0.0],
@@ -174,15 +186,15 @@ function physics() {
   params.obsvU = XU1.slice([3, 6]);
 }
 
-obj_xs = nj.array([0, 25 * rs, 0.0]);
-asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0.0, -0.12]), 2);
+const obj_xs = nj.array([0, 25 * rs, 0.0]);
+const asteroid_freefall = sim_freefall(1000, obj_xs, Velocity3(obj_xs, [0.0, -0.12]), 2);
 
 function sim_freefall(n, x0, u0, obj_i) {
   const dt = 0.1;
   var xs = new Float32Array(n*3), us = new Float32Array(n*3), it = new Float32Array(n*2);
   var xu = nj.concatenate(x0, u0);
   var tau = 0.0;
-  for (i = 0; i < n; i++) {
+  for (var i = 0; i < n; i++) {
     if (i > 0) {
       xu = rk4(geo_f(nj.array([0,0,0])), xu, dt);
       tau += dt;
@@ -204,6 +216,7 @@ async function init() {
   document.body.appendChild(canvas);
 
   gl = initGl(canvas);
+  renderer.init(gl);
 
   toolbar = createToolbar();
 
@@ -241,7 +254,7 @@ async function init() {
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
 
-  tex = await loadSpriteTexture("models/sprites.png", 64*2, 64, 60);
+  const tex = await loadSpriteTexture("models/sprites.png", 64*2, 64, 60);
   params.spriteTexture = tex;
 
   // fetch shaders
@@ -253,12 +266,26 @@ async function init() {
   objectTextures = initObjectSamplers();
   makeTestObject(objectTextures, asteroid_freefall);
 
-  glContext = {
-    surfaceProgram: compileSurfaceProgram(surfaceVert, surfaceFrag),
-    screenProgram: compileScreenProgram(screenVert, screenFrag),
+  const glContext = {
+    surfaceProgram: renderer.compileSurfaceProgram(surfaceVert, surfaceFrag),
+    screenProgram: renderer.compileScreenProgram(screenVert, screenFrag),
   };
 
   return glContext;
+}
+
+function initGl (canvas) {
+  var gl;
+  try {
+    gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
+  } catch(error) { }
+
+  if (gl) {
+
+  } else {
+    alert('WebGL not supported.');
+  }
+  return gl;
 }
 
 function createToolbar() {
@@ -371,8 +398,8 @@ function onWindowResize(event) {
 
   if (gl) {
     gl.viewport(0, 0, canvas.width, canvas.height);
-    frontTarget = createTarget(params.screenWidth, params.screenHeight);
-    backTarget = createTarget(params.screenWidth, params.screenHeight);
+    frontTarget = renderer.createTarget(params.screenWidth, params.screenHeight);
+    backTarget = renderer.createTarget(params.screenWidth, params.screenHeight);
   }
 }
 
@@ -382,7 +409,7 @@ function animate(glContext) {
 
   renderUi();
 
-  render(glContext, frontTarget, backTarget);
+  renderer.render(glContext, frontTarget, backTarget, params, objectTextures);
   [frontTarget, backTarget] = [backTarget, frontTarget];
 }
 
@@ -409,7 +436,7 @@ async function loadSpriteTexture(url, width, height, depth) {
     img.addEventListener('load', () => resolve(img));
     img.src = url;
   });
-  img = x = await loadPromise;
+  const img = await loadPromise;
 
   if (img.width * img.height != width * height * depth) {
     console.error("Image has unexpected number of pixels.", [img.width, img.height], [width, height, depth]);
