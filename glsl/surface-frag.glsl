@@ -21,7 +21,7 @@ uniform sampler2D obj_xs;
 uniform sampler2D obj_us;
 uniform sampler2D obj_its;
 
-uniform objectInfo {
+layout(std140) uniform objectInfo {
 	vec3 objSize[3];
 	vec3 objTexMin[3];
 	vec3 objTexMax[3];

@@ -55,7 +55,6 @@ export function compileSurfaceProgram(vertex, fragment) {
   cacheUniformLocation(program, 'obsv_sprite');
   cacheUniformLocation(program, 'screen_size');
   cacheUniformLocation(program, 'rs');
-  cacheUniformLocation(program, 'sprites');
   cacheUniformLocation(program, 'obj_xs');
   cacheUniformLocation(program, 'obj_us');
   cacheUniformLocation(program, 'obj_its');
@@ -178,7 +177,6 @@ export function render(glContext, frontTarget, backTarget, params, objectTexture
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['screen_size'], params.screenSize);
   gl.uniform1f(glContext.surfaceProgram.uniformsCache['rs'], params.rs);
 
-  gl.uniform1i(glContext.surfaceProgram.uniformsCache['sprites'], 2);
   gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_xs'], 3);
   gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_us'], 4);
   gl.uniform1i(glContext.surfaceProgram.uniformsCache['obj_its'], 5);
@@ -188,9 +186,6 @@ export function render(glContext, frontTarget, backTarget, params, objectTexture
 
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, backTarget.texture);
-
-  gl.activeTexture(gl.TEXTURE2);
-  gl.bindTexture(gl.TEXTURE_3D, params.spriteTexture);
 
   gl.activeTexture(gl.TEXTURE3);
   gl.bindTexture(gl.TEXTURE_2D, objectTextures.tex_x);

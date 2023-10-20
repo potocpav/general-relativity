@@ -10,18 +10,9 @@ var fullscreenButton;
 var frontTarget, backTarget;
 var objectTextures;
 
-var canvas; // , surfaceBuffer, vertexPosition, screenVertexPosition;
+var canvas;
 var gl;
 var objectInfo;
-
-// class ObjectInfo {
-//   constructor() {
-//     uboLocation = undefined;
-//     uboBlockSize = undefined;
-//     uboBuffer = undefined;
-//     uboVariableInfo = undefined;
-//   }
-// }
 
 // Minkowski metric
 const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
@@ -218,7 +209,10 @@ async function init() {
   document.body.appendChild(canvas);
 
   gl = initGl(canvas);
+
   objectInfo = new ObjectInfo(gl);
+  await objectInfo.initialize();
+
   renderer.init(gl, objectInfo);
 
   toolbar = createToolbar();
@@ -251,14 +245,10 @@ async function init() {
 
   document.addEventListener('wheel', (event) => {
     params.screenSize *= Math.exp(event.deltaY / 500);
-    // params.timeScale *= Math.exp(-event.deltaX / 500);
   }, false);
 
   onWindowResize();
   window.addEventListener('resize', onWindowResize, false);
-
-  const tex = await loadSpriteTexture("models/sprites.png", 64*2, 64, 60);
-  params.spriteTexture = tex;
 
   // fetch shaders
   const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
@@ -430,30 +420,6 @@ function printTime(s) {
 
 function print3Vec(x) {
   return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
-}
-
-// creates a 3D texture info from an URL with a given width, height and depth
-async function loadSpriteTexture(url, width, height, depth) {
-  const loadPromise = new Promise((resolve) => {
-    var img = new Image();
-    img.addEventListener('load', () => resolve(img));
-    img.src = url;
-  });
-  const img = await loadPromise;
-
-  if (img.width * img.height != width * height * depth) {
-    console.error("Image has unexpected number of pixels.", [img.width, img.height], [width, height, depth]);
-  }
-
-  var tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_3D, tex);
-  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, width, height, depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
-  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-  return tex;
 }
 
 function initObjectSamplers() {
