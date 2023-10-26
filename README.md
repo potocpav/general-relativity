@@ -14,7 +14,8 @@ Infra:
 
 - [x] Find a basis project, clone & adapt it
 - [x] Publish to GH Pages
-- [ ] Link to GitHub
+- [x] Refactor to use classes & files
+- [x] Link to GitHub
 - [ ] Improve menus
 
 Raytracing:
@@ -27,9 +28,9 @@ Raytracing:
 - [x] Gravitational redshift
 - [x] Doppler redshift
 - [x] Object redshift
-- [ ] Light attenuation
-- [ ] Relativistic beaming
-- [ ] Object relativistic beaming
+- [x] Light attenuation
+- [x] Relativistic beaming
+- [x] Object relativistic beaming
 - [ ] Correct redshift visualization
 - [ ] HDR
 - [ ] Bloom
@@ -50,12 +51,25 @@ Test objects, interaction:
 - [x] Correct length contractions for objects
 - [x] Compute object trajectories
 - [x] Interactive spaceship control
-- [ ] Interactive object spawning
+- [x] Interactive object spawning
 - [ ] Time controls
 - [ ] Control effects (redshift, beaming, etc.)
 - [ ] Scenario presets
 - [ ] Automatically generate floaters
-- [ ] Spatial indexing
+- [ ] Spatial indexing of object trajectories to improve performance of multiple objects
+
+Scenario ideas:
+
+- Twin paradox
+- Gravitational time dilation
+- Light clocks
+- Light curving around massive objects
+- Falling into black hole, trying to fight gravity
+- Visiting a planet close to supermassive BH
+- Relativistic beaming & redshift (semaphore?)
+- Objects falling into BH, accretion disc
+- Expanding space-time?
+- Gaining energy from Kerr hole
 
 ## Acknowledgements
 

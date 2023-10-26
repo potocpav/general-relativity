@@ -3,7 +3,7 @@ import * as math from './math.js';
 // 3-velocity from 2-velocity (ds = -1)
 // (supposing diagonal metric tensor)
 export const velocity3 = (metric, x, u2_cart) => {
-  const [_, ux, uy] = metric.dScreenToWorld(x, u2_cart).tolist();
+  const [ux, uy] = metric.viewportToWorld(x, u2_cart).tolist();
   const gx = metric.g(x);
   console.assert(gx.get(0,1) == 0 && gx.get(0,2) == 0 && gx.get(1,2) == 0);
   return nj.array([Math.sqrt(-(1 + gx.get(1,1) * ux*ux + gx.get(2,2) * uy*uy) / gx.get(0,0)), ux, uy]);
@@ -57,16 +57,16 @@ export class Schwarzschild {
     ]);
   }
 
-  // transformation from screen-space element `x` into world element
+  // transformation from 2D screen-space element `x` into 2D world element
   // around a given working point `x0`
   //
   // FIXME: figure out whether this function is accurate around black holes.
   // It may be messing up our raindrop view of BH horizon angle while crossing it,
   // which should have radius of ~42 degrees.
-  dScreenToWorld(x0, x) {
+  // FIXME: incorporate Lorentz transformation
+  viewportToWorld(x0, x) {
     const r = x0.get(1), phi = x0.get(2);
     const A = nj.array([[Math.cos(phi), -r * Math.sin(phi)], [Math.sin(phi), r * Math.cos(phi)]]);
-    return nj.concatenate(x.slice([0,1]), math.inverse2(A).dot(x.slice([1,3])));
+    return math.inverse2(A).dot(x);
   }
-
 }

@@ -10,8 +10,10 @@ import { velocity3, Schwarzschild } from './metric.js';
 
 var quality = 4, quality_levels = [1, 2, 4, 8];
 var toolbar;
+var boostButton, spawnButton;
 var timeButton, obsvXButton, obsvUButton;
-var fullscreenButton;
+var githubButton, fullscreenButton;
+var mouseWorldX;
 
 const rs = 0.01;
 const metric = new Schwarzschild(rs);
@@ -24,16 +26,17 @@ var trajectories;
 var asteroid;
 
 var params = {
-  mouseX: undefined,
-  mouseY: undefined,
+  mousePos: nj.array([0, 0]),
   pointerDn: false,
+  screenDim: nj.array([window.innerWidth, window.innerHeight]),
+  tool: 'boost',
 };
 
 function initWorld() {
   const x = nj.array([0, 30 * rs, 0]);
-  const u2 = nj.array([undefined, 0, 0.08]);
+  const u2 = nj.array([0, 0.08]);
 
-  world.screenSize = 1.5;
+  world.viewportSize = 1.5;
   world.timeScale = 1.0;
   world.rs = rs;
 
@@ -41,10 +44,12 @@ function initWorld() {
   world.obsvX = x;
   world.obsvU = velocity3(metric, x, u2);
   world.obsvO = nj.array([0.0, 1.0]);
+  mouseWorldX = nj.array([0.0, 0.0, 0.0]);
+  world.eventX = nj.array([0.0, 0.0, 0.0]);
 
   // objects
   const asteroid_x0 = nj.array([0, 25 * rs, 0.0]);
-  const asteroid_v0 = nj.array([undefined, 0.0, -0.12]);
+  const asteroid_v0 = nj.array([0.0, -0.12]);
   asteroid = new Trajectory(metric, asteroidId, asteroid_x0, velocity3(metric, asteroid_x0, asteroid_v0))
   trajectories.add(asteroid);
 }
@@ -76,25 +81,23 @@ async function startup() {
 }
 
 function initEventListeners() {
-  var clientXLast, clientYLast;
   document.addEventListener('pointermove', function (event) {
-    var clientX = event.clientX;
-    var clientY = event.clientY;
-
-    if (clientXLast != clientX || clientYLast != clientY)
-      stopHideUI(toolbar);
-
-    clientXLast = clientX;
-    clientYLast = clientY;
-
-    params.mouseX = clientX / window.innerWidth;
-    params.mouseY = 1 - clientY / window.innerHeight;
+    params.mousePos = nj.array([event.clientX, window.innerHeight - event.clientY]);
   }, false);
 
   document.addEventListener('pointerdown', (event) => {
-    params.pointerDn = true;
-    params.mouseX = event.clientX / window.innerWidth;
-    params.mouseY = 1 - event.clientY / window.innerHeight;
+    params.mousePos = nj.array([event.clientX, window.innerHeight - event.clientY]);
+
+    if (params.tool == 'boost') {
+      params.pointerDn = true;
+    }
+
+    if (params.tool == 'spawn') {
+      const mouseWorldX = world.getWorldPos(params.mousePos, params.screenDim);
+      const asteroid_v0 = nj.array([0.0, 0.0]);
+      asteroid = new Trajectory(metric, asteroidId, mouseWorldX, velocity3(metric, mouseWorldX, asteroid_v0))
+      trajectories.add(asteroid);
+    }
   });
 
   document.addEventListener('pointerup', (event) => {
@@ -102,7 +105,8 @@ function initEventListeners() {
   });
 
   document.addEventListener('wheel', (event) => {
-    params.screenSize *= Math.exp(event.deltaY / 500);
+    world.viewportSize *= Math.exp(event.deltaY / 500);
+
   }, false);
 
   onWindowResize();
@@ -123,6 +127,14 @@ function createToolbar() {
   rightside.style.cssFloat = 'right';
   toolbar.appendChild(rightside);
 
+  githubButton = document.createElement('img');
+  githubButton.src = 'img/github-mark-white.svg';
+  githubButton.title = 'Go to GitHub Repository';
+  githubButton.addEventListener('click', function (event) {
+    window.location.href = "https://github.com/potocpav/general-relativity";
+  }, false);
+  rightside.appendChild(githubButton);
+
   fullscreenButton = document.createElement('img');
   fullscreenButton.src = 'img/fullscreen.svg';
   fullscreenButton.title = 'Press F11 to enter or leave fullscreen mode';
@@ -141,13 +153,36 @@ function createToolbar() {
       document.documentElement.webkitRequestFullscreen();
     }
   }, false);
-
   rightside.appendChild(fullscreenButton);
+
+  boostButton = document.createElement('button');
+  boostButton.textContent = 'boost';
+
+  spawnButton = document.createElement('button');
+  spawnButton.textContent = 'spawn';
+
+  toolbar.appendChild(boostButton);
+  boostButton.classList.add("clicked");
+  boostButton.addEventListener('click', e => {
+    params.tool = 'boost';
+    spawnButton.classList.remove("clicked");
+    boostButton.classList.add("clicked");
+    e.preventDefault();
+  }, false);
+
+  toolbar.appendChild(spawnButton);
+  spawnButton.addEventListener('click', e => {
+    params.tool = 'spawn';
+    boostButton.classList.remove("clicked");
+    spawnButton.classList.add("clicked");
+    e.preventDefault();
+  }, false);
 
   timeButton = document.createElement('button');
   timeButton.textContent = '0:00.00';
-  timeButton.addEventListener('click', function (event) {
-    initialize();
+  timeButton.addEventListener('click', e => {
+    initWorld();
+    e.preventDefault();
   }, false);
   toolbar.appendChild(timeButton);
 
@@ -175,50 +210,16 @@ function createToolbar() {
   return toolbar;
 }
 
-var hideUITimer;
-var isUIHidden = false;
-
-function startHideUITimer (toolbar) {
-  stopHideUITimer();
-  if (!isUIHidden)
-    hideUITimer = window.setTimeout(onHideUITimer, 1000 * 2);
-
-  function onHideUITimer() {
-    stopHideUITimer();
-
-    if (!isUIHidden) {
-      isUIHidden = true;
-      toolbar.style.opacity = '0';
-      document.body.style.cursor = 'none';
-    }
-  }
-
-  function stopHideUITimer () {
-    if (hideUITimer) {
-      window.clearTimeout(hideUITimer);
-      hideUITimer = 0;
-    }
-  }
-}
-
-function stopHideUI (toolbar) {
-  if (isUIHidden) {
-    isUIHidden = false;
-    toolbar.style.opacity = '1';
-    document.body.style.cursor = '';
-  }
-  startHideUITimer(toolbar);
-}
-
 function onWindowResize() {
   canvas.width = window.innerWidth / quality;
   canvas.height = window.innerHeight / quality;
   renderer.initializeWindow(canvas.width, canvas.height);
+  params.screenDim = nj.array([window.innerWidth, window.innerHeight]);
 }
 
 function animate() {
   requestAnimationFrame(() => animate());
-  world.update(params.mouseX, params.mouseY, params.pointerDn);
+  world.update(params.mousePos, params.pointerDn, params.screenDim);
   renderUi();
   renderer.render();
 }

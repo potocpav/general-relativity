@@ -16,9 +16,10 @@ export class Trajectory {
     var xu = nj.concatenate(this.x, this.u);
     for (var i = 0; i < n; i++) {
       if (i > 0) {
-        xu = rk4(geo_f(this.metric, nj.array([0,0,0])), xu, dt);
+        xu = rk4(geo_f(this.metric, undefined), xu, dt);
         this.tau += dt;
       }
+
       xs[i*3 + 0] = xu.get(0);
       xs[i*3 + 1] = xu.get(1);
       xs[i*3 + 2] = xu.get(2);

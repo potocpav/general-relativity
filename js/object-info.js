@@ -12,7 +12,7 @@ export const
 const objSize = new Float32Array([
   2, 0.1, 0.1, -1,
   2, 0.1, 0.1, -1,
-  5, 0.1, 0.1, -1,
+  5, 0.05, 0.05, -1,
   ]);
 
 // Minimum pixel coordinates of sprites in the combined sprite image

@@ -45,6 +45,10 @@ button:hover, select:hover, a:hover {
   color: #000000;
 }
 
+button.clicked {
+  background-color: #555;
+}
+
 img {
   padding: 4px;
   border: 0px;

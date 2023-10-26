@@ -10,6 +10,7 @@ uniform vec3 obsv_x;
 uniform vec3 obsv_u;
 uniform vec2 obsv_o; // orientation vector
 uniform int obsv_sprite;
+uniform vec3 event_x; // debugging event
 
 uniform float screen_size;
 uniform float rs;
@@ -30,11 +31,11 @@ out vec4 out_color;
 
 #define pi 3.141592653589793
 
-// Screen-space to world-space
+// Screen-space to viwport-space
 
 // TODO: don't specify height, specify the (geometric?) mean of screen dimensions
 // to look good on both vertical and horizontal devices
-vec2 s2w(vec2 screen, vec2 origin, float size) {
+vec2 s2v(vec2 screen, float size) {
 	float meanRes = (resolution.x + resolution.y) / 2.0;
 	return ((screen - resolution / 2.0) / meanRes) * size / 2.0;
 }
@@ -115,7 +116,7 @@ float black_hole(vec3 pos) {
 
 // compute 3-vector out of a 2-vector so that ds = 0
 // (supposing a diagonal metric)
-vec3 light_u3(vec3 x, vec2 u2) {
+vec3 light3(vec3 x, vec2 u2) {
 	float res = dot(g(x) * vec3(0.0, u2), vec3(0.0, u2)) / g(x)[0][0];
 	return vec3(-sqrt(-res), u2);
 }
@@ -159,7 +160,7 @@ mat2 rot(vec2 a) {
 	return mat2(a.y, a.x, -a.x, a.y);
 }
 
-vec2 cart2polar(float r, float phi, vec2 x) {
+vec2 viewport2world(float r, float phi, vec2 x) {
 	mat2 A = mat2(cos(phi), -r * sin(phi), sin(phi), r * cos(phi));
 	return x * inverse2(A);
 }
@@ -180,16 +181,44 @@ vec3 neg_u(vec3 u) {
 	return vec3(u.x, -u.yz);
 }
 
-vec3 redshift(float a, vec3 c) {
-	// random functions to make it look sorta good
-	// TODO: make something proper
-	return max(vec3(0.0), min(vec3(1.0),
-		vec3(
-				c.r * min(1.0, pow(a,2.0)),
-				c.g * 0.5,
-				c.b * min(1.0, 1.0 / pow(a,2.0))
-			)
-		));
+// redshift calculation
+
+float x(float l) {
+	return 1.065 * exp(-0.5 * pow((l - 595.8) / 33.33, 2.0)) + 0.366 * exp(-0.5 * pow((l - 446.8) / 19.44, 2.0));
+}
+
+float y(float l) {
+	return 1.014 * exp(-0.5 * pow((log(l) - log(556.3)) / 0.075, 2.0));
+}
+
+float z(float l) {
+	return 1.839 * exp(-0.5 * pow((log(l) - log(449.8)) / 0.051, 2.0));
+}
+
+vec3 redshift(float l, vec3 sRgb) {
+	const float power_exp = 3.0;
+	const mat3 sRgbToSpectral = mat3(
+		0.4148, 0.0140, 0.0129,
+ 		0.0580, 0.6812, 0.0797,
+ 		0.0191, 0.0257, 0.6391
+	);
+	vec3 linear = pow(sRgb, vec3(2.2));
+	vec3 spectral = sRgbToSpectral * linear;
+	float R = 610.0, G = 550.0, B = 465.0;
+
+	float lS = 1.0; // disable color redshift, because it looks too wrong ATM
+	mat3 shift = mat3(
+		x(R*lS), y(R*lS), z(R*lS),
+		x(G*lS), y(G*lS), z(G*lS),
+		x(B*lS), y(B*lS), z(B*lS)
+	);
+	mat3 xyzToSrgb = mat3(
+		 3.2406,-0.9689,  0.0557,
+		-1.5372, 1.8757, -0.2040,
+		-0.4986, 0.0415,  1.0569
+	);
+	vec3 shifted = xyzToSrgb * shift * spectral * pow(l, -power_exp);
+	return max(vec3(0.0), min(vec3(1.0), pow(shifted, vec3(1.0/2.2))));
 }
 
 // Transform metric at point x to Minkowski metric
@@ -237,12 +266,10 @@ const float max_iters = 100.0;
 
 void main( void ) {
 	// screen to observer space transformation
-	vec2 screen_origin = vec2(0.5, 0.5);
+	vec2 pix_cartesian = s2v(gl_FragCoord.xy, screen_size);
+	vec2 pix_target = viewport2world(obsv_x.y, obsv_x.z, pix_cartesian);
 
-	vec2 pix_cartesian = s2w(gl_FragCoord.xy, screen_origin, screen_size);
-	vec2 pix_target = cart2polar(obsv_x.y, obsv_x.z, pix_cartesian);
-
-	vec3 pix_v3 = light_u3(obsv_x, pix_target); // 3-vec pointing at pix
+	vec3 pix_v3 = light3(obsv_x, pix_target); // 3-vec pointing at pix
 
 	mat3 gx = g(obsv_x);
 
@@ -252,7 +279,6 @@ void main( void ) {
 	// raytracing along null geodesics
 	vec3 pix_x = obsv_x;
 	vec3 pix_u = pix_u0;
-	float pix_norm = dot(pix_target, pix_target);
 	float dl = 1.0 / max_iters;
 	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
 		vec3 pix_u1 = rk4_u(pix_x, pix_u, dl);
@@ -291,10 +317,10 @@ void main( void ) {
 			obj_boost = general_boost(T_pix_x, obj_u);
 			obj_deltax = obj_boost * cyclic(obj_x - pix_x);
 
-			if (obj_deltax.x < 0.0)
-				j0 = j;
-			else
+			if (obj_deltax.x > 0.0 || isnan(obj_deltax.x))
 				j1 = j;
+			else
+				j0 = j;
 		}
 
 		vec4 obj_color = render_obj(
@@ -309,8 +335,13 @@ void main( void ) {
 	}
 
 	vec4 obsv_color = render_obj(
-		obsv_x, obsv_sprite, 1.0, time, vec3(0.0, cyclic(obsv_x-pix_x).yz/1.0), obsv_o);
+		pix_x, obsv_sprite, 1.0, time, vec3(0.0, cyclic(obsv_x-pix_x).yz/1.0), obsv_o);
+
 	objects_color = mix(objects_color, obsv_color, obsv_color.a);
+
+	// vec4 event_color = render_obj(
+	// 	pix_x, 2, 1.0, time, vec3(0.0, cyclic(event_x-pix_x).yz/1.0), vec2(1.0, 0.0));
+	// objects_color = mix(objects_color, event_color, event_color.a);
 
 	out_color = black_hole(pix_x) * mix(vec4(world_color, 1.0), objects_color, objects_color.a);
 }

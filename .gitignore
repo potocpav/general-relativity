@@ -1,3 +1,4 @@
-/sympy/venv
+__pycache__
+/python/venv
 /models/render
 *.blend1

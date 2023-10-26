@@ -181,7 +181,7 @@ function createShader(src, type) {
       error = error.substring(0, error.length - 1);
     }
 
-    console.log(src, error);
+    console.error(src, error);
     return null;
   }
   return shader;

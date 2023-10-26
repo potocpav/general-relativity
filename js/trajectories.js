@@ -28,6 +28,26 @@ export class Trajectories {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 
     gl.bindTexture(gl.TEXTURE_2D, null);
+
+    this.nObjects = 2;
+    this.nPoints = 30;
+    this.lastObjectAdded = -1;
+
+    // allocate texture buffers
+    const zeroBuffer = new Float32Array(this.nObjects * this.nPoints * 3);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex_x);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, this.nObjects, this.nPoints, 0, gl.RGB, gl.FLOAT,
+      zeroBuffer);
+
+    gl.bindTexture(gl.TEXTURE_2D, this.tex_u);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, this.nObjects, this.nPoints, 0, gl.RGB, gl.FLOAT,
+      zeroBuffer);
+
+    gl.bindTexture(gl.TEXTURE_2D, this.tex_it);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, this.nObjects, this.nPoints, 0, gl.RG, gl.FLOAT,
+      zeroBuffer);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
   compile(program) {
@@ -37,43 +57,25 @@ export class Trajectories {
   }
 
   add(trajectory) {
-    // TODO: don't overwrite, add
-    const nObjects = 1;
-    const nPoints = 1000;
-    const data = trajectory.simulate(nPoints);
+    this.lastObjectAdded += 1;
+    this.lastObjectAdded %= this.nObjects;
+
+    this.data = trajectory.simulate(this.nPoints);
+
     gl.bindTexture(gl.TEXTURE_2D, this.tex_x);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
-      new Float32Array(data.xs));
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, this.lastObjectAdded, 0, 1, this.nPoints, gl.RGB, gl.FLOAT,
+      new Float32Array(this.data.xs));
 
     gl.bindTexture(gl.TEXTURE_2D, this.tex_u);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
-      new Float32Array(data.us));
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, this.lastObjectAdded, 0, 1, this.nPoints, gl.RGB, gl.FLOAT,
+      new Float32Array(this.data.us));
 
     gl.bindTexture(gl.TEXTURE_2D, this.tex_it);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, nObjects, nPoints, 0, gl.RG, gl.FLOAT,
-      new Float32Array(data.it));
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, this.lastObjectAdded, 0, 1, this.nPoints, gl.RG, gl.FLOAT,
+      new Float32Array(this.data.it));
 
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
-
-
-  // setData(data) {
-  //   const nObjects = 1;
-  //   const nPoints = data.n;
-  //   gl.bindTexture(gl.TEXTURE_2D, this.tex_x);
-  //   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
-  //     new Float32Array(data.xs));
-
-  //   gl.bindTexture(gl.TEXTURE_2D, this.tex_u);
-  //   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, nObjects, nPoints, 0, gl.RGB, gl.FLOAT,
-  //     new Float32Array(data.us));
-
-  //   gl.bindTexture(gl.TEXTURE_2D, this.tex_it);
-  //   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, nObjects, nPoints, 0, gl.RG, gl.FLOAT,
-  //     new Float32Array(data.it));
-
-  //   gl.bindTexture(gl.TEXTURE_2D, null);
-  // }
 
   render() {
     gl.uniform1i(this.xsUniformLocation, 3);

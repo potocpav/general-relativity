@@ -19,18 +19,23 @@ function boost(u) {
   ]);
 }
 
-function neg_u(u) {
+export function neg_u(u) {
 	return nj.array([u.get(0), -u.get(1), -u.get(2)]);
 }
 
-function general_boost(Tx, u) {
+// assuming diagonal metric.T
+export function general_boost(Tx, u) {
   return inverse_diag3(Tx).dot(boost(Tx.dot(u))).dot(Tx);
 }
 
 // Geodesic ODE arount x0, solving for [v^mu, x^mu] 6-vector
 export const geo_f = (metric, accel_rest) => (xu) => {
   const x = xu.slice([0, 3]), u = xu.slice([3, 6]);
-  const accel = general_boost(metric.T(x), neg_u(u)).dot(accel_rest);
+  var accel;
+  if (accel_rest != undefined)
+    accel = general_boost(metric.T(x), neg_u(u)).dot(accel_rest);
+  else
+  accel = nj.array([0,0,0]);
   return nj.array([
     u.get(0),
     u.get(1),
