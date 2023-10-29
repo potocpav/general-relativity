@@ -10,6 +10,7 @@ export class World {
     this.lastDate = undefined;
     this.time = 0;
     this.metric = metric;
+    this.dt = 0.017;
   }
   compile(program) {
     this.time_loc = gl.getUniformLocation(program, 'time');
@@ -25,15 +26,15 @@ export class World {
   }
 
   update(mousePos, pointerDn, screenDim) {
-    // physics
-    var dt = 0.01;
     var date = Date.now() / 1000;
-    if (this.lastTime !== undefined) {
-      dt = (date - this.lastDate) * this.timeScale;
-      dt = Math.max(0.01, Math.min(0.1, dt));
+    var targetDt;
+    if (this.lastDate !== undefined) {
+      targetDt = (date - this.lastDate) * this.timeScale;
+      targetDt = Math.max(0.01, Math.min(0.1, targetDt));
+      this.dt = this.dt * 0.99 + targetDt * 0.01;
     }
     this.lastDate = date;
-    this.time += dt;
+    this.time += this.dt;
 
     // rocket motor
     var accel3_rest = nj.array([0,0,0]);
@@ -51,7 +52,7 @@ export class World {
     }
 
     const XU = nj.concatenate(this.obsvX, this.obsvU);
-    const XU1 = math.rk4(math.geo_f(this.metric, accel3_rest), XU, dt);
+    const XU1 = math.rk4(math.geo_f(this.metric, accel3_rest), XU, this.dt);
 
     this.obsvX = XU1.slice([0, 3]);
     this.obsvU = XU1.slice([3, 6]);
