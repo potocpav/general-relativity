@@ -121,6 +121,8 @@ vec3 light3(vec3 x, vec2 u2) {
 	return vec3(-sqrt(-res), u2);
 }
 
+// RK4 with constant step solver
+
 vec3 geo_u(vec3 x, vec3 u) {
 	return vec3(
 		-dot(Gamma0(x) * u, u),
@@ -139,6 +141,36 @@ vec3 rk4_u(vec3 x, vec3 u, float h) {
 vec3 rk4_x(vec3 x, vec3 u, float h) {
 	return x + u * h;
 }
+
+// Bogacki–Shampine RK23 adaptive solver
+
+// vec3 rk23_u(vec3 x, vec3 u, float h) {
+// 	const vec3 rtol = vec3(0.001);
+// 	const vec3 atol = vec3(0.000001);
+// 	float lmax = undefined;
+
+// 	const mat3 A = mat3(
+// 		0.0, 0.5, 0.0,
+// 		0.0, 0.0, 0.75,
+// 		0.0, 0.0, 0.0);
+// 	const vec3 B = vec3(2.0/9.0, 1.0/3.0, 4.0/9.0);
+// 	const vec3 C = vec3(0.0, 0.5, 0.75);
+// 	const vec4 E = vec4(5.0/72.0, -1.0/12.0, -1.0/9.0, 1.0/8.0);
+// 	// TODO: K
+
+// 	vec3 K;
+// 	K0 = geo_u(x, u);
+// 	dy = K0 *
+
+// 	// vec3 k1 = geo_u(x, u);
+// 	// vec3 k2 = geo_u(x, u + k1 * h / 2.0);
+// 	// vec3 k3 = geo_u(x, u + k2 * h / 2.0);
+// 	// vec3 k4 = geo_u(x, u + k3 * h);
+// 	// return u + h / 6.0 * (k1 + 2.0*k2 + 2.0*k3 + k4);
+// }
+
+
+// Matrix manipulation
 
 mat2 inverse2(mat2 m) {
   return mat2(
