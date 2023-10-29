@@ -40,9 +40,8 @@ button, select, a, a:visited {
   text-transform: uppercase;
 }
 
-button:hover, select:hover, a:hover {
-  background-color: #FFFFFF;
-  color: #000000;
+button:hover, a:hover, img:hover, select:hover {
+  background-color: #333;
 }
 
 button.clicked {
@@ -61,10 +60,6 @@ img {
   cursor: pointer;
 }
 
-img:hover {
-  background-color: #FFFFFF;
-}
-
 option {
   color: #ffffff;
   background-color: #000000;
@@ -80,7 +75,6 @@ option {
   padding: 25px;
   padding-top: max(25px, env(safe-area-inset-top)); /* handle hole-punch camera & notch */
   width: 100%;
-
 }
 
 #right_side {

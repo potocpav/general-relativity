@@ -35,13 +35,14 @@ Raytracing:
 - [ ] HDR
 - [ ] Bloom
 
-Black hole:
+Object dynamics:
 
 - [x] Schwarzschild metric for observer
 - [x] Schwarzschild metric for light
 - [x] Use a precise solver for photons
 - [x] Use a precise solver for motion
 - [x] Orbiting around a black hole test
+- [ ] Correct object orientation with parallel transport
 - [ ] Traversable event horizon
 
 Test objects, interaction:

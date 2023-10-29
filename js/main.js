@@ -1,12 +1,17 @@
 // Greetings to Iq/RGBA! ;)
 
-import { html, Component, render } from 'https://unpkg.com/htm/preact/standalone.module.js';
+// import { Component, render } from 'https://unpkg.com/htm/preact/standalone.module.js';
+import { h, createElement, Component, render } from 'https://esm.sh/preact';
+import htm from 'https://unpkg.com/htm?module';
+
 import * as renderer from './renderer.js';
 import { World } from './world.js';
 import { ObjectInfo, shipId, shipThrustingId, asteroidId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
 import { velocity3, Schwarzschild } from './metric.js';
+
+const html = htm.bind(h);
 
 var quality = 4
 const quality_levels = [1, 2, 4, 8]
@@ -104,23 +109,23 @@ class App extends Component {
     world.viewportSize *= Math.exp(ev.deltaY / 500);
   }
 
-  activateBoost = _ => {
-    this.setState({tool: 'boost'});
-  }
+  zoomIn = _ => world.viewportSize /= 1.7;
+
+  zoomOut = _ => world.viewportSize *= 1.7;
+
+  activateBoost = _ => this.setState({tool: 'boost'});
 
   activateSpawn = _ => {
     this.setState({tool: 'spawn'});
   }
 
   tauClicked = _ => {
-    console.log('tau clicked');
     initWorld();
     this.setState({tau: world.time })
   }
 
   selectQuality = ev => {
     quality = quality_levels[ev.target.selectedIndex];
-    console.log(quality);
     refreshWindow();
   }
 
@@ -148,13 +153,12 @@ class App extends Component {
     return html`
     <div id="preact_toolbar">
       <div id="right_side">
-        <img src="img/github-mark-white.svg" title="Go to GitHub Repository" onClick=${this.goToGithub} />
+        <button onClick=${this.zoomIn}>+</button>
+        <button onClick=${this.zoomOut}>−</button>
         <select onChange=${this.selectQuality}>
-          <option>1x</option>
-          <option>2x</option>
-          <option selected=true>4x</option>
-          <option>8x</option>
+        ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
         </select>
+        <img src="img/github-mark-white.svg" title="Go to GitHub Repository" onClick=${this.goToGithub} />
         <img src="img/fullscreen.svg" title="Press F11 to enter or leave fullscreen mode" onClick=${this.fullscreen} />
       </div>
       <div id="left_side">
