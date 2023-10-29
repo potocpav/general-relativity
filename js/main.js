@@ -1,8 +1,8 @@
 // Greetings to Iq/RGBA! ;)
 
 // import { Component, render } from 'https://unpkg.com/htm/preact/standalone.module.js';
-import { h, createElement, Component, render } from 'https://esm.sh/preact';
-import htm from 'https://unpkg.com/htm?module';
+import { h, Component, render } from 'https://esm.sh/preact';
+import htm from 'https://esm.sh/htm';
 
 import * as renderer from './renderer.js';
 import { World } from './world.js';
@@ -16,7 +16,7 @@ const html = htm.bind(h);
 var quality = 4
 const quality_levels = [1, 2, 4, 8]
 
-const rs = 0.01;
+const rs = 0.03;
 const metric = new Schwarzschild(rs);
 
 var canvas;
@@ -33,8 +33,9 @@ var params = {
 };
 
 function initWorld() {
-  const x = nj.array([0, 30 * rs, 0]);
-  const u2 = nj.array([0, 0.08]);
+  const r = 10 * rs;
+  const x = nj.array([0, r, 0]);
+  const u2 = nj.array([0.0, Math.sqrt(rs/(2*r)) * 0.9]);
 
   world.viewportSize = 1.5;
   world.timeScale = 1.0;
@@ -64,6 +65,8 @@ class App extends Component {
   componentDidMount () {
     canvas = document.getElementById("canvas")
     gl = renderer.initGl(canvas);
+
+    document.body.onkeydown = this.onKeyDown;
 
     startup().then(() => {
       initWorld();
@@ -109,6 +112,17 @@ class App extends Component {
     world.viewportSize *= Math.exp(ev.deltaY / 500);
   }
 
+  onKeyDown = ev => {
+    switch (ev.code) {
+      case "Digit1": this.activateBoost();
+      break; case "Digit2": this.activateSpawn();
+    }
+    switch (ev.key) {
+      case "r": this.reset();
+      break; case " ": console.log('space');
+    }
+  }
+
   zoomIn = _ => world.viewportSize /= 1.7;
 
   zoomOut = _ => world.viewportSize *= 1.7;
@@ -119,7 +133,7 @@ class App extends Component {
     this.setState({tool: 'spawn'});
   }
 
-  tauClicked = _ => {
+  reset = _ => {
     initWorld();
     this.setState({tau: world.time })
   }
@@ -151,7 +165,7 @@ class App extends Component {
 
   render() {
     return html`
-    <div id="preact_toolbar">
+    <div id="toolbar">
       <div id="right_side">
         <button onClick=${this.zoomIn}>+</button>
         <button onClick=${this.zoomOut}>−</button>
@@ -165,9 +179,9 @@ class App extends Component {
         <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
         <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
 
-        <button onClick=${this.tauClicked}>${printTime(this.state.tau)}</button>
+        <button onClick=${this.reset}>${printTime(this.state.tau)}</button>
         <button>${print3Vec(this.state.obsvX)}</button>
-        <button>${print3Vec(this.state.obsvU)}</button>
+        <button>${printVelocity(this.state.obsvU)}</button>
       </div>
     </div>
     <canvas
@@ -182,7 +196,6 @@ class App extends Component {
 }
 
 render(html`<${App} />`, document.body);
-
 
 async function startup() {
   world = new World(gl, metric);
@@ -212,6 +225,14 @@ function printTime(s) {
     const minutes = Math.floor(s / 60);
     const seconds = (s % 60).toFixed(2).padStart(5, '0');
     return `${minutes}:${seconds}`;
+  }
+}
+
+function printVelocity(u) {
+  if (u === null) {
+    return "n/a"
+  } else {
+    return "v = " + Math.floor(Math.sqrt(1-Math.pow(u.get(0), -2)) * 100) + " %"
   }
 }
 

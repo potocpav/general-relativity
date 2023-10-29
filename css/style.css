@@ -69,7 +69,7 @@ option {
   transition: opacity 1s;
 }
 
-#preact_toolbar {
+#toolbar {
   position: absolute;
   top: 0;
   padding: 25px;

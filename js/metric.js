@@ -6,7 +6,8 @@ export const velocity3 = (metric, x, u2_cart) => {
   const [ux, uy] = metric.viewportToWorld(x, u2_cart).tolist();
   const gx = metric.g(x);
   console.assert(gx.get(0,1) == 0 && gx.get(0,2) == 0 && gx.get(1,2) == 0);
-  return nj.array([Math.sqrt(-(1 + gx.get(1,1) * ux*ux + gx.get(2,2) * uy*uy) / gx.get(0,0)), ux, uy]);
+  const lambda = Math.pow(-(gx.get(0,0) + gx.get(1,1) * ux*ux + gx.get(2,2) * uy*uy), -1/2);
+  return nj.array([lambda, ux*lambda, uy*lambda]);
 }
 
 export class Schwarzschild {

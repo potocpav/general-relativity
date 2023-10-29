@@ -30,6 +30,7 @@ layout(std140) uniform objectInfo {
 out vec4 out_color;
 
 #define pi 3.141592653589793
+#define epsilon 1e-5
 
 // Screen-space to viwport-space
 
@@ -200,7 +201,7 @@ vec2 viewport2world(float r, float phi, vec2 x) {
 // Lorentz boost matrix
 
 mat3 boost(vec3 u) {
-	float fac = (u.x - 1.0) / dot(u.yz, u.yz);
+	float fac = (u.x - 1.0) / (dot(u.yz, u.yz) + epsilon);
 	return mat3(
 		u.x, -u.y, -u.z,
 		-u.y, 1.0 + fac * u.y*u.y, fac * u.y*u.z,
@@ -317,7 +318,7 @@ void main( void ) {
 		vec3 pix_x1 = rk4_x(pix_x, pix_u, dl);
 		pix_u = pix_u1;
 		pix_x = pix_x1;
-		if (pix_x.y < rs * rs)
+		if (pix_x.y < rs)
 			break;
 	}
 	float lorentz_rshift = pix_u0.x / pix_v3.x;

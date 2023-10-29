@@ -2,6 +2,8 @@
 // // Minkowski metric
 // const nu = nj.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]);
 
+const epsilon = 1e-10;
+
 function inverse_diag3(m) {
 	return nj.array([
 		[1 / m.get(0,0), 0, 0],
@@ -11,7 +13,7 @@ function inverse_diag3(m) {
 
 // Lorentz boost
 function boost(u) {
-	const fac = (u.get(0) - 1.0) / (u.get(1)*u.get(1) + u.get(2)*u.get(2));
+	const fac = (u.get(0) - 1.0) / (u.get(1)*u.get(1) + u.get(2)*u.get(2) + epsilon);
 	return nj.array([
 		[u.get(0), -u.get(1), -u.get(2)],
 		[-u.get(1), 1.0 + fac * u.get(1)*u.get(1), fac * u.get(1)*u.get(2)],
@@ -35,7 +37,7 @@ export const geo_f = (metric, accel_rest) => (xu) => {
   if (accel_rest != undefined)
     accel = general_boost(metric.T(x), neg_u(u)).dot(accel_rest);
   else
-  accel = nj.array([0,0,0]);
+    accel = nj.array([0,0,0]);
   return nj.array([
     u.get(0),
     u.get(1),

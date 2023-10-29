@@ -37,7 +37,7 @@ export class World {
     this.time += this.dt;
 
     // rocket motor
-    var accel3_rest = nj.array([0,0,0]);
+    var accel3_rest = undefined;
     const acceleration = 0.5;
     if (mousePos.get(0) != 0 || mousePos.get(1) != 0) {
       const mouseViewport = screenToViewport(mousePos, screenDim, this.viewportSize);
