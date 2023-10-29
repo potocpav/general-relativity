@@ -61,9 +61,9 @@ img {
   cursor: pointer;
 }
 
-  img:hover {
-    background-color: #FFFFFF;
-  }
+img:hover {
+  background-color: #FFFFFF;
+}
 
 option {
   color: #ffffff;
@@ -72,4 +72,17 @@ option {
 
 #toolbar {
   transition: opacity 1s;
+}
+
+#preact_toolbar {
+  position: absolute;
+  top: 0;
+  padding: 25px;
+  padding-top: max(25px, env(safe-area-inset-top)); /* handle hole-punch camera & notch */
+  width: 100%;
+
+}
+
+#right_side {
+  float: right;
 }

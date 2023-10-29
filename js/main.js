@@ -1,19 +1,15 @@
 // Greetings to Iq/RGBA! ;)
 
+import { html, Component, render } from 'https://unpkg.com/htm/preact/standalone.module.js';
 import * as renderer from './renderer.js';
-import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, shipId, shipThrustingId, asteroidId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
 import { velocity3, Schwarzschild } from './metric.js';
 
-var quality = 4, quality_levels = [1, 2, 4, 8];
-var toolbar;
-var boostButton, spawnButton;
-var timeButton, obsvXButton, obsvUButton;
-var githubButton, fullscreenButton;
-var mouseWorldX;
+var quality = 4
+const quality_levels = [1, 2, 4, 8]
 
 const rs = 0.01;
 const metric = new Schwarzschild(rs);
@@ -29,7 +25,6 @@ var params = {
   mousePos: nj.array([0, 0]),
   pointerDn: false,
   screenDim: nj.array([window.innerWidth, window.innerHeight]),
-  tool: 'boost',
 };
 
 function initWorld() {
@@ -44,7 +39,6 @@ function initWorld() {
   world.obsvX = x;
   world.obsvU = velocity3(metric, x, u2);
   world.obsvO = nj.array([0.0, 1.0]);
-  mouseWorldX = nj.array([0.0, 0.0, 0.0]);
   world.eventX = nj.array([0.0, 0.0, 0.0]);
 
   // objects
@@ -54,91 +48,87 @@ function initWorld() {
   trajectories.add(asteroid);
 }
 
-startup().then(() => {
-  initWorld();
-  animate();
-});
+class App extends Component {
+  state = {
+    tool: 'boost',
+    tau: null,
+    obsvX: null,
+    obsvU: null,
+  }
 
-async function startup() {
-  canvas = document.createElement('canvas');
-  document.body.appendChild(canvas);
+  componentDidMount () {
+    canvas = document.getElementById("canvas")
+    gl = renderer.initGl(canvas);
 
-  gl = renderer.initGl(canvas);
+    startup().then(() => {
+      initWorld();
+      this.animate();
+    });
+  }
 
-  world = new World(gl, metric);
+  animate() {
+    requestAnimationFrame(() => this.animate());
+    world.update(params.mousePos, params.pointerDn, params.screenDim);
+    renderer.render();
+    this.setState({
+      tau: world.time,
+      obsvX: world.obsvX,
+      obsvU: world.obsvU,
+    });
+  }
 
-  objectInfo = new ObjectInfo(gl);
-  await objectInfo.initialize();
+  onPointerMove = ev => {
+    params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
+  }
 
-  trajectories = new Trajectories(gl);
+  onPointerDown = ev => {
+    params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
 
-  await renderer.init(gl, world, objectInfo, trajectories);
-
-  toolbar = createToolbar();
-
-  // event listeners
-  initEventListeners();
-}
-
-function initEventListeners() {
-  document.addEventListener('pointermove', function (event) {
-    params.mousePos = nj.array([event.clientX, window.innerHeight - event.clientY]);
-  }, false);
-
-  document.addEventListener('pointerdown', (event) => {
-    params.mousePos = nj.array([event.clientX, window.innerHeight - event.clientY]);
-
-    if (params.tool == 'boost') {
+    if (this.state.tool == 'boost') {
       params.pointerDn = true;
     }
 
-    if (params.tool == 'spawn') {
+    if (this.state.tool == 'spawn') {
       const mouseWorldX = world.getWorldPos(params.mousePos, params.screenDim);
       const asteroid_v0 = nj.array([0.0, 0.0]);
       asteroid = new Trajectory(metric, asteroidId, mouseWorldX, velocity3(metric, mouseWorldX, asteroid_v0))
       trajectories.add(asteroid);
     }
-  });
+  }
 
-  document.addEventListener('pointerup', (event) => {
+  onPointerUp = _ => {
     params.pointerDn = false;
-  });
+  }
 
-  document.addEventListener('wheel', (event) => {
-    world.viewportSize *= Math.exp(event.deltaY / 500);
+  onWheel = ev => {
+    world.viewportSize *= Math.exp(ev.deltaY / 500);
+  }
 
-  }, false);
+  activateBoost = _ => {
+    this.setState({tool: 'boost'});
+  }
 
-  onWindowResize();
-  window.addEventListener('resize', onWindowResize, false);
-}
+  activateSpawn = _ => {
+    this.setState({tool: 'spawn'});
+  }
 
-function createToolbar() {
-  toolbar = document.createElement('div');
-  toolbar.id = 'toolbar';
-  toolbar.style.position = 'absolute';
-  toolbar.style.top = '0px';
-  toolbar.style.padding = '25px';
-  toolbar.style.paddingTop = 'max(25px, env(safe-area-inset-top))'; // handle hole-punch camera & notch
-  toolbar.style.width = '100%';
-  document.body.appendChild(toolbar);
+  tauClicked = _ => {
+    console.log('tau clicked');
+    initWorld();
+    this.setState({tau: world.time })
+  }
 
-  var rightside = document.createElement('div');
-  rightside.style.cssFloat = 'right';
-  toolbar.appendChild(rightside);
+  selectQuality = ev => {
+    quality = quality_levels[ev.target.selectedIndex];
+    console.log(quality);
+    refreshWindow();
+  }
 
-  githubButton = document.createElement('img');
-  githubButton.src = 'img/github-mark-white.svg';
-  githubButton.title = 'Go to GitHub Repository';
-  githubButton.addEventListener('click', function (event) {
+  goToGithub = _ => {
     window.location.href = "https://github.com/potocpav/general-relativity";
-  }, false);
-  rightside.appendChild(githubButton);
+  }
 
-  fullscreenButton = document.createElement('img');
-  fullscreenButton.src = 'img/fullscreen.svg';
-  fullscreenButton.title = 'Press F11 to enter or leave fullscreen mode';
-  fullscreenButton.addEventListener('click', function (event) {
+  fullscreen = _ => {
     if (document.fullscreenElement) {
       document.exitFullscreen();
       return;
@@ -152,90 +142,79 @@ function createToolbar() {
     } else if (document.documentElement.webkitRequestFullscreen /* Safari */) {
       document.documentElement.webkitRequestFullscreen();
     }
-  }, false);
-  rightside.appendChild(fullscreenButton);
-
-  boostButton = document.createElement('button');
-  boostButton.textContent = 'boost';
-
-  spawnButton = document.createElement('button');
-  spawnButton.textContent = 'spawn';
-
-  toolbar.appendChild(boostButton);
-  boostButton.classList.add("clicked");
-  boostButton.addEventListener('click', e => {
-    params.tool = 'boost';
-    spawnButton.classList.remove("clicked");
-    boostButton.classList.add("clicked");
-    e.preventDefault();
-  }, false);
-
-  toolbar.appendChild(spawnButton);
-  spawnButton.addEventListener('click', e => {
-    params.tool = 'spawn';
-    boostButton.classList.remove("clicked");
-    spawnButton.classList.add("clicked");
-    e.preventDefault();
-  }, false);
-
-  timeButton = document.createElement('button');
-  timeButton.textContent = '0:00.00';
-  timeButton.addEventListener('click', e => {
-    initWorld();
-    e.preventDefault();
-  }, false);
-  toolbar.appendChild(timeButton);
-
-  obsvXButton = document.createElement('button');
-  toolbar.appendChild(obsvXButton);
-
-  obsvUButton = document.createElement('button');
-  toolbar.appendChild(obsvUButton);
-
-  var select = document.createElement('select');
-
-  for (var i = 0; i < quality_levels.length; i ++) {
-    var option = document.createElement('option');
-    option.textContent = quality_levels[i] + 'x';
-    if (quality_levels[i] == quality) option.selected = true;
-    select.appendChild(option);
   }
 
-  select.addEventListener('change', function (event) {
-    quality = quality_levels[event.target.selectedIndex];
-    onWindowResize();
-  }, false);
+  render() {
+    return html`
+    <div id="preact_toolbar">
+      <div id="right_side">
+        <img src="img/github-mark-white.svg" title="Go to GitHub Repository" onClick=${this.goToGithub} />
+        <select onChange=${this.selectQuality}>
+          <option>1x</option>
+          <option>2x</option>
+          <option selected=true>4x</option>
+          <option>8x</option>
+        </select>
+        <img src="img/fullscreen.svg" title="Press F11 to enter or leave fullscreen mode" onClick=${this.fullscreen} />
+      </div>
+      <div id="left_side">
+        <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
+        <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
 
-  toolbar.appendChild(select);
-  return toolbar;
+        <button onClick=${this.tauClicked}>${printTime(this.state.tau)}</button>
+        <button>${print3Vec(this.state.obsvX)}</button>
+        <button>${print3Vec(this.state.obsvU)}</button>
+      </div>
+    </div>
+    <canvas
+      id="canvas"
+      onPointerMove=${this.onPointerMove}
+      onPointerDown=${this.onPointerDown}
+      onPointerUp=${this.onPointerUp}
+      onWheel=${this.onWheel}
+      />
+    `;
+  }
 }
 
-function onWindowResize() {
+render(html`<${App} />`, document.body);
+
+
+async function startup() {
+  world = new World(gl, metric);
+
+  objectInfo = new ObjectInfo(gl);
+  await objectInfo.initialize();
+
+  trajectories = new Trajectories(gl);
+
+  await renderer.init(gl, world, objectInfo, trajectories);
+
+  refreshWindow();
+  window.addEventListener('resize', refreshWindow, false);
+}
+
+function refreshWindow() {
   canvas.width = window.innerWidth / quality;
   canvas.height = window.innerHeight / quality;
   renderer.initializeWindow(canvas.width, canvas.height);
   params.screenDim = nj.array([window.innerWidth, window.innerHeight]);
 }
 
-function animate() {
-  requestAnimationFrame(() => animate());
-  world.update(params.mousePos, params.pointerDn, params.screenDim);
-  renderUi();
-  renderer.render();
-}
-
-function renderUi() {
-  timeButton.textContent = printTime(world.time);
-  obsvXButton.textContent = "X: " + print3Vec(world.obsvX);
-  obsvUButton.textContent = "U: " + print3Vec(world.obsvU);
-}
-
 function printTime(s) {
-  const minutes = Math.floor(s / 60);
-  const seconds = (s % 60).toFixed(2).padStart(5, '0');
-  return `${minutes}:${seconds}`;
+  if (s === null) {
+    return "n/a"
+  } else {
+    const minutes = Math.floor(s / 60);
+    const seconds = (s % 60).toFixed(2).padStart(5, '0');
+    return `${minutes}:${seconds}`;
+  }
 }
 
 function print3Vec(x) {
-  return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
+  if (x === null) {
+    return "n/a"
+  } else {
+    return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
+  }
 }

@@ -47,24 +47,24 @@ export class ObjectInfo {
       img.addEventListener('load', () => resolve(img));
       img.src = spritesFile;
     });
-    const img = await loadPromise;
+    this.img = await loadPromise;
 
-    const [width, height, depth] = spritesShape;
-    if (img.width * img.height != width * height * depth) {
-      console.error("Image has unexpected number of pixels.", [img.width, img.height], [width, height, depth]);
+    [this.width, this.height, this.depth] = spritesShape;
+    if (this.img.width * this.img.height != this.width * this.height * this.depth) {
+      console.error("Image has unexpected number of pixels.", [this.img.width, this.img.height], [this.width, this.height, this.depth]);
     }
+  }
 
+  compile(program) {
     this.spriteTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.spriteTexture);
-    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, width, height, depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, this.width, this.height, this.depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.img);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
-  }
 
-  compile(program) {
     this.spriteUniformLocation = gl.getUniformLocation(program, 'sprites');
 
     // set up object info UBO
