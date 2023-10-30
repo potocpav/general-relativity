@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { ObjectInfo, shipId, shipThrustingId, asteroidId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, Schwarzschild } from './metric.js';
+import { velocity3, Schwarzschild, GP } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -35,9 +35,11 @@ var params = {
 function initWorld() {
   const r = 10 * rs;
   const x = nj.array([0, r, 0]);
-  const u2 = nj.array([0.0, Math.sqrt(rs/(2*r)) * 0.9]);
+  // const u2 = nj.array([0.0, 0.0]); // stationary
+  // const u2 = nj.array([-(1 - rs/r) * Math.sqrt(rs/r), 0.0]); // raindrop
+  const u2 = nj.array([0.0, Math.sqrt(rs/(2*r))]); // circular orbit
 
-  world.viewportSize = 1.5;
+  world.viewportSize = 3;
   world.timeScale = 1.0;
   world.rs = rs;
 
