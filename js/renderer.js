@@ -77,7 +77,7 @@ function compileSurfaceProgram(vertex, fragment) {
 
   // Cache uniforms
   cacheUniformLocation(program, 'resolution');
-  cacheUniformLocation(program, 'screen_size');
+  cacheUniformLocation(program, 'viewport_size');
 
   world.compile(program);
   trajectories.compile(program);

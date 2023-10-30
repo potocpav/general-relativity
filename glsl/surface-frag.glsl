@@ -12,7 +12,7 @@ uniform vec2 obsv_o; // orientation vector
 uniform int obsv_sprite;
 uniform vec3 event_x; // debugging event
 
-uniform float screen_size;
+uniform float viewport_size;
 uniform float rs;
 
 uniform sampler3D sprites;
@@ -87,7 +87,7 @@ vec3 grid_color(vec3 pos) {
 	// adaptive stride calculation
 	mat3 gx = g(pos);
 	float grids_per_screen = 20.0;
-	vec3 stride_raw = screen_size / vec3(sqrt(-gx[0][0]), sqrt(gx[1][1]), sqrt(gx[2][2])) / grids_per_screen;
+	vec3 stride_raw = viewport_size / vec3(sqrt(-gx[0][0]), sqrt(gx[1][1]), sqrt(gx[2][2])) / grids_per_screen;
 	vec3 stride_log = log2(stride_raw);
 	vec3 stride_floor = floor(stride_log);
 	vec3 stride_alpha = 1.0 - (stride_log - stride_floor);
@@ -110,9 +110,8 @@ vec3 grid_color(vec3 pos) {
 	return vec3((0.0 + max(grid, grid2))*0.3);
 }
 
-float black_hole(vec3 pos) {
-	float pos_viz = (rs - pos.y) * 100.0;
-	return min(1.0, max(0.0, -pos_viz));
+vec4 out_of_bounds(bool reached, vec4 c) {
+	return reached ? c : vec4(0.1, 0.0, 0.0, 1.0);
 }
 
 // compute 3-vector out of a 2-vector so that ds = 0
@@ -134,23 +133,9 @@ vec3 geo_u(vec3 x, vec3 u) {
 		-dot(Gamma2(x) * u, u));
 }
 
-// RK4 with constant step solver
-void rk4(vec3 x, vec3 u, float h, out vec3 x1, out vec3 u1) {
-	vec3 k1x = u;
-	vec3 k1u = geo_u(x, u);
-	vec3 k2x = u + k1u * h / 2.0;
-	vec3 k2u = geo_u(x + k1x * h / 2.0, u + k1u * h / 2.0);
-	vec3 k3x = u + k2u * h / 2.0;
-	vec3 k3u = geo_u(x + k2x * h / 2.0, u + k2u * h / 2.0);
-	vec3 k4x = u + k3u * h;
-	vec3 k4u = geo_u(x + k3x * h, u + k3u * h);
-	x1 = x + h / 6.0 * (k1x + 2.0*k2x + 2.0*k3x + k4x);
-	u1 = u + h / 6.0 * (k1u + 2.0*k2u + 2.0*k3u + k4u);
-}
-
 // Bogacki–Shampine RK23 adaptive solver
 // https://en.m.wikipedia.org/wiki/Bogacki%E2%80%93Shampine_method
-void rk23(vec3 x, vec3 u, float h, out vec3 x1, out vec3 u1, out vec3 z1u) {
+void rk23(vec3 x, vec3 u, float h, out vec3 x1, out vec3 u1, out vec3 z1x, out vec3 z1u) {
 	vec3 k1x = geo_x(x, u);
 	vec3 k1u = geo_u(x, u);
 	vec3 k2x = geo_x(x + k1x * h * 0.5, u + k1u * h * 0.5);
@@ -161,33 +146,61 @@ void rk23(vec3 x, vec3 u, float h, out vec3 x1, out vec3 u1, out vec3 z1u) {
 	u1 = u + h * (2.0/9.0 * k1u + 1.0/3.0 * k2u + 4.0/9.0 * k3u);
 	vec3 k4x = geo_x(x1, u1);
 	vec3 k4u = geo_u(x1, u1); 	// TODO: re-use k4u
+	z1x = x + h * (7.0/24.0 * k1x + 0.25 * k2x + 1.0/3.0 * k3x + 0.125 * k4x);
 	z1u = u + h * (7.0/24.0 * k1u + 0.25 * k2u + 1.0/3.0 * k3u + 0.125 * k4u);
 }
 
-// 	const vec3 rtol = vec3(0.001);
-// 	const vec3 atol = vec3(0.000001);
-// 	float lmax = undefined;
+bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
+	const float SAFETY = 0.9;
+	float INITIAL_H = 0.1;
+	const float MIN_FACTOR = 0.1;
+	const float MAX_FACTOR = 10.0;
+	const float ATOL = 0.0;
+	const float RTOL = 0.001;
+	const float ERR_EXPONENT = -1.0/3.0;
+	const int MAX_ITERS = 40;
 
-// 	const mat3 A = mat3(
-// 		0.0, 0.5, 0.0,
-// 		0.0, 0.0, 0.75,
-// 		0.0, 0.0, 0.0);
-// 	const vec3 B = vec3(2.0/9.0, 1.0/3.0, 4.0/9.0);
-// 	const vec3 C = vec3(0.0, 0.5, 0.75);
-// 	const vec4 E = vec4(5.0/72.0, -1.0/12.0, -1.0/9.0, 1.0/8.0);
-// 	// TODO: K
+	x = x0;
+	u = u0;
+	float l = 0.0;
+	float h = INITIAL_H;
+	bool step_accepted = true;
+	for (int n = 0; n < MAX_ITERS && l < 1.0; n += 1) {
+		float l1 = min(l + h, 1.0);
+		h = l1 - l;
 
-// 	vec3 K;
-// 	K0 = geo_u(x, u);
-// 	dy = K0 *
+		vec3 x1, u1, z1x, z1u;
+		rk23(x, u, h, x1, u1, z1x, z1u);
 
-// 	// vec3 k1 = geo_u(x, u);
-// 	// vec3 k2 = geo_u(x, u + k1 * h / 2.0);
-// 	// vec3 k3 = geo_u(x, u + k2 * h / 2.0);
-// 	// vec3 k4 = geo_u(x, u + k3 * h);
-// 	// return u + h / 6.0 * (k1 + 2.0*k2 + 2.0*k3 + k4);
-// }
+		float scale = ATOL + max(length(u), length(u1)) * RTOL;
+		float error = length(z1u - u1) / scale;
 
+		float factor;
+		if (error < 1.0) {
+			if (error == 0.0) {
+				factor = MAX_FACTOR;
+			} else {
+				factor = min(MAX_FACTOR, SAFETY * pow(error, ERR_EXPONENT));
+			}
+			if (!step_accepted) {
+				factor = min(1.0, factor);
+			}
+			h *= factor;
+			step_accepted = true;
+		} else {
+			factor = max(MIN_FACTOR, SAFETY * pow(error, ERR_EXPONENT));
+			h *= factor;
+			step_accepted = false;
+		}
+
+		if (step_accepted) {
+			l = l1;
+			u = u1;
+			x = x1;
+		}
+	}
+	return l >= 1.0;
+}
 
 // Matrix manipulation
 
@@ -313,11 +326,9 @@ vec4 render_obj(vec3 pix_x, int sprite_i, float rshift, float tau, vec3 deltax, 
 	}
 }
 
-const float max_iters = 100.0;
-
 void main( void ) {
 	// screen to observer space transformation
-	vec2 pix_cartesian = s2v(gl_FragCoord.xy, screen_size);
+	vec2 pix_cartesian = s2v(gl_FragCoord.xy, viewport_size);
 	vec2 pix_target = viewport2world(obsv_x.y, obsv_x.z, pix_cartesian);
 
 	vec3 pix_v3 = light3(obsv_x, pix_target); // 3-vec pointing at pix
@@ -328,17 +339,8 @@ void main( void ) {
 	vec3 pix_u0 = general_boost(T(obsv_x), neg_u(obsv_u)) * pix_v3;
 
 	// raytracing along null geodesics
-	vec3 pix_x = obsv_x;
-	vec3 pix_u = pix_u0;
-	float dl = 1.0 / max_iters;
-	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
-		vec3 pix_x1, pix_u1, z;
-		rk23(pix_x, pix_u, dl, pix_x1, pix_u1, z);
-		pix_u = pix_u1;
-		pix_x = pix_x1;
-		if (pix_x.y < rs)
-			break;
-	}
+	vec3 pix_x, pix_u;
+	bool reached = raytrace(obsv_x, pix_u0, pix_x, pix_u);
 	float lorentz_rshift = pix_u0.x / pix_v3.x;
 	float grav_rshift = sqrt(g(obsv_x)[0][0] / g(pix_x)[0][0]);
 	float rshift = lorentz_rshift * grav_rshift;
@@ -394,5 +396,5 @@ void main( void ) {
 	// 	pix_x, 2, 1.0, time, vec3(0.0, cyclic(event_x-pix_x).yz/1.0), vec2(1.0, 0.0));
 	// objects_color = mix(objects_color, event_color, event_color.a);
 
-	out_color = black_hole(pix_x) * mix(vec4(world_color, 1.0), objects_color, objects_color.a);
+	out_color = out_of_bounds(reached, mix(vec4(world_color, 1.0), objects_color, objects_color.a));
 }

@@ -31,6 +31,7 @@ Raytracing:
 - [x] Light attenuation
 - [x] Relativistic beaming
 - [x] Object relativistic beaming
+- [x] Adaptive RK step size for photons
 - [ ] Correct redshift visualization
 - [ ] HDR
 - [ ] Bloom

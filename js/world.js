@@ -19,7 +19,7 @@ export class World {
     this.obsv_o_loc = gl.getUniformLocation(program, 'obsv_o');
     this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
     this.rs_loc = gl.getUniformLocation(program, 'rs');
-    this.screen_size_loc = gl.getUniformLocation(program, 'screen_size');
+    this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
 
     // just a debugging event
     this.event_x_loc = gl.getUniformLocation(program, 'event_x');
@@ -83,7 +83,7 @@ export class World {
     gl.uniform2f(this.obsv_o_loc, this.obsvO.get(0), this.obsvO.get(1));
     gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
     gl.uniform1f(this.rs_loc, this.rs);
-    gl.uniform1f(this.screen_size_loc, this.viewportSize);
+    gl.uniform1f(this.viewport_size_loc, this.viewportSize);
     gl.uniform3f(this.event_x_loc, this.eventX.get(0), this.eventX.get(1), this.eventX.get(2));
   }
 }

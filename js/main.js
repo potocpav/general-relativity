@@ -13,8 +13,8 @@ import { velocity3, Schwarzschild, GP } from './metric.js';
 
 const html = htm.bind(h);
 
-var quality = 4
-const quality_levels = [1, 2, 4, 8]
+var quality = 2;
+const quality_levels = [1, 2, 4, 8];
 
 const rs = 0.03;
 const metric = new Schwarzschild(rs);
