@@ -62,6 +62,7 @@ class App extends Component {
     tau: null,
     obsvX: null,
     obsvU: null,
+    fps: null,
   }
 
   componentDidMount () {
@@ -84,6 +85,7 @@ class App extends Component {
       tau: world.time,
       obsvX: world.obsvX,
       obsvU: world.obsvU,
+      fps: Math.floor(1 / world.dt),
     });
   }
 
@@ -184,6 +186,7 @@ class App extends Component {
         <button onClick=${this.reset}>${printTime(this.state.tau)}</button>
         <button>${print3Vec(this.state.obsvX)}</button>
         <button>${printVelocity(this.state.obsvU)}</button>
+        <button>${this.state.fps + " FPS"}</button>
       </div>
     </div>
     <canvas

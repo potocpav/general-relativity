@@ -122,7 +122,10 @@ vec3 light3(vec3 x, vec2 u2) {
 	return vec3(-sqrt(-res), u2);
 }
 
-// RK4 with constant step solver
+
+vec3 geo_x(vec3 x, vec3 u) {
+	return u;
+}
 
 vec3 geo_u(vec3 x, vec3 u) {
 	return vec3(
@@ -131,21 +134,36 @@ vec3 geo_u(vec3 x, vec3 u) {
 		-dot(Gamma2(x) * u, u));
 }
 
-vec3 rk4_u(vec3 x, vec3 u, float h) {
-	vec3 k1 = geo_u(x, u);
-	vec3 k2 = geo_u(x, u + k1 * h / 2.0);
-	vec3 k3 = geo_u(x, u + k2 * h / 2.0);
-	vec3 k4 = geo_u(x, u + k3 * h);
-	return u + h / 6.0 * (k1 + 2.0*k2 + 2.0*k3 + k4);
-}
-
-vec3 rk4_x(vec3 x, vec3 u, float h) {
-	return x + u * h;
+// RK4 with constant step solver
+void rk4(vec3 x, vec3 u, float h, out vec3 x1, out vec3 u1) {
+	vec3 k1x = u;
+	vec3 k1u = geo_u(x, u);
+	vec3 k2x = u + k1u * h / 2.0;
+	vec3 k2u = geo_u(x + k1x * h / 2.0, u + k1u * h / 2.0);
+	vec3 k3x = u + k2u * h / 2.0;
+	vec3 k3u = geo_u(x + k2x * h / 2.0, u + k2u * h / 2.0);
+	vec3 k4x = u + k3u * h;
+	vec3 k4u = geo_u(x + k3x * h, u + k3u * h);
+	x1 = x + h / 6.0 * (k1x + 2.0*k2x + 2.0*k3x + k4x);
+	u1 = u + h / 6.0 * (k1u + 2.0*k2u + 2.0*k3u + k4u);
 }
 
 // Bogacki–Shampine RK23 adaptive solver
+// https://en.m.wikipedia.org/wiki/Bogacki%E2%80%93Shampine_method
+void rk23(vec3 x, vec3 u, float h, out vec3 x1, out vec3 u1, out vec3 z1u) {
+	vec3 k1x = geo_x(x, u);
+	vec3 k1u = geo_u(x, u);
+	vec3 k2x = geo_x(x + k1x * h * 0.5, u + k1u * h * 0.5);
+	vec3 k2u = geo_u(x + k1x * h * 0.5, u + k1u * h * 0.5);
+	vec3 k3x = geo_x(x + k2x * h * 0.75, u + k2u * h * 0.75);
+	vec3 k3u = geo_u(x + k2x * h * 0.75, u + k2u * h * 0.75);
+	x1 = x + h * (2.0/9.0 * k1x + 1.0/3.0 * k2x + 4.0/9.0 * k3x);
+	u1 = u + h * (2.0/9.0 * k1u + 1.0/3.0 * k2u + 4.0/9.0 * k3u);
+	vec3 k4x = geo_x(x1, u1);
+	vec3 k4u = geo_u(x1, u1); 	// TODO: re-use k4u
+	z1u = u + h * (7.0/24.0 * k1u + 0.25 * k2u + 1.0/3.0 * k3u + 0.125 * k4u);
+}
 
-// vec3 rk23_u(vec3 x, vec3 u, float h) {
 // 	const vec3 rtol = vec3(0.001);
 // 	const vec3 atol = vec3(0.000001);
 // 	float lmax = undefined;
@@ -314,8 +332,8 @@ void main( void ) {
 	vec3 pix_u = pix_u0;
 	float dl = 1.0 / max_iters;
 	for (float tau = 0.0; tau < 1.0; tau += 1.0 / max_iters) {
-		vec3 pix_u1 = rk4_u(pix_x, pix_u, dl);
-		vec3 pix_x1 = rk4_x(pix_x, pix_u, dl);
+		vec3 pix_x1, pix_u1, z;
+		rk23(pix_x, pix_u, dl, pix_x1, pix_u1, z);
 		pix_u = pix_u1;
 		pix_x = pix_x1;
 		if (pix_x.y < rs)
