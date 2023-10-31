@@ -73,19 +73,19 @@ class App extends Component {
 
     startup().then(() => {
       initWorld();
-      this.animate();
+      requestAnimationFrame(t => this.animate(t));
     });
   }
 
-  animate() {
-    requestAnimationFrame(() => this.animate());
-    world.update(params.mousePos, params.pointerDn, params.screenDim);
+  animate(t) {
+    requestAnimationFrame(t => this.animate(t));
+    world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim);
     renderer.render();
     this.setState({
       tau: world.time,
       obsvX: world.obsvX,
       obsvU: world.obsvU,
-      fps: Math.floor(1 / world.dt),
+      fps: Math.floor(world.fps),
     });
   }
 
@@ -171,22 +171,31 @@ class App extends Component {
     return html`
     <div id="toolbar">
       <div id="right_side">
-        <button onClick=${this.zoomIn}>+</button>
-        <button onClick=${this.zoomOut}>−</button>
-        <select onChange=${this.selectQuality}>
-        ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
-        </select>
-        <img src="img/github-mark-white.svg" title="Go to GitHub Repository" onClick=${this.goToGithub} />
-        <img src="img/fullscreen.svg" title="Press F11 to enter or leave fullscreen mode" onClick=${this.fullscreen} />
+        <div>
+          <select onChange=${this.selectQuality}>
+          ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
+          </select>
+          <img src="img/github-mark-white.svg" title="Go to GitHub Repository" onClick=${this.goToGithub} />
+          <img src="img/fullscreen.svg" title="Press F11 to enter or leave fullscreen mode" onClick=${this.fullscreen} />
+        </div>
+        <div>
+          <button onClick=${this.zoomIn}>+</button>
+          <button onClick=${this.zoomOut}>−</button>
+        </div>
       </div>
       <div id="left_side">
-        <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
-        <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
-
-        <button onClick=${this.reset}>${printTime(this.state.tau)}</button>
-        <button>${print3Vec(this.state.obsvX)}</button>
-        <button>${printVelocity(this.state.obsvU)}</button>
-        <button>${this.state.fps + " FPS"}</button>
+        <div>
+          <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
+          <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
+        </div>
+        <div>
+          <button onClick=${this.reset}>${printTime(this.state.tau)}</button>
+          <button>${print3Vec(this.state.obsvX)}</button>
+        </div>
+        <div>
+          <button>${printVelocity(this.state.obsvU)}</button>
+          <button>${this.state.fps + " FPS"}</button>
+        </div>
       </div>
     </div>
     <canvas

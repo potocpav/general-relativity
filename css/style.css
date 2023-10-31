@@ -26,7 +26,7 @@ button, select, a, a:visited {
 
   border: 0px;
   border-radius: 5px;
-  margin-right: 5px;
+  margin: 5px;
 
   color: #FFFFFF;
   background-color: #000000;
@@ -72,11 +72,12 @@ option {
 #toolbar {
   position: absolute;
   top: 0;
-  padding: 25px;
-  padding-top: max(25px, env(safe-area-inset-top)); /* handle hole-punch camera & notch */
+  padding: 10px;
+  padding-top: max(10px, env(safe-area-inset-top)); /* handle hole-punch camera & notch */
   width: 100%;
 }
 
 #right_side {
   float: right;
+  text-align: right;
 }
