@@ -62,7 +62,7 @@ Test objects, interaction:
 - [x] Compute object trajectories
 - [x] Interactive spaceship control
 - [x] Interactive object spawning
-- [ ] Time controls
+- [x] Time controls
 - [ ] Control effects (redshift, beaming, etc.)
 - [ ] Scenario presets
 - [ ] Automatically generate floaters

@@ -7,7 +7,7 @@ export class World {
   constructor(gl_, metric) {
     gl = gl_;
 
-    this.lastTime = undefined;
+    this.lastRealTime = undefined;
     this.time = 0;
     this.metric = metric;
     this.dt = 0.017;
@@ -27,12 +27,16 @@ export class World {
   }
 
   update(time, mousePos, pointerDn, screenDim) {
-    if (this.lastTime !== undefined) {
-      this.dt = Math.max(0.005, Math.min(0.1, (time - this.lastTime) * this.timeScale));
+    var realTimeDt;
+    if (this.lastRealTime !== undefined) {
+      realTimeDt = Math.max(0.005, Math.min(0.1, time - this.lastRealTime));
+    } else {
+      realTimeDt = 0.017;
     }
-    this.lastTime = time;
+    this.lastRealTime = time;
+    this.fps = 0.99 * this.fps + 0.01 / realTimeDt;
+    this.dt = realTimeDt * this.timeScale;
     this.time += this.dt;
-    this.fps = 0.99 * this.fps + 0.01 / this.dt;
 
     // rocket motor
     var accel3_rest = undefined;

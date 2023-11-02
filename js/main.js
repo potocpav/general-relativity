@@ -39,6 +39,7 @@ function initWorld() {
   // const u2 = nj.array([-(1 - rs/r) * Math.sqrt(rs/r), 0.0]); // raindrop
   const u2 = nj.array([0.0, Math.sqrt(rs/(2*r))]); // circular orbit
 
+  world.time = 0;
   world.viewportSize = 3;
   world.timeScale = 1.0;
   world.rs = rs;
@@ -59,6 +60,9 @@ function initWorld() {
 class App extends Component {
   state = {
     tool: 'boost',
+    timeSlider: 0,
+    timeScale: 1,
+    pause: false,
     tau: null,
     obsvX: null,
     obsvU: null,
@@ -79,6 +83,7 @@ class App extends Component {
 
   animate(t) {
     requestAnimationFrame(t => this.animate(t));
+    world.timeScale = this.state.pause ? 0 : Math.pow(10, this.state.timeSlider);
     world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim);
     renderer.render();
     this.setState({
@@ -86,6 +91,7 @@ class App extends Component {
       obsvX: world.obsvX,
       obsvU: world.obsvU,
       fps: Math.floor(world.fps),
+      timeScale: world.timeScale,
     });
   }
 
@@ -94,6 +100,7 @@ class App extends Component {
   }
 
   onPointerDown = ev => {
+    if (ev.target.id != "toolbar") return;
     params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
 
     if (this.state.tool == 'boost') {
@@ -123,8 +130,20 @@ class App extends Component {
     }
     switch (ev.key) {
       case "r": this.reset();
-      break; case " ": console.log('space');
+      break; case " ": this.onPlayPause();
     }
+  }
+
+  onPlayPause = _ => {
+    this.setState({pause: !this.state.pause});
+  }
+
+  onResetTimeSlider = _ => {
+    this.setState({timeSlider: 0, pause: false});
+  }
+
+  onTimeSlider = ev => {
+    this.setState({timeSlider: Number(ev.target.value)});
   }
 
   zoomIn = _ => world.viewportSize /= 1.7;
@@ -139,7 +158,6 @@ class App extends Component {
 
   reset = _ => {
     initWorld();
-    this.setState({tau: world.time })
   }
 
   selectQuality = ev => {
@@ -169,8 +187,13 @@ class App extends Component {
 
   render() {
     return html`
-    <div id="toolbar">
-      <div id="right_side">
+    <div
+      id="toolbar"
+      onPointerMove=${this.onPointerMove}
+      onPointerDown=${this.onPointerDown}
+      onPointerUp=${this.onPointerUp}
+      onWheel=${this.onWheel}>
+      <div id="top_right">
         <div>
           <select onChange=${this.selectQuality}>
           ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
@@ -183,13 +206,12 @@ class App extends Component {
           <button onClick=${this.zoomOut}>−</button>
         </div>
       </div>
-      <div id="left_side">
+      <div id="top_left">
         <div>
           <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
           <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
         </div>
         <div>
-          <button onClick=${this.reset}>${printTime(this.state.tau)}</button>
           <button>${print3Vec(this.state.obsvX)}</button>
         </div>
         <div>
@@ -197,14 +219,26 @@ class App extends Component {
           <button>${this.state.fps + " FPS"}</button>
         </div>
       </div>
+
+      <div id="bottom_left">
+        <div>
+          <button onClick=${this.reset}>τ = ${printTime(this.state.tau)}</button>
+          <button onClick=${this.onResetTimeSlider}>τ' = ${this.state.timeScale.toFixed(2)}</button>
+        </div>
+        <div>
+          <button onClick=${this.onPlayPause} style="width: 4em; height: 3em;">${this.state.pause ? '▶' : '⏸'}</button>
+          <input type="range" min="-2" max="2" value="${this.state.timeSlider}" id="time_slider" step="0.1" list="values" onInput=${this.onTimeSlider} />
+          <datalist id="values">
+            <option value="-2" label="-2"></option>
+            <option value="-1" label="-1"></option>
+            <option value="0" label="0"></option>
+            <option value="1" label="1"></option>
+            <option value="2" label="2"></option>
+          </datalist>
+        </div>
+      </div>
     </div>
-    <canvas
-      id="canvas"
-      onPointerMove=${this.onPointerMove}
-      onPointerDown=${this.onPointerDown}
-      onPointerUp=${this.onPointerUp}
-      onWheel=${this.onWheel}
-      />
+    <canvas id="canvas" />
     `;
   }
 }
