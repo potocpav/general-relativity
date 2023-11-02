@@ -8,6 +8,14 @@ You can play with general relativity [here](https://potocpav.github.io/general-r
 npx browser-sync start --server
 ```
 
+## How it works
+
+- [ ] Describe the architecture
+
+Raytracing along geodesics is done inside the GLSL fragment shader.
+
+Observer and object trajectories are computed in JS.
+
 ## Plan
 
 Infra:

@@ -193,7 +193,7 @@ class App extends Component {
           <button>${print3Vec(this.state.obsvX)}</button>
         </div>
         <div>
-          <button>${printVelocity(this.state.obsvU)}</button>
+          <button>${printVelocity(this.state.obsvX, this.state.obsvU)}</button>
           <button>${this.state.fps + " FPS"}</button>
         </div>
       </div>
@@ -242,11 +242,13 @@ function printTime(s) {
   }
 }
 
-function printVelocity(u) {
+function printVelocity(x, u) {
   if (u === null) {
     return "n/a"
   } else {
-    return "v = " + Math.floor(Math.sqrt(1-Math.pow(u.get(0), -2)) * 100) + " %"
+    const lambda = metric.T(x).dot(u).get(0);
+    const v = Math.sqrt(1-Math.pow(lambda, -2));
+    return "v = " + Math.floor(v * 100) + " %"
   }
 }
 
