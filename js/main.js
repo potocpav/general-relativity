@@ -20,6 +20,7 @@ const rs = 0.03;
 const metric = new Schwarzschild(rs);
 
 var canvas;
+var overlay;
 var gl;
 var world;
 var objectInfo;
@@ -30,6 +31,7 @@ var params = {
   mousePos: nj.array([0, 0]),
   pointerDn: false,
   screenDim: nj.array([window.innerWidth, window.innerHeight]),
+  canvasCtx: undefined,
 };
 
 function initWorld() {
@@ -60,6 +62,8 @@ function initWorld() {
 class App extends Component {
   state = {
     tool: 'boost',
+    spawnDragOrigin: undefined,
+    spawnVelocity: undefined,
     timeSlider: 0,
     timeScale: 1,
     pause: false,
@@ -71,6 +75,7 @@ class App extends Component {
 
   componentDidMount () {
     canvas = document.getElementById("canvas")
+    overlay = document.getElementById("overlay")
     gl = renderer.initGl(canvas);
 
     document.body.onkeydown = this.onKeyDown;
@@ -86,6 +91,8 @@ class App extends Component {
     world.timeScale = this.state.pause ? 0 : Math.pow(10, this.state.timeSlider);
     world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim);
     renderer.render();
+    this.renderOverlay();
+
     this.setState({
       tau: world.time,
       obsvX: world.obsvX,
@@ -95,28 +102,62 @@ class App extends Component {
     });
   }
 
+  renderOverlay() {
+    var ctx = overlay.getContext("2d");
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
+      const [originPxX, originPxY] = this.state.spawnDragOrigin.tolist();
+      const originX = originPxX / quality;
+      const originY = overlay.height - originPxY / quality;
+      const targetX = params.mousePos.get(0) / quality;
+      const targetY = overlay.height - params.mousePos.get(1) / quality;
+      const absVel = Math.sqrt(this.state.spawnVelocity.dot(this.state.spawnVelocity).get(0));
+
+      ctx.beginPath();
+      ctx.strokeStyle = `#fff`;
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(targetX, targetY);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.font = "11px serif";
+      ctx.fillStyle = `#fff`;
+      ctx.fillText(Math.round(absVel * 100) + " %", targetX, targetY);
+    }
+
+  }
+
   onPointerMove = ev => {
     params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
+    if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
+      const vLinear = this.state.spawnDragOrigin.subtract(params.mousePos).divide((params.screenDim.get(0) + params.screenDim.get(1)) / 2);
+      const vAbs = Math.sqrt(vLinear.dot(vLinear).get(0));
+      const vScale = (1 - Math.exp(-vAbs * 3)) / vAbs;
+      this.setState({spawnVelocity: vLinear.multiply(vScale)});
+    }
   }
 
   onPointerDown = ev => {
-    if (ev.target.id != "toolbar") return;
+    if (ev.target.tagName != "DIV") return;
     params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
 
     if (this.state.tool == 'boost') {
       params.pointerDn = true;
-    }
-
-    if (this.state.tool == 'spawn') {
-      const mouseWorldX = world.getWorldPos(params.mousePos, params.screenDim);
-      const asteroid_v0 = nj.array([0.0, 0.0]);
-      asteroid = new Trajectory(metric, asteroidId, mouseWorldX, velocity3(metric, mouseWorldX, asteroid_v0))
-      trajectories.add(asteroid);
+    } else if (this.state.tool == 'spawn') {
+      this.setState({spawnDragOrigin: params.mousePos, spawnVelocity: nj.array([0,0])});
     }
   }
 
   onPointerUp = _ => {
-    params.pointerDn = false;
+    if (this.state.tool == 'boost') {
+      params.pointerDn = false;
+    } else if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
+      const spawnX = world.getWorldPos(this.state.spawnDragOrigin, params.screenDim);
+      asteroid = new Trajectory(metric, asteroidId, spawnX, velocity3(metric, spawnX, this.state.spawnVelocity))
+      trajectories.add(asteroid);
+      this.setState({spawnDragOrigin: undefined, spawnVelocity: undefined});
+    }
   }
 
   onWheel = ev => {
@@ -152,22 +193,16 @@ class App extends Component {
 
   activateBoost = _ => this.setState({tool: 'boost'});
 
-  activateSpawn = _ => {
-    this.setState({tool: 'spawn'});
-  }
+  activateSpawn = _ => this.setState({tool: 'spawn'});
 
-  reset = _ => {
-    initWorld();
-  }
+  reset = _ => initWorld();
 
   selectQuality = ev => {
     quality = quality_levels[ev.target.selectedIndex];
     refreshWindow();
   }
 
-  goToGithub = _ => {
-    window.location.href = "https://github.com/potocpav/general-relativity";
-  }
+  goToGithub = _ => window.location.href = "https://github.com/potocpav/general-relativity";
 
   fullscreen = _ => {
     if (document.fullscreenElement) {
@@ -187,8 +222,10 @@ class App extends Component {
 
   render() {
     return html`
+    <canvas id="canvas" />
+    <canvas id="overlay" />
     <div
-      id="toolbar"
+      id="ui"
       onPointerMove=${this.onPointerMove}
       onPointerDown=${this.onPointerDown}
       onPointerUp=${this.onPointerUp}
@@ -238,7 +275,6 @@ class App extends Component {
         </div>
       </div>
     </div>
-    <canvas id="canvas" />
     `;
   }
 }
@@ -262,6 +298,8 @@ async function startup() {
 function refreshWindow() {
   canvas.width = window.innerWidth / quality;
   canvas.height = window.innerHeight / quality;
+  overlay.width = window.innerWidth / quality;
+  overlay.height = window.innerHeight / quality;
   renderer.initializeWindow(canvas.width, canvas.height);
   params.screenDim = nj.array([window.innerWidth, window.innerHeight]);
 }
