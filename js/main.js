@@ -6,17 +6,17 @@ import htm from 'https://esm.sh/htm';
 
 import * as renderer from './renderer.js';
 import { World } from './world.js';
-import { ObjectInfo, shipId, shipThrustingId, asteroidId } from './object-info.js';
+import { ObjectInfo, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, Schwarzschild, GP } from './metric.js';
+import { velocity3, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
 
 var quality = 2;
 const quality_levels = [1, 2, 4, 8];
 
-const rs = 0.03;
+const rs = 0.3;
 const metric = new Schwarzschild(rs);
 
 var canvas;
@@ -41,7 +41,7 @@ function initWorld() {
   const u2 = nj.array([0.0, Math.sqrt(rs/(2*r))]); // circular orbit
 
   world.time = 0;
-  world.viewportSize = 3;
+  world.viewportSize = 20;
   world.timeScale = 1.0;
   world.rs = rs;
 
@@ -54,7 +54,7 @@ function initWorld() {
   // objects
   const asteroid_x0 = nj.array([0, 25 * rs, 0.0]);
   const asteroid_v0 = nj.array([0.0, -0.12]);
-  asteroid = new Trajectory(metric, asteroidId, asteroid_x0, velocity3(metric, asteroid_x0, asteroid_v0))
+  asteroid = new Trajectory(metric, photonClockId, asteroid_x0, velocity3(metric, asteroid_x0, asteroid_v0))
   trajectories.add(asteroid);
 }
 
@@ -153,7 +153,7 @@ class App extends Component {
       params.pointerDn = false;
     } else if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
       const spawnX = world.getWorldPos(this.state.spawnDragOrigin, params.screenDim);
-      asteroid = new Trajectory(metric, asteroidId, spawnX, velocity3(metric, spawnX, this.state.spawnVelocity))
+      asteroid = new Trajectory(metric, photonClockId, spawnX, velocity3(metric, spawnX, this.state.spawnVelocity))
       trajectories.add(asteroid);
       this.setState({spawnDragOrigin: undefined, spawnVelocity: undefined});
     }

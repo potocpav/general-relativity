@@ -30,7 +30,7 @@ export class Trajectories {
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     this.nObjects = 2;
-    this.nPoints = 30;
+    this.nPoints = 100;
     this.lastObjectAdded = -1;
 
     // allocate texture buffers

@@ -2,31 +2,35 @@
 var gl;
 
 const spritesFile = "models/sprites.webp";
-const spritesShape = [64*2, 64, 60]; // x, y, d
+const spritesShape = [64*3, 64, 60]; // x, y, d
 export const
   shipId = 0,
   shipThrustingId = 1,
-  asteroidId = 2;
+  asteroidId = 2,
+  photonClockId = 3;
 
 // Sprite extents in world coordinates, including time coordinate.
 const objSize = new Float32Array([
-  2, 0.1, 0.1, -1,
-  2, 0.1, 0.1, -1,
-  5, 0.05, 0.05, -1,
+  2, 0.5, 0.5, -1,   // rocket
+  2, 0.5, 0.5, -1,   // thrusting rocket
+  5, 0.3, 0.3, -1, // asteroid
+  1, 64/38/2, 64/38/2, -1,   // photon clock
   ]);
 
 // Minimum pixel coordinates of sprites in the combined sprite image
 const objTexMin = new Float32Array([
-  64, 0, 0, -1,
-  64, 0, 31, -1,
   0, 0, 0, -1,
+  0, 0, 31, -1,
+  64, 0, 0, -1,
+  128, 0, 0, -1,
   ]);
 
 // Maximum pixel coordinates of sprites in the combined sprite image
 const objTexMax = new Float32Array([
-  127, 63, 29, -1,
-  127, 63, 59, -1,
+  63, 63, 29, -1,
   63, 63, 59, -1,
+  127, 63, 59, -1,
+  191, 63, 59, -1,
   ]);
 
 

@@ -21,10 +21,11 @@ uniform sampler2D obj_xs;
 uniform sampler2D obj_us;
 uniform sampler2D obj_its;
 
+#define N_SPRITES 4
 layout(std140) uniform objectInfo {
-	vec3 objSize[3];
-	vec3 objTexMin[3];
-	vec3 objTexMax[3];
+	vec3 objSize[N_SPRITES];
+	vec3 objTexMin[N_SPRITES];
+	vec3 objTexMax[N_SPRITES];
 };
 
 out vec4 out_color;
