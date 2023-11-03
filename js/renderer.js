@@ -1,5 +1,6 @@
 
 var gl;
+var EXT_color_buffer_float;
 
 var world;
 var objectInfo;
@@ -11,7 +12,7 @@ var vertexPosition;
 var screenVertexPosition;
 
 var screenWidth, screenHeight;
-var frontTarget, backTarget;
+var target;
 
 export function initGl (canvas) {
   var gl;
@@ -24,6 +25,8 @@ export function initGl (canvas) {
   } else {
     alert('WebGL not supported.');
   }
+
+  EXT_color_buffer_float = gl.getExtension('EXT_color_buffer_float');
   return gl;
 }
 
@@ -129,8 +132,7 @@ export function initializeWindow(width, height) {
   screenWidth = width;
   screenHeight = height;
   gl.viewport(0, 0, width, height);
-  frontTarget = createTarget(width, height);
-  backTarget = createTarget(width, height);
+  target = createTarget(width, height);
 }
 
 function createTarget(width, height) {
@@ -142,7 +144,13 @@ function createTarget(width, height) {
 
   // set up framebuffer
   gl.bindTexture(gl.TEXTURE_2D, target.texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  // enable HDR rendering if supported
+  if (EXT_color_buffer_float) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
+  } else {
+    console.warn("HDR not supported");
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  }
 
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -152,17 +160,8 @@ function createTarget(width, height) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target.texture, 0);
 
-  // set up renderbuffer
-  gl.bindRenderbuffer(gl.RENDERBUFFER, target.renderbuffer);
-
-  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, target.renderbuffer);
-
-  // clean up
   gl.bindTexture(gl.TEXTURE_2D, null);
-  gl.bindRenderbuffer(gl.RENDERBUFFER, null);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
   return target;
 }
@@ -203,20 +202,17 @@ export function render() {
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
   gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, backTarget.texture);
-
   world.render();
   trajectories.render();
   objectInfo.render();
 
   gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
-  // Render custom shader to front buffer
+  // Render custom shader to target buffer
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER, frontTarget.framebuffer);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
 
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Set uniforms for screen shader
@@ -230,14 +226,9 @@ export function render() {
   gl.vertexAttribPointer(screenVertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE1);
-  gl.bindTexture(gl.TEXTURE_2D, frontTarget.texture);
+  gl.bindTexture(gl.TEXTURE_2D, target.texture);
 
   // Render front buffer to screen
-
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-  [frontTarget, backTarget] = [backTarget, frontTarget];
 }

@@ -31,7 +31,6 @@ var params = {
   mousePos: nj.array([0, 0]),
   pointerDn: false,
   screenDim: nj.array([window.innerWidth, window.innerHeight]),
-  canvasCtx: undefined,
 };
 
 function initWorld() {

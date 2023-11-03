@@ -282,7 +282,7 @@ vec3 redshift(float l, vec3 sRgb) {
 		-0.4986, 0.0415,  1.0569
 	);
 	vec3 shifted = xyzToSrgb * shift * spectral * pow(l, -power_exp);
-	return max(vec3(0.0), min(vec3(1.0), pow(shifted, vec3(1.0/2.2))));
+	return pow(shifted, vec3(1.0/2.2));
 }
 
 // Transform metric at point x to Minkowski metric
