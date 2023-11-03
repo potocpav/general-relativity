@@ -1,7 +1,7 @@
 
 var gl;
 
-const spritesFile = "models/sprites.png";
+const spritesFile = "models/sprites.webp";
 const spritesShape = [64*2, 64, 60]; // x, y, d
 export const
   shipId = 0,
