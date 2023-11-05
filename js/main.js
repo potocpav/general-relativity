@@ -6,7 +6,7 @@ import htm from 'https://esm.sh/htm';
 
 import * as renderer from './renderer.js';
 import { World } from './world.js';
-import { ObjectInfo, photonClockId } from './object-info.js';
+import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
 import { velocity3, Schwarzschild } from './metric.js';
@@ -18,6 +18,15 @@ const quality_levels = [1, 2, 4, 8];
 
 const rs = 0.3;
 const metric = new Schwarzschild(rs);
+
+const objectIds = {
+  'asteroid': asteroidId,
+  'photonClock': photonClockId,
+};
+const nextObjectId = id => {
+  const keys = Object.keys(objectIds);
+  return Object.fromEntries(keys.map((k, i) => [k, keys[(i+1) % keys.length]]))[id];
+};
 
 var canvas;
 var overlay;
@@ -61,6 +70,7 @@ function initWorld() {
 class App extends Component {
   state = {
     tool: 'boost',
+    spawnObject: 'asteroid',
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
     timeSlider: 0,
@@ -144,7 +154,10 @@ class App extends Component {
     if (this.state.tool == 'boost') {
       params.pointerDn = true;
     } else if (this.state.tool == 'spawn') {
-      this.setState({spawnDragOrigin: params.mousePos, spawnVelocity: nj.array([0,0])});
+      this.setState({
+        spawnDragOrigin: params.mousePos,
+        spawnVelocity: nj.array([0,0]),
+      });
     }
   }
 
@@ -153,7 +166,7 @@ class App extends Component {
       params.pointerDn = false;
     } else if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
       const spawnX = world.getWorldPos(this.state.spawnDragOrigin, params.screenDim);
-      asteroid = new Trajectory(metric, photonClockId, spawnX, velocity3(metric, spawnX, this.state.spawnVelocity))
+      asteroid = new Trajectory(metric, objectIds[this.state.spawnObject], spawnX, velocity3(metric, spawnX, this.state.spawnVelocity))
       trajectories.add(asteroid);
       this.setState({spawnDragOrigin: undefined, spawnVelocity: undefined});
     }
@@ -166,7 +179,12 @@ class App extends Component {
   onKeyDown = ev => {
     switch (ev.code) {
       case "Digit1": this.activateBoost();
-      break; case "Digit2": this.activateSpawn();
+      break; case "Digit2":
+        if (this.state.tool != 'spawn')
+          this.activateSpawn();
+        else {
+          this.setState({spawnObject: nextObjectId(this.state.spawnObject)});
+        }
     }
     switch (ev.key) {
       case "r": this.reset();
@@ -193,6 +211,9 @@ class App extends Component {
   activateBoost = _ => this.setState({tool: 'boost'});
 
   activateSpawn = _ => this.setState({tool: 'spawn'});
+
+  onSpawnAsteroid = _ => this.setState({spawnObject: 'asteroid'});
+  onSpawnPhotonClock = _ => this.setState({spawnObject: 'photonClock'});
 
   reset = _ => initWorld();
 
@@ -247,6 +268,12 @@ class App extends Component {
           <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
           <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
         </div>
+        ${this.state.tool != 'spawn' ? '' : html`
+        <div>
+          <button class=${this.state.spawnObject == 'asteroid' ? "clicked" : ""} onClick=${this.onSpawnAsteroid}>Asteroid</button>
+          <button class=${this.state.spawnObject == 'photonClock' ? "clicked" : ""} onClick=${this.onSpawnPhotonClock}>Clock</button>
+        </div>
+        `}
         <div>
           <button>${print3Vec(this.state.obsvX)}</button>
         </div>
