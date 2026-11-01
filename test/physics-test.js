@@ -196,6 +196,47 @@ function checkFreeFallJs() {
   return {ok: errors.length == 0, message: errors.length ? errors.join(', ') : 'r(tau) matches down to 0.1 rs'};
 }
 
+// The ship's heading is Fermi–Walker transported: on a circular orbit at r,
+// a gyroscope turns relative to the fixed (screen) directions by the geodetic
+// precession 2 pi (1 - sqrt(1 - 1.5 rs / r)) per orbit. Under thrust, the
+// transported axis stays a unit vector orthogonal to the 4-velocity.
+function checkGyroscopeJs() {
+  const errors = [];
+  // the heading's angle relative to the screen axes
+  const screenAngle = y => {
+    const h = math.matVec(math.coordToRest(metric, y.slice(0, 3), y.slice(3, 6)), y.slice(6, 9));
+    return Math.atan2(h[2], h[1]) + y[2];
+  };
+  const drift = y => {
+    const g = metric.g(y.slice(0, 3)), u = y.slice(3, 6), h = y.slice(6, 9);
+    return Math.max(Math.abs(math.dot(h, math.matVec(g, u))), Math.abs(math.dot(h, math.matVec(g, h)) - 1));
+  };
+  let maxDrift = 0;
+  for (const k of [10, 4, 3]) {
+    const r = k * rs, x = [0, r, 0];
+    const u = velocity3(metric, x, [0, Math.sqrt(rs / (2 * r))]);
+    const h = math.matVec(math.restToCoord(metric, x, u), [0, 1, 0]);
+    // proper time of one orbit: coordinate period 2 pi sqrt(r^3 / M), M = rs / 2, times sqrt(1 - 1.5 rs / r)
+    const period = 2 * Math.PI * Math.sqrt(2 * r ** 3 / rs) * Math.sqrt(1 - 1.5 * rs / r);
+    const y0 = [...x, ...u, ...h];
+    const y = math.integrate(metric, math.geo_fw_f(metric), y0, period, 0.005);
+    const turned = (screenAngle(y) - screenAngle(y0) - 2 * Math.PI) * 180 / Math.PI;
+    const expected = 360 * (1 - Math.sqrt(1 - 1.5 * rs / r));
+    if (!(Math.abs(turned - expected) < 0.01)) errors.push(`${k} rs: ${turned.toFixed(3)} deg, expected ${expected.toFixed(3)}`);
+    maxDrift = Math.max(maxDrift, drift(y));
+  }
+  // thrusting, sideways to the heading (own random numbers, so as not to
+  // change the other tests' samples)
+  const rand = prng(3);
+  const x = [0, (3 + 7 * rand()) * rs, 6 * rand()], u = localVelocity3(metric, x, [0.5 * rand() - 0.25, 0.5 * rand() - 0.25]);
+  const h = math.matVec(math.restToCoord(metric, x, u), [0, 0.6, 0.8]);
+  const y = math.integrate(metric, math.geo_fw_f(metric, [0, 0.4, -0.3]), [...x, ...u, ...h], 3, 0.005);
+  maxDrift = Math.max(maxDrift, drift(y));
+  if (!(maxDrift < 1e-8)) errors.push(`h.u or h.h - 1 drifted by ${maxDrift.toExponential(1)}`);
+  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
+    `geodetic precession at 10, 4, 3 rs within 0.01 deg; h.u, h.h - 1 drift ${maxDrift.toExponential(1)}`};
+}
+
 // JS geodesics vs the analytic shadow edges.
 function checkShadowJs() {
   const delta = 0.1 * Math.PI / 180;
@@ -720,6 +761,7 @@ async function main() {
     await run(prefix + 'surface shader', () => checkSurfaceShader(gl, vertexSource));
     await run(prefix + 'frames (JS)', async () => checkFramesJs());
     await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
+    await run(prefix + 'gyroscope (JS)', async () => checkGyroscopeJs());
     await run(prefix + 'ray tracer vs geodesic equation (JS)', async () => checkTraceRayJs());
     if (type == GullstrandPainleve) await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());
     await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());

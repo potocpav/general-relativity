@@ -43,15 +43,16 @@ export const staticGamma = (metric, x, u) => {
 // Lorentz factor of 4-velocity `u` relative to the reference observer at x.
 export const referenceGamma = (metric, x, u) => matVec(metric.T(x), u)[0];
 
-// Christoffel symbols contracted with u twice, Gamma^mu_ab u^a u^b, for a
-// metric depending only on r:
+// Christoffel symbols contracted with vectors u and v, Gamma^mu_ab u^a v^b,
+// for a metric depending only on r:
 //   Gamma^mu_ab = 1/2 g^mu nu (d_a g_nu b + d_b g_nu a - d_nu g_ab)
 // where only d_r is non-zero, so
-//   Gamma^mu_ab u^a u^b = 1/2 g^mu nu (2 u^r (g' u)_nu - delta^r_nu u.g'.u)
-function radialChristoffelUU(metric, x, u) {
-  const dgu = matVec(metric.dgdr(x), u);
-  const udgu = dot(u, dgu);
-  const w = dgu.map((v, nu) => 2 * u[1] * v - (nu == 1 ? udgu : 0));
+//   Gamma^mu_ab u^a v^b = 1/2 g^mu nu (u^r (g' v)_nu + v^r (g' u)_nu - delta^r_nu u.g'.v)
+function radialChristoffel(metric, x, u, v) {
+  const dg = metric.dgdr(x);
+  const dgu = matVec(dg, u), dgv = matVec(dg, v);
+  const udgv = dot(u, dgv);
+  const w = dgv.map((_, nu) => u[1] * dgv[nu] + v[1] * dgu[nu] - (nu == 1 ? udgv : 0));
   return scale(matVec(metric.gInv(x), w), 0.5);
 }
 
@@ -129,8 +130,13 @@ export class Schwarzschild {
     return [[-rs / (r * r), 0, 0], [0, -rs / ((r - rs) * (r - rs)), 0], [0, 0, 2 * r]];
   }
 
+  // Gamma^mu_ab u^a v^b, and the same with v = u
+  gammaUV(x, u, v) {
+    return radialChristoffel(this, x, u, v);
+  }
+
   gammaUU(x, u) {
-    return radialChristoffelUU(this, x, u);
+    return radialChristoffel(this, x, u, u);
   }
 
   T(x) {
@@ -218,8 +224,13 @@ export class GullstrandPainleve {
     return [[-this.rs / (r * r), -s / (2 * r), 0], [-s / (2 * r), 0, 0], [0, 0, 2 * r]];
   }
 
+  // Gamma^mu_ab u^a v^b, and the same with v = u
+  gammaUV(x, u, v) {
+    return radialChristoffel(this, x, u, v);
+  }
+
   gammaUU(x, u) {
-    return radialChristoffelUU(this, x, u);
+    return radialChristoffel(this, x, u, u);
   }
 
   // raindrop frame: e_0 = (1, -s, 0), e_r = (0, 1, 0), e_phi = (0, 0, 1/r), s = sqrt(rs/r)

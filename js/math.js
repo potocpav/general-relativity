@@ -56,6 +56,27 @@ export const geo_f = (metric, accel_rest) => (xu) => {
   ];
 }
 
+// Geodesic (or accelerated, with `accel_rest`) motion together with the
+// Fermi–Walker transport of a spatial vector h, the ship's gyroscope axis:
+// solving for the [x^mu, u^mu, h^mu] 9-vector, with
+//   dh/dtau = -Gamma(u, h) + (h.a) u
+// where a is the 4-acceleration. For free fall this is parallel transport;
+// the extra term keeps h orthogonal to u when accelerating (no rotation
+// other than what the acceleration forces).
+export const geo_fw_f = (metric, accel_rest) => (xuh) => {
+  const x = xuh.slice(0, 3), u = xuh.slice(3, 6), h = xuh.slice(6, 9);
+  const accel = accel_rest !== undefined
+    ? matVec(restToCoord(metric, x, u), accel_rest)
+    : [0, 0, 0];
+  const gammaUU = metric.gammaUU(x, u), gammaUH = metric.gammaUV(x, u, h);
+  const ha = dot(h, matVec(metric.g(x), accel));
+  return [
+    ...u,
+    ...gammaUU.map((g, i) => -g + accel[i]),
+    ...gammaUH.map((g, i) => -g + ha * u[i]),
+  ];
+}
+
 export const rk4 = (f, y, h) => {
   const k1 = f(y);
   const k2 = f(y.map((v, i) => v + k1[i] * h / 2));

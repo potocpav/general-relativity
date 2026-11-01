@@ -25,16 +25,32 @@ export class World {
     this.showRedshift = true;
   }
 
-  // Ship heading as an angle in screen-aligned cartesian coordinates,
-  // so that it doesn't rotate with the polar frame while orbiting.
+  // `heading` is the ship's initial heading, as an angle on the screen.
+  // From then on, the heading is a gyroscope axis: a spatial vector in the
+  // ship's rest frame, Fermi–Walker transported along its worldline
+  // (obsvH, coordinate components), and turned only by steering.
   reset(x, u, heading = Math.PI / 2) {
     this.time = 0;
     this.obsvX = x;
     this.obsvU = u;
-    this.heading = heading;
-    this.obsvO = this.metric.cartesianToLocal(x, headingVector(this.heading));
+    this.setHeading(this.metric.cartesianToLocal(x, headingVector(heading)));
     this.obsvSprite = 0;
     this.crashed = false;
+  }
+
+  // Point the ship's heading in direction `local`, given in the ship's rest
+  // frame (r-hat, phi-hat) components, which are the screen's axes rotated by phi.
+  setHeading(local) {
+    const n = math.norm(local);
+    this.obsvO = [local[0] / n, local[1] / n];
+    this.obsvH = math.matVec(math.restToCoord(this.metric, this.obsvX, this.obsvU), [0, ...this.obsvO]);
+  }
+
+  // The heading in rest frame components, re-orthonormalized against
+  // numerical drift (dropping its time component, renormalizing).
+  restHeading() {
+    const h = math.matVec(math.coordToRest(this.metric, this.obsvX, this.obsvU), this.obsvH);
+    return [h[1], h[2]];
   }
 
   // Switch to the coordinates of `metric`, converting the observer's state.
@@ -43,7 +59,9 @@ export class World {
   setMetric(metric) {
     const state = convertState(this.metric, metric, this.obsvX, this.obsvU);
     if (state === null) return false;
+    const h = convertState(this.metric, metric, this.obsvX, this.obsvH);
     [this.obsvX, this.obsvU] = state;
+    this.obsvH = h[1];
     this.metric = metric;
     // continue if the new coordinates can follow the observer further
     if (this.crashed && metric.canFollow(this.obsvX)) this.crashed = false;
@@ -83,19 +101,20 @@ export class World {
     if (this.crashed && !(this.dt < 0)) return;
     this.crashed = false;
 
-    // steering
-    this.heading += keys.turn * turnRate * realTimeDt;
+    // steering: turn the heading within the rest frame
+    var heading = this.restHeading();
+    const turn = keys.turn * turnRate * realTimeDt, c = Math.cos(turn), s = Math.sin(turn);
+    heading = [c * heading[0] - s * heading[1], s * heading[0] + c * heading[1]];
     var thrusting = keys.thrust;
     if (pointerDn && mousePos) {
       const mouseViewport = screenToViewport(mousePos, screenDim, this.viewportSize);
       if (math.norm(mouseViewport) > 1e-9) {
         // point away from the pointer
-        this.heading = Math.atan2(-mouseViewport[1], -mouseViewport[0]);
+        heading = this.metric.cartesianToLocal(this.obsvX, math.scale(mouseViewport, -1));
         thrusting = true;
       }
     }
-    // heading in the local orthonormal (r, phi) frame
-    this.obsvO = this.metric.cartesianToLocal(this.obsvX, headingVector(this.heading));
+    this.setHeading(heading);
 
     // rocket motor, in the ship's rest frame
     var accel3_rest = undefined;
@@ -104,15 +123,17 @@ export class World {
       this.obsvSprite = 1;
     }
 
-    const f = math.geo_f(this.metric, accel3_rest);
-    const xu = math.integrate(this.metric, f, [...this.obsvX, ...this.obsvU], this.dt, maxStep);
-    if (xu === null) {
+    const f = math.geo_fw_f(this.metric, accel3_rest);
+    const xuh = math.integrate(this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], this.dt, maxStep);
+    if (xuh === null) {
       this.crashed = true;
       return;
     }
     this.time += this.dt;
-    this.obsvX = xu.slice(0, 3);
-    this.obsvU = xu.slice(3, 6);
+    this.obsvX = xuh.slice(0, 3);
+    this.obsvU = xuh.slice(3, 6);
+    this.obsvH = xuh.slice(6, 9);
+    this.setHeading(this.restHeading());
   }
 
   // get world coordinates under the screen coordinates,

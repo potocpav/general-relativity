@@ -92,6 +92,7 @@ Object dynamics:
 - [x] Use a precise solver for photons
 - [x] Use a precise solver for motion
 - [x] Orbiting around a black hole test
+- [x] Ship orientation: Fermi–Walker transported gyroscope axis (geodetic precession)
 - [ ] Correct object orientation with parallel transport
 - [x] Traversable event horizon
 
