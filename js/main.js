@@ -82,6 +82,10 @@ function spawn(objectName, screenPos, velocity) {
   objects.spawn(objectIds[objectName], x, u);
 }
 
+// keys that control the app (see onKeyDown)
+const isKeyboardControl = ev =>
+  isArrowControl(ev.key) || ev.code == "Digit1" || ev.code == "Digit2" || ["r", "p", "h", "s", " "].includes(ev.key);
+
 const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
 
 // The time slider runs from -3 to 3, with ticks at time scales -10, -1, -0.1,
@@ -202,7 +206,14 @@ class App extends Component {
   }
 
   onPointerDown = ev => {
+    // While the display options are open, a press outside them closes them;
+    // on the view, it does nothing else (no boost, spawn or pinch).
+    if (this.state.showDisplayOptions && !ev.target.closest('#top_right')) {
+      this.setState({showDisplayOptions: false});
+      if (ev.target.tagName == "DIV") return;
+    }
     if (ev.target.tagName != "DIV") return;
+    if (ev.target.closest('#top_right')) return; // the display options' background
     // keep receiving events when the pointer leaves the window
     ev.currentTarget.setPointerCapture(ev.pointerId);
     touches.set(ev.pointerId, [ev.clientX, ev.clientY]);
@@ -256,6 +267,7 @@ class App extends Component {
   }
 
   onKeyDown = ev => {
+    if (this.state.showDisplayOptions && isKeyboardControl(ev)) this.setState({showDisplayOptions: false});
     if (isArrowControl(ev.key)) {
       // don't scroll, or move the focused time slider
       ev.preventDefault();
