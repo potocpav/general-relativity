@@ -505,6 +505,97 @@ async function checkNearHorizonGpu(gl, vertexSource) {
   };
 }
 
+// Where a light ray seen by an observer comes from, decided analytically from
+// its conserved energy E (= -p_t), impact parameter b = |L / E| and radial
+// direction v = dr/dl, traced backwards in time:
+// - outside the photon sphere (r >= 1.5 rs) it reaches the sky if b > b_crit
+//   (it turns around outside the photon sphere) or if it heads outwards;
+// - inside (including inside the horizon) only if b < b_crit, E < 0 and it
+//   heads outwards (with b > b_crit it turns around inside the photon sphere
+//   and falls back; E > 0 inside means it comes from the other side).
+// Everything else ends in the black hole's shadow.
+function reachesSky(x, p) {
+  const ul = math.matVec(metric.g(x), p), E = -ul[0], L = ul[2];
+  if (!(E < 0)) return false;
+  const b = Math.abs(L / E), r = x[1], v = p[1];
+  return r >= 1.5 * rs ? (b > bCrit || v > 0) : (b < bCrit && v > 0);
+}
+
+// Light rays seen by random observers inside and outside the horizon reach
+// the sky or end in the shadow as reachesSky predicts, in JS and on the GPU.
+// The rays are long, so that most shadow rays end before affine parameter 1;
+// rays still approaching the horizon at the end (their radial speed there
+// tends to |E|, which can be small) are skipped, as their fate is undecided.
+async function checkSkyGpu(gl, vertexSource, rMin, rMax) {
+  const cases = [];
+  for (let i = 0; cases.length < nSamples && i < 1000; i++) {
+    const x0 = randomPoint(rMin, rMax);
+    const angle = uniform(0, 2 * Math.PI);
+    const p0 = screenRay(metric, x0, randomVelocity(x0), [30 * Math.cos(angle), 30 * Math.sin(angle)]);
+    if (Math.abs(impactParameter(x0, p0) / bCrit - 1) < 0.03) continue;
+    const ray = math.traceRay(metric, x0, p0, 1e-3);
+    if (ray.status == math.RAY_REACHED && ray.x[1] < 1.1 * rs) continue;
+    cases.push({x0, p0, sky: reachesSky(x0, p0), js: ray.status == math.RAY_REACHED});
+  }
+  const test = {glsl: 'vec3 x, u; return vec4(raytrace(in_(0).xyz, in_(1).xyz, x, u) ? 1.0 : 0.0);'};
+  const gpu = await runOnGpu(gl, vertexSource, test, cases.map(c => [c.x0, c.p0]), 1);
+  let jsWrong = 0, gpuWrong = 0;
+  const details = [];
+  cases.forEach((c, i) => {
+    const js = c.js, gpuSky = gpu[i][0][0] == 1;
+    if (js != c.sky) jsWrong++;
+    if (gpuSky != c.sky) gpuWrong++;
+    if (js != c.sky || gpuSky != c.sky) {
+      const ul = math.matVec(metric.g(c.x0), c.p0);
+      details.push(`r = ${(c.x0[1] / rs).toFixed(3)} rs, E = ${(-ul[0]).toFixed(3)}, ` +
+        `b = ${(Math.abs(ul[2] / ul[0]) / bCrit).toFixed(3)} b_crit, v = ${c.p0[1].toFixed(3)}: ` +
+        `expected ${c.sky ? 'sky' : 'shadow'}, JS ${js ? 'sky' : 'shadow'}, GPU ${gpuSky ? 'sky' : 'shadow'}`);
+    }
+  });
+  const sky = cases.filter(c => c.sky).length;
+  return {
+    ok: jsWrong == 0 && gpuWrong == 0,
+    message: `${cases.length} rays (${sky} reaching the sky); ` +
+      `wrong: ${jsWrong} in JS, ${gpuWrong} on the GPU` + (details.length ? `: ${details.join('; ')}` : ''),
+  };
+}
+
+// A free-falling (raindrop) observer at r sees the shadow edge at angle psi
+// from the outward direction where r sin psi / (1 + s cos psi) = b_crit,
+// s = sqrt(rs/r): for light seen in direction psi, E = -(1 + s cos psi) and
+// L = r sin psi. At the horizon, psi = 2 atan(b_crit / rs) = 137.9 deg: the
+// black hole covers 42.1 deg around the inward direction. Checked with rays
+// 0.3 deg on either side of the edge, on the GPU.
+async function checkInfallViewGpu(gl, vertexSource) {
+  const deg = Math.PI / 180, delta = 0.3 * deg;
+  const cases = [];
+  const halfAngles = [];
+  for (const k of [1.2, 1.0, 0.5]) {
+    const r = k * rs, s = Math.sqrt(rs / r), x0 = [0, r, 0.4];
+    let lo = 0, hi = Math.PI; // sky at lo, shadow at hi
+    for (let i = 0; i < 60; i++) {
+      const psi = (lo + hi) / 2;
+      r * Math.sin(psi) / (1 + s * Math.cos(psi)) < bCrit ? lo = psi : hi = psi;
+    }
+    const edge = (lo + hi) / 2;
+    halfAngles.push(`${k} rs: ${((Math.PI - edge) / deg).toFixed(1)} deg`);
+    // raindrop rest frame = reference frame
+    const ray = psi => math.matVec(metric.Tinv(x0), math.scale([-1, Math.cos(psi), Math.sin(psi)], 30));
+    for (const sign of [1, -1]) {
+      cases.push({x0, p0: ray(sign * (edge - delta)), sky: true, label: `${k} rs, sky side`});
+      cases.push({x0, p0: ray(sign * (edge + delta)), sky: false, label: `${k} rs, shadow side`});
+    }
+  }
+  const test = {glsl: 'vec3 x, u; return vec4(raytrace(in_(0).xyz, in_(1).xyz, x, u) ? 1.0 : 0.0);'};
+  const gpu = await runOnGpu(gl, vertexSource, test, cases.map(c => [c.x0, c.p0]), 1);
+  const failures = cases.filter((c, i) => (gpu[i][0][0] == 1) != c.sky).map(c => c.label);
+  return {
+    ok: failures.length == 0,
+    message: `shadow half-angle around the inward direction: ${halfAngles.join(', ')}` +
+      (failures.length ? `; wrong: ${failures.join(', ')}` : ''),
+  };
+}
+
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
@@ -551,6 +642,11 @@ async function main() {
     await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());
     await run(prefix + 'shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
     await run(prefix + 'near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
+    if (type == GullstrandPainleve) {
+      await run(prefix + 'sky or shadow from inside the horizon, analytic (JS, GPU)', () => checkSkyGpu(gl, vertexSource, 0.2 * rs, 0.98 * rs));
+      await run(prefix + 'sky or shadow from outside, analytic (JS, GPU)', () => checkSkyGpu(gl, vertexSource, 1.02 * rs, 4 * rs));
+      await run(prefix + 'view while falling in, analytic (GPU)', () => checkInfallViewGpu(gl, vertexSource));
+    }
     for (const test of tests.filter(t => !t.metrics || t.metrics.includes(type))) {
       await run(prefix + test.name, () => runComparison(gl, vertexSource, test));
     }

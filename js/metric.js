@@ -87,7 +87,7 @@ export class Schwarzschild {
   static label = 'Schwarzschild';
   static glslId = 0;
 
-  static endMessage = "You have crossed the event horizon: Schwarzschild coordinates can't follow you inside.";
+  static endMessage = "You have reached the event horizon: Schwarzschild coordinates can't follow you inside. Switch to Gullstrand–Painlevé to continue, or";
 
   constructor(rs) {
     this.rs = rs;
@@ -169,7 +169,7 @@ export class GullstrandPainleve {
   static label = 'Gullstrand–Painlevé';
   static glslId = 1;
 
-  static endMessage = "You have hit the singularity.";
+  static endMessage = "You have hit the singularity:";
 
   constructor(rs) {
     this.rs = rs;

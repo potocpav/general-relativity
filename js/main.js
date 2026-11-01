@@ -327,7 +327,7 @@ class App extends Component {
     world.setMetric(next);
     trajectories.setMetric(next);
     metric = next;
-    this.setState({metric: type.id, message: null});
+    this.setState({metric: type.id, message: null, crashed: world.crashed});
   }
 
   selectQuality = ev => {
@@ -410,7 +410,7 @@ class App extends Component {
         </div>
         ${this.state.crashed && html`
         <div>
-          <button onClick=${this.reset}>${metric.constructor.endMessage} Press R to reset.</button>
+          <button onClick=${this.reset}>${metric.constructor.endMessage} press R to reset.</button>
         </div>
         `}
       </div>

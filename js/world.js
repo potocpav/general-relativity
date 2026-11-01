@@ -43,6 +43,8 @@ export class World {
     if (state === null) return false;
     [this.obsvX, this.obsvU] = state;
     this.metric = metric;
+    // continue if the new coordinates can follow the observer further
+    if (this.crashed && metric.canFollow(this.obsvX)) this.crashed = false;
     return true;
   }
 

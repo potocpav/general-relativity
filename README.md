@@ -37,6 +37,21 @@ against the analytic critical angles, including relativistic aberration.
 
 Observer and object trajectories are computed in JS.
 
+The simulation runs in one of two coordinate systems for the same Schwarzschild black hole,
+selectable in the top right (`js/metric.js`, `METRIC` in `glsl/physics.glsl`):
+
+- **Schwarzschild** (default): the textbook coordinates. They are singular at the event horizon,
+  so the ship and objects stop there. The grid is carried by static observers.
+- **Gullstrand–Painlevé**: regular across the horizon, so the ship and objects can fall in and are
+  followed until close to the singularity, and the view from inside is rendered. The grid is
+  carried by "raindrop" observers, falling freely from rest at infinity, so its colors differ.
+
+Switching converts the ship and objects between the coordinates. Light rays are traced with their
+conserved energy and angular momentum, which keeps them regular at the horizon. Rays that end in
+the black hole's shadow are dark red; from inside, that includes light that would come from the
+white hole (in a real black hole, from the collapsed star). `test/` checks the inside view against
+analytic results, e.g. that at the horizon the black hole covers 42° around the inward direction.
+
 ## Plan
 
 Infra:
@@ -73,7 +88,7 @@ Object dynamics:
 - [x] Use a precise solver for motion
 - [x] Orbiting around a black hole test
 - [ ] Correct object orientation with parallel transport
-- [ ] Traversable event horizon
+- [x] Traversable event horizon
 
 Test objects, interaction:
 
