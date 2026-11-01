@@ -8,7 +8,7 @@ import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Objects } from './objects.js';
-import { scenarios, defaultRs, scenarioMetric } from './scenarios.js';
+import { scenarios, defaultRs, scenarioMetric, defaultTimeScale } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes } from './metric.js';
 
 const html = htm.bind(h);
@@ -96,7 +96,8 @@ class App extends Component {
     spawnObject: 'asteroid',
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
-    timeSlider: timeScaleToSlider(1),
+    timeSlider: timeScaleToSlider(defaultTimeScale),
+    showDisplayOptions: false,
     pause: false,
     scenario: scenarios[0].id,
     showDescription: true,
@@ -307,12 +308,14 @@ class App extends Component {
     this.setState({showEventHorizon: show});
   }
 
+  toggleDisplayOptions = _ => this.setState({showDisplayOptions: !this.state.showDisplayOptions});
+
   onPlayPause = _ => {
     this.setState({pause: !this.state.pause});
   }
 
   onResetTimeSlider = _ => {
-    this.setState({timeSlider: timeScaleToSlider(1), pause: false});
+    this.setState({timeSlider: timeScaleToSlider(defaultTimeScale), pause: false});
   }
 
   onTimeSlider = ev => {
@@ -440,12 +443,9 @@ class App extends Component {
       onWheel=${this.onWheel}>
       <div id="top_right">
         <div>
-          <select onChange=${this.selectMetric} title="Coordinates of the simulation">
-          ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric}>${t.label}</option>`)}
-          </select>
-          <select onChange=${this.selectQuality} title="Device pixels per rendered pixel">
-          ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
-          </select>
+          <button class=${"icon" + (this.state.showDisplayOptions ? " clicked" : "")} title="Display options" onClick=${this.toggleDisplayOptions}>
+            <img src="img/eye.svg" alt="Display options" />
+          </button>
           <a class="icon" href="https://github.com/potocpav/general-relativity" target="_blank" rel="noopener" title="Go to GitHub Repository">
             <img src="img/github-mark-white.svg" alt="GitHub" />
           </a>
@@ -453,28 +453,43 @@ class App extends Component {
             <img src="img/fullscreen.svg" alt="Fullscreen" />
           </button>
         </div>
-        <div>
-          <button onClick=${this.zoomIn}>+</button>
-          <button onClick=${this.zoomOut}>−</button>
+        ${this.state.showDisplayOptions && html`
+        <div class="popup">
+          <div>
+            <select onChange=${this.selectMetric} title="Coordinates of the simulation">
+            ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric}>${t.label}</option>`)}
+            </select>
+          </div>
+          <div>
+            <select onChange=${this.selectQuality} title="Quality: device pixels per rendered pixel">
+            ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
+            </select>
+            <button onClick=${this.zoomIn} title="Zoom in">+</button>
+            <button onClick=${this.zoomOut} title="Zoom out">−</button>
+          </div>
+          <div>
+            <button
+              class=${this.state.showPhotonSphere ? "clicked" : ""}
+              title="Circular light orbits at 1.5 rs (P)"
+              onClick=${this.togglePhotonSphere}>Photon sphere</button>
+          </div>
+          <div>
+            <button
+              class=${this.state.showEventHorizon ? "clicked" : ""}
+              title="The event horizon at rs (H)"
+              onClick=${this.toggleEventHorizon}>Event horizon</button>
+          </div>
+          <div>
+            <button
+              class=${this.state.showRedshift ? "clicked" : ""}
+              title="Gravitational and Doppler redshift of colors and brightness (S)"
+              onClick=${this.toggleRedshift}>Redshift</button>
+          </div>
+          <div>
+            <span class="label">${this.state.fps + " FPS"}</span>
+          </div>
         </div>
-        <div>
-          <button
-            class=${this.state.showPhotonSphere ? "clicked" : ""}
-            title="Circular light orbits at 1.5 rs (P)"
-            onClick=${this.togglePhotonSphere}>Photon sphere</button>
-        </div>
-        <div>
-          <button
-            class=${this.state.showEventHorizon ? "clicked" : ""}
-            title="The event horizon at rs (H)"
-            onClick=${this.toggleEventHorizon}>Event horizon</button>
-        </div>
-        <div>
-          <button
-            class=${this.state.showRedshift ? "clicked" : ""}
-            title="Gravitational and Doppler redshift of colors and brightness (S)"
-            onClick=${this.toggleRedshift}>Redshift</button>
-        </div>
+        `}
       </div>
       <div id="top_left">
         <div>
@@ -499,18 +514,20 @@ class App extends Component {
           <button class=${this.state.spawnObject == 'photonClock' ? "clicked" : ""} onClick=${this.onSpawnPhotonClock}>Clock</button>
         </div>
         `}
-        <div>
-          <button>${print3Vec(this.state.obsvX)}</button>
-        </div>
-        <div>
-          <button>${printVelocity(this.state.obsvX, this.state.obsvU)}</button>
-          <button>${this.state.fps + " FPS"}</button>
-        </div>
         ${this.state.crashed && html`
         <div>
           <button onClick=${this.reset}>${metric.constructor.endMessage} press R to reset.</button>
         </div>
         `}
+      </div>
+
+      <div id="bottom_right">
+        <div>
+          <span class="label" title="The ship's coordinates (time, r, φ)">${print3Vec(this.state.obsvX)}</span>
+        </div>
+        <div>
+          <span class="label" title="The ship's speed">${printVelocity(this.state.obsvX, this.state.obsvU)}</span>
+        </div>
       </div>
 
       <div id="bottom_left">

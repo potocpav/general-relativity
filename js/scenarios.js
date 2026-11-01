@@ -80,7 +80,8 @@ function backwards(metric, [x, u], tau) {
 const ship = ([x, u], heading = Math.PI / 2) => ({x, u, heading});
 const object = (type, [x, u]) => ({type, x, u});
 
-const defaults = {viewportSize: 20, timeScale: 1, paused: false};
+export const defaultTimeScale = 4;
+const defaults = {viewportSize: 20, timeScale: defaultTimeScale, paused: false};
 
 // --- scenarios
 
@@ -169,7 +170,8 @@ export const scenarios = [
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 8 * rs,
+        // at 1x: 9 s to the horizon, 5 s inside, as the description says
+        viewportSize: 8 * rs, timeScale: 1,
         ship: ship(raindrop(metric, 2 * rs, 0), Math.PI),
         objects: [],
       };

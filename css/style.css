@@ -94,11 +94,44 @@ button.description {
 #top_right {
   float: right;
   text-align: right;
+  position: relative;
+  z-index: 1;
 }
 
 #bottom_left {
   position: absolute;
   bottom: 0;
+}
+
+#bottom_right {
+  position: absolute;
+  bottom: 0;
+  right: 10px;
+  text-align: right;
+}
+
+/* display options, opened with the eye button; overlays the content below */
+.popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  white-space: nowrap;
+  padding: 5px;
+  margin: 0 5px;
+  border-radius: 5px;
+  background-color: rgba(0, 0, 0, 0.95);
+}
+
+/* read-only text, styled like the buttons */
+.label {
+  display: inline-block;
+  padding: 8px 12px;
+  margin: 5px;
+  border-radius: 5px;
+  color: #fff;
+  background-color: #000;
+  font-family: monospace;
+  font-size: smaller;
 }
 
 #time_slider {
