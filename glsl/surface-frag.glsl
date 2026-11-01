@@ -208,7 +208,7 @@ void main( void ) {
 	vec3 world_color = reached ? redshift(show_redshift ? rshift : 1.0, grid_color(pix_x)) : shadow_color;
 
 	// annotations, not redshifted
-	float photon_sphere = radius_line(pix_x.y, 1.5 * rs, fwidth(float(reached)) == 0.0);
+	float photon_sphere = radius_line(pix_x.y, 1.5 * rs, fwidth(float(reached)) == 0.0 && reached);
 	world_color = mix(world_color, photon_sphere_color, show_photon_sphere ? photon_sphere : 0.0);
 	// The event horizon at the edge of the shadow (from outside) or where rays
 	// cross it (from inside, Gullstrand–Painlevé only); ray_end_radius is
