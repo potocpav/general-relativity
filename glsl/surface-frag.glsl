@@ -212,7 +212,8 @@ void main( void ) {
 	int nPoints = textureSize(obj_its, 0).y;
 	float last = float(nPoints - 1);
 	int bisect_iters = int(log2(float(nPoints)) + 7.0);
-	for (int i = 0; i < n_objects; i++) { // for each object
+	// rays that didn't arrive (the black hole's shadow) show no objects
+	for (int i = 0; i < (reached ? n_objects : 0); i++) { // for each object
 		mat3 obj_boost;
 		vec3 obj_deltax;
 		// bisect time for the object trajectory

@@ -1,6 +1,7 @@
 // Shader source loading and assembly.
 
 import { nSprites } from './object-info.js';
+import { horizonMargin } from './metric.js';
 
 export async function fetchText(url) {
   const response = await fetch(url);
@@ -14,6 +15,7 @@ export async function fetchText(url) {
 export function shaderDefines() {
   return {
     N_SPRITES: nSprites,
+    HORIZON_MARGIN: horizonMargin.toFixed(6),
   };
 }
 

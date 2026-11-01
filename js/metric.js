@@ -1,6 +1,6 @@
 // Bodies closer than this (in multiples of rs) are considered lost behind the
 // event horizon. Schwarzschild coordinates are singular at r = rs.
-const horizonMargin = 1.02;
+export const horizonMargin = 1.02;
 
 // 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
 // in screen-aligned cartesian components (ds = -1).

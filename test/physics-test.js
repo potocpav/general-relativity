@@ -57,9 +57,10 @@ const shadowSetups = [
   {name: 'circular orbit, 10 rs', r0: 10 * rs, orbiting: true},
 ];
 
-// Screen-space light rays just inside and just outside each shadow edge,
-// `delta` [rad] away from it. Returns [{x0, u0, fallsIn, label}].
-function shadowEdgeRays(setup, delta) {
+// The observer of a shadow setup, and screen-space light rays cast by it.
+// Returns {x0, edges, ray(psi, length)}: `edges` are the analytic shadow edges and
+// `psi` screen angles, both as local angles from r-hat towards phi-hat.
+function shadowObserver(setup) {
   const phi0 = 0.7; // not 0, so that the rotation to screen axes is tested too
   const x0 = [0, setup.r0, phi0];
   const tangential = [-Math.sin(phi0), Math.cos(phi0)];
@@ -71,22 +72,28 @@ function shadowEdgeRays(setup, delta) {
 
   const s = bCrit / setup.r0 * Math.sqrt(1 - rs / setup.r0);
   const h = setup.r0 >= 1.5 * rs ? Math.asin(s) : Math.PI - Math.asin(s);
-  // local angle psi from r-hat towards phi-hat; aberration for motion along phi-hat:
-  // a direction at angle chi from the velocity appears at chi', cos chi' = (cos chi + beta) / (1 + beta cos chi)
+  // aberration for motion along phi-hat: a direction at angle chi from the
+  // velocity appears at chi', cos chi' = (cos chi + beta) / (1 + beta cos chi)
   const aberrate = psi => {
     const chi = psi - Math.PI / 2;
     const c = (Math.cos(chi) + beta) / (1 + beta * Math.cos(chi));
     return Math.PI / 2 + Math.sign(Math.sin(chi)) * Math.acos(c);
   };
   const B = math.general_boost(Tx, math.neg_u(u));
-  const ray = psi => {
-    const v = [20 * Math.cos(psi + phi0), 20 * Math.sin(psi + phi0)]; // screen-aligned
+  const ray = (psi, length = 20) => {
+    const v = [length * Math.cos(psi + phi0), length * Math.sin(psi + phi0)]; // screen-aligned
     return math.matVec(B, light3(metric.g(x0), metric.viewportToWorld(x0, v)));
   };
+  return {x0, edges: [aberrate(Math.PI - h), aberrate(Math.PI + h)], ray};
+}
 
+// Screen-space light rays just inside and just outside each shadow edge,
+// `delta` [rad] away from it. Returns [{x0, u0, fallsIn, label}].
+function shadowEdgeRays(setup, delta) {
+  const {x0, edges, ray} = shadowObserver(setup);
   const rays = [];
-  [[Math.PI - h, +1], [Math.PI + h, -1]].forEach(([edge, inwards], i) => {
-    const psi = aberrate(edge);
+  edges.forEach((psi, i) => {
+    const inwards = i == 0 ? +1 : -1;
     rays.push({x0, u0: ray(psi + inwards * delta), fallsIn: true, label: `edge ${i + 1} inside`});
     rays.push({x0, u0: ray(psi - inwards * delta), fallsIn: false, label: `edge ${i + 1} outside`});
   });
@@ -123,13 +130,6 @@ const tests = [
     input: () => [randomPoint()],
     glsl: 'return mat_row(g(in_(0).xyz), row);',
     expected: ([x]) => metric.g(x),
-    tolerance: 1e-5,
-  },
-  {
-    name: 'gamma_uu',
-    input: () => { const x = randomPoint(); return [x, randomVelocity(x)]; },
-    glsl: 'return vec4(gamma_uu(in_(0).xyz, in_(1).xyz), 0.0);',
-    expected: ([x, u]) => [metric.gammaUU(x, u)],
     tolerance: 1e-5,
   },
   {
@@ -336,6 +336,50 @@ async function checkShadowGpu(gl, vertexSource, deg) {
   };
 }
 
+// Rays aimed into the shadow that end just in front of the horizon must be
+// traced to the end, not given up on: the shadow must not be too big.
+// For each ray direction, the screen length at which the ray ends at a given
+// radius is found with the JS geodesics; the GPU must reach the same radius,
+// and report a slightly longer ray as fallen in.
+async function checkNearHorizonGpu(gl, vertexSource) {
+  const endRadius = (x0, u0) => {
+    const xu = math.integrate(metric, math.geo_f(metric), [...x0, ...u0], 1, 1e-3);
+    return xu ? xu[1] : 0;
+  };
+  const cases = [];
+  for (const setup of [shadowSetups[0], shadowSetups[3]]) {
+    const {x0, edges, ray} = shadowObserver(setup);
+    const center = (edges[0] + edges[1]) / 2;
+    for (const offset of [0, 0.5, -0.8]) { // fraction of the shadow half-width
+      const psi = center + offset * (edges[1] - edges[0]) / 2;
+      for (const target of [1.05, 1.2, 1.5]) {
+        let lo = 0, hi = 40; // screen lengths ending outside / behind target
+        for (let i = 0; i < 30; i++) {
+          const mid = (lo + hi) / 2;
+          endRadius(x0, ray(psi, mid)) > target * rs ? lo = mid : hi = mid;
+        }
+        const label = `${setup.name}, ${offset} of half-width`;
+        cases.push({x0, u0: ray(psi, lo), reached: true, target, label: `${label}: ends at ${target} rs`});
+        const longer = ray(psi, hi + 0.5);
+        if (endRadius(x0, longer) == 0) {
+          cases.push({x0, u0: longer, reached: false, target, label: `${label}: past the horizon`});
+        }
+      }
+    }
+  }
+  const test = {glsl: 'vec3 x, u; bool reached = raytrace(in_(0).xyz, in_(1).xyz, x, u); return vec4(reached ? 1.0 : 0.0, x.y, 0.0, 0.0);'};
+  const gpu = await runOnGpu(gl, vertexSource, test, cases.map(c => [c.x0, c.u0]), 1);
+  const failures = cases.filter((c, i) => {
+    const [reached, r] = gpu[i][0];
+    if ((reached == 1) != c.reached) return true;
+    return c.reached && Math.abs(r / rs - c.target) > 0.01;
+  }).map((c, i) => c.label);
+  return {
+    ok: failures.length == 0,
+    message: `${cases.length} rays` + (failures.length ? `; wrong: ${failures.join(', ')}` : ''),
+  };
+}
+
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
@@ -372,6 +416,7 @@ async function main() {
   await run('surface shader', () => checkSurfaceShader(gl, vertexSource));
   await run('shadow edges (JS)', async () => checkShadowJs());
   await run('shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
+  await run('near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
   for (const test of tests) {
     await run(test.name, () => runComparison(gl, vertexSource, test));
   }

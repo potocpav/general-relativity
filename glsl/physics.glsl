@@ -1,5 +1,6 @@
 // Spacetime physics shared by the surface shader and the physics tests.
 // Mirrors js/metric.js, js/math.js and js/world.js; test/ checks that they agree.
+// Light rays use a different (equivalent) formulation than js/math.js, see below.
 // Assembled by js/shaders.js, which prepends `#version` and the shared defines.
 
 precision highp float;
@@ -23,17 +24,6 @@ mat3 g(vec3 x) {
 		-(1.0 - rs / r), 0.0, 0.0,
 		0.0, 1.0 / (1.0 - rs / r), 0.0,
 		0.0, 0.0, r * r);
-}
-
-// Christoffel symbols contracted with u twice: Gamma^mu_ab u^a u^b
-// (only the non-zero symbols are evaluated)
-vec3 gamma_uu(vec3 x, vec3 u) {
-	float r = x.y;
-	float a = rs / (2.0 * r * (r - rs)); // Gamma^t_tr = -Gamma^r_rr
-	return vec3(
-		2.0 * a * u.x * u.y,
-		rs * (r - rs) / (2.0 * r*r*r) * u.x*u.x - a * u.y*u.y + (rs - r) * u.z*u.z,
-		2.0 / r * u.y * u.z);
 }
 
 // Transform metric at point x to Minkowski metric
@@ -98,56 +88,82 @@ mat3 general_boost(mat3 Tx, vec3 u) {
 	return inverse_diag3(Tx) * boost(Tx * u) * Tx;
 }
 
-// Geodesics
+// Light rays
 
-// geodesic equation: du/dl (dx/dl = u)
-vec3 geo_u(vec3 x, vec3 u) {
-	return -gamma_uu(x, u);
+// Light rays are traced using their conserved energy E = (1 - rs/r) u^t and
+// angular momentum L = r^2 u^phi, as y = (t, r, phi, v = dr/dl):
+//   dt/dl = E / (1 - rs/r),  dr/dl = v,  dphi/dl = L / r^2,
+//   dv/dl = L^2 (r - 1.5 rs) / r^4    (from v^2 = E^2 - L^2 (1 - rs/r) / r^2)
+// Unlike the geodesic equation in Schwarzschild coordinates (as in js/math.js),
+// the (r, phi, v) part is regular at the horizon: only u^t diverges there,
+// and it doesn't feed back. Rays falling in therefore reach the horizon in a
+// few steps, instead of crawling towards it with ever smaller steps.
+vec4 ray_f(vec4 y, float E, float L) {
+	float r = y.y;
+	return vec4(E / (1.0 - rs / r), y.w, L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r));
 }
 
-// Bogacki–Shampine RK23 adaptive solver
+// spatial velocity (radial, tangential) of a ray state, for error control
+vec2 ray_velocity(vec4 y, float L) {
+	return vec2(y.w, L / y.y);
+}
+
+// Bogacki–Shampine RK23 step
 // https://en.m.wikipedia.org/wiki/Bogacki%E2%80%93Shampine_method
-// `k1u` must be geo_u(x, u). Outputs `k4u` = geo_u(x1, u1), which is the `k1u`
-// of the next step if this one gets accepted (First Same As Last).
-void rk23(vec3 x, vec3 u, vec3 k1u, float h, out vec3 x1, out vec3 u1, out vec3 k4u, out vec3 z1u) {
-	vec3 k1x = u;
-	vec3 k2x = u + k1u * h * 0.5;
-	vec3 k2u = geo_u(x + k1x * h * 0.5, k2x);
-	vec3 k3x = u + k2u * h * 0.75;
-	vec3 k3u = geo_u(x + k2x * h * 0.75, k3x);
-	x1 = x + h * (2.0/9.0 * k1x + 1.0/3.0 * k2x + 4.0/9.0 * k3x);
-	u1 = u + h * (2.0/9.0 * k1u + 1.0/3.0 * k2u + 4.0/9.0 * k3u);
-	k4u = geo_u(x1, u1);
-	z1u = u + h * (7.0/24.0 * k1u + 0.25 * k2u + 1.0/3.0 * k3u + 0.125 * k4u);
+// `k1` must be ray_f(y). Outputs `k4` = ray_f(y1), which is the `k1`
+// of the next step if this one gets accepted (First Same As Last),
+// and the 2nd order estimate `z1` for error control.
+void rk23(vec4 y, vec4 k1, float h, float E, float L, out vec4 y1, out vec4 k4, out vec4 z1) {
+	vec4 k2 = ray_f(y + 0.5 * h * k1, E, L);
+	vec4 k3 = ray_f(y + 0.75 * h * k2, E, L);
+	y1 = y + h * (2.0/9.0 * k1 + 1.0/3.0 * k2 + 4.0/9.0 * k3);
+	k4 = ray_f(y1, E, L);
+	z1 = y + h * (7.0/24.0 * k1 + 0.25 * k2 + 1.0/3.0 * k3 + 0.125 * k4);
 }
 
-// Integrate a geodesic from affine parameter 0 to 1.
-// Returns false if the integration didn't reach the end.
-bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
+#define RAY_REACHED 0       // traced to the end
+#define RAY_HORIZON 1       // fell behind the horizon (within HORIZON_MARGIN)
+#define RAY_OUT_OF_STEPS 2  // ran out of solver steps
+
+// Trace a light ray (x0, u0 null) from affine parameter 0 to 1 with an adaptive
+// RK23 solver. Returns one of the RAY_* statuses; `steps` is the number of
+// solver iterations used.
+int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
 	const float SAFETY = 0.9;
 	const float INITIAL_H = 0.1;
 	const float MIN_FACTOR = 0.1;
 	const float MAX_FACTOR = 10.0;
-	const float ATOL = 0.0;
 	const float RTOL = 0.001;
 	const float ERR_EXPONENT = -1.0/3.0;
 	const int MAX_ITERS = 40;
 
-	x = x0;
-	u = u0;
-	vec3 k1u = geo_u(x, u);
+	float E = (1.0 - rs / x0.y) * u0.x;
+	float L = x0.y * x0.y * u0.z;
+	vec4 y = vec4(x0, u0.y);
+	vec4 k1 = ray_f(y, E, L);
 	float l = 0.0;
 	float h = INITIAL_H;
 	bool step_accepted = true;
-	for (int n = 0; n < MAX_ITERS && l < 1.0; n += 1) {
+	int status = RAY_OUT_OF_STEPS;
+	for (steps = 0; steps < MAX_ITERS; steps += 1) {
+		if (y.y < rs * HORIZON_MARGIN) {
+			status = RAY_HORIZON;
+			break;
+		}
+		if (l >= 1.0) {
+			status = RAY_REACHED;
+			break;
+		}
+
 		float l1 = min(l + h, 1.0);
 		h = l1 - l;
 
-		vec3 x1, u1, k4u, z1u;
-		rk23(x, u, k1u, h, x1, u1, k4u, z1u);
+		vec4 y1, k4, z1;
+		rk23(y, k1, h, E, L, y1, k4, z1);
 
-		float scale = ATOL + max(length(u), length(u1)) * RTOL;
-		float error = length(z1u - u1) / scale;
+		vec2 w1 = ray_velocity(y1, L);
+		float scale = max(length(ray_velocity(y, L)), length(w1)) * RTOL + 1e-30;
+		float error = length(ray_velocity(z1, L) - w1) / scale;
 
 		float factor;
 		if (error < 1.0) {
@@ -169,10 +185,22 @@ bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
 
 		if (step_accepted) {
 			l = l1;
-			u = u1;
-			x = x1;
-			k1u = k4u;
+			y = y1;
+			k1 = k4;
 		}
 	}
-	return l >= 1.0;
+	if (status == RAY_OUT_OF_STEPS) { // the last step may have finished it
+		if (y.y < rs * HORIZON_MARGIN) status = RAY_HORIZON;
+		else if (l >= 1.0) status = RAY_REACHED;
+	}
+	x = y.xyz;
+	u = vec3(E / (1.0 - rs / y.y), y.w, L / (y.y * y.y));
+	return status;
+}
+
+// Trace a light ray from affine parameter 0 to 1.
+// Returns false if it didn't get there (fell in, or ran out of solver steps).
+bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
+	int steps;
+	return trace_ray(x0, u0, x, u, steps) == RAY_REACHED;
 }
