@@ -65,20 +65,52 @@ export const rk4 = (f, y, h) => {
 }
 
 // Integrate the geodesic ODE `f` (see geo_f) over the parameter interval
-// `duration` with RK4 steps of at most `maxStep`. Steps are shortened near
-// the horizon, where Schwarzschild coordinates are singular and a long step
-// could jump across it. Returns null if the body falls behind the horizon.
+// `duration` with RK4 steps of at most `maxStep`. Steps are shortened where
+// the body approaches a place it can't be followed (metric.stepLimit), so
+// that a long step doesn't jump across it. Returns null if the body gets
+// there (metric.canFollow).
 export function integrate(metric, f, xu, duration, maxStep) {
   const maxIters = 100000;
   var done = 0;
   for (var i = 0; duration - done > 1e-12; i++) {
     if (i >= maxIters) return null;
-    const horizonStep = 0.1 * (xu[1] - metric.rs) / (Math.abs(xu[4]) + 1e-12);
-    const h = Math.min(maxStep, horizonStep, duration - done);
+    const h = Math.min(maxStep, metric.stepLimit(xu), duration - done);
     const next = rk4(f, xu, h);
-    if (!metric.isOutsideHorizon(next)) return null;
+    if (!metric.canFollow(next)) return null;
     xu = next;
     done += h;
   }
   return xu;
+}
+
+export const RAY_REACHED = 0;  // traced to the end
+export const RAY_HORIZON = 1;  // went where it can't be followed (the black hole's shadow)
+
+// Trace a light ray, a past-directed null geodesic from x0 with momentum p0,
+// from affine parameter 0 to 1. Mirrors trace_ray in glsl/physics.glsl: the
+// ray is traced using its conserved energy E and angular momentum L, as
+// y = [t, r, phi, v = dr/dl] with
+//   dt/dl = metric.rayDtdl(r, v, E, L),  dr/dl = v,  dphi/dl = L / r^2,
+//   dv/dl = L^2 (r - 1.5 rs) / r^4,
+// which (except for t) is regular at the horizon. Steps are at most
+// `maxStep`, and short enough to move by a small fraction of r.
+// Returns {status, x, p}, with x and p at the end if it was reached.
+export function traceRay(metric, x0, p0, maxStep = 1e-3) {
+  const rs = metric.rs;
+  const E = metric.rayEnergy(x0, p0), L = x0[1] * x0[1] * p0[2];
+  const f = y => {
+    const r = y[1];
+    return [metric.rayDtdl(r, y[3], E, L), y[3], L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r)];
+  };
+  var y = [...x0, p0[1]], l = 0;
+  for (var i = 0; 1 - l > 1e-12; i++) {
+    if (metric.rayTerminated(y, E) || i > 1e6) return {status: RAY_HORIZON};
+    const speed = Math.abs(y[3]) + Math.abs(L) / y[1];
+    const h = Math.min(maxStep, 1 - l, 0.02 * y[1] / (speed + 1e-12));
+    y = rk4(f, y, h);
+    l += h;
+  }
+  if (metric.rayTerminated(y, E)) return {status: RAY_HORIZON};
+  const r = y[1];
+  return {status: RAY_REACHED, x: y.slice(0, 3), p: [metric.rayDtdl(r, y[3], E, L), y[3], L / (r * r)]};
 }

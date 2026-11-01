@@ -6,7 +6,7 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { Schwarzschild, GullstrandPainleve, metricTypes, convertState, localVelocity3, velocity3 } from '../js/metric.js';
+import { Schwarzschild, GullstrandPainleve, metricTypes, convertState, localVelocity3, velocity3, singularityRadius } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
@@ -158,13 +158,50 @@ function checkCoordinateTransformJs() {
   return {ok: maxError < 1e-9, message: `max difference after tau = 3: ${maxError.toExponential(2)}`};
 }
 
+// The JS ray tracer (conserved quantities) agrees with integrating the
+// geodesic equation, for rays outside the horizon that aren't near-critical.
+function checkTraceRayJs() {
+  let maxError = 0, compared = 0;
+  for (let i = 0; i < 64; i++) {
+    const x0 = randomPoint(2, 10);
+    const p0 = screenRay(metric, x0, randomVelocity(x0), randomVector2(10));
+    if (Math.abs(impactParameter(x0, p0) / bCrit - 1) < 0.1) continue;
+    const ray = math.traceRay(metric, x0, p0, 1e-4);
+    const xu = math.integrate(metric, math.geo_f(metric), [...x0, ...p0], 1, 1e-4);
+    if (ray.status != math.RAY_REACHED || xu === null) continue;
+    compared++;
+    for (let k = 0; k < 3; k++) {
+      maxError = Math.max(maxError, Math.abs(ray.x[k] - xu[k]) / Math.max(1, Math.abs(xu[k])),
+        Math.abs(ray.p[k] - xu[3 + k]) / Math.max(1, Math.abs(xu[3 + k])));
+    }
+  }
+  return {ok: maxError < 1e-6 && compared > 32, message: `max error ${maxError.toExponential(2)}, ${compared} rays`};
+}
+
+// A raindrop (falling from rest at infinity) crosses the horizon and reaches
+// radius r at proper time tau = 2 / (3 sqrt(rs)) (r0^1.5 - r^1.5), and is
+// followed until close to the singularity.
+function checkFreeFallJs() {
+  const r0 = 10 * rs, x0 = [0, r0, 0.3];
+  const u0 = math.matVec(metric.Tinv(x0), [1, 0, 0]); // the reference (raindrop) observer
+  const tau = r => 2 / (3 * Math.sqrt(rs)) * (Math.pow(r0, 1.5) - Math.pow(r, 1.5));
+  const fall = t => math.integrate(metric, math.geo_f(metric), [...x0, ...u0], t, 1e-3);
+  const errors = [];
+  for (const r of [2 * rs, rs, 0.5 * rs, 0.1 * rs]) {
+    const xu = fall(tau(r));
+    if (xu === null || Math.abs(xu[1] - r) > 1e-6) errors.push(`r at tau(${r / rs} rs) = ${xu && xu[1] / rs} rs`);
+  }
+  if (fall(tau(0.9 * singularityRadius * rs)) !== null) errors.push('followed past the singularity radius');
+  return {ok: errors.length == 0, message: errors.length ? errors.join(', ') : 'r(tau) matches down to 0.1 rs'};
+}
+
 // JS geodesics vs the analytic shadow edges.
 function checkShadowJs() {
   const delta = 0.1 * Math.PI / 180;
   const failures = [];
   for (const setup of shadowSetups) {
     for (const ray of shadowEdgeRays(setup, delta)) {
-      const fallsIn = math.integrate(metric, math.geo_f(metric), [...ray.x0, ...ray.u0], 1, 2e-4) === null;
+      const fallsIn = math.traceRay(metric, ray.x0, ray.u0, 2e-4).status == math.RAY_HORIZON;
       if (fallsIn != ray.fallsIn) failures.push(`${setup.name}: ${ray.label}`);
     }
   }
@@ -233,7 +270,7 @@ const tests = [
   },
   {
     // A light ray as cast for a screen pixel, traced to affine parameter 1
-    // by the adaptive RK23 on the GPU, and by fine-step RK4 in JS.
+    // by the adaptive RK23 on the GPU, and by fine-step RK4 in JS (traceRay).
     // Rays that either side doesn't finish are skipped, and so are rays
     // close to the critical impact parameter: they wind around the photon
     // sphere, which amplifies any integration error (see the shadow tests).
@@ -248,15 +285,43 @@ const tests = [
       return row == 0 ? vec4(x, reached ? 1.0 : 0.0) : vec4(u, 0.0);`,
     expected: ([x0, u0]) => {
       if (Math.abs(impactParameter(x0, u0) / bCrit - 1) < 0.1) return null;
-      const xu = math.integrate(metric, math.geo_f(metric), [...x0, ...u0], 1, 1e-3);
-      return xu && [[...xu.slice(0, 3), 1], [...xu.slice(3, 6), 0]];
+      return expectedRay(x0, u0);
     },
     skip: gpuRows => gpuRows[0][3] != 1,
     minCompared: 0.5,
     // the shader's solver has a relative tolerance of 1e-3 per step
     tolerance: 1e-2,
   },
+  {
+    // The same, for observers inside the black hole.
+    name: 'raytrace from inside the horizon',
+    metrics: [GullstrandPainleve],
+    input: () => {
+      const x0 = randomPoint(0.2 * rs, 0.95 * rs);
+      return [x0, screenRay(metric, x0, randomVelocity(x0), randomVector2(10))];
+    },
+    glsl: `
+      vec3 x, u;
+      bool reached = raytrace(in_(0).xyz, in_(1).xyz, x, u);
+      return row == 0 ? vec4(x, reached ? 1.0 : 0.0) : vec4(u, 0.0);`,
+    expected: ([x0, u0]) => {
+      if (Math.abs(impactParameter(x0, u0) / bCrit - 1) < 0.1) return null;
+      return expectedRay(x0, u0);
+    },
+    skip: gpuRows => gpuRows[0][3] != 1,
+    minCompared: 0.25,
+    // These rays sweep large angles through the strongest field, so the
+    // shader's per-step tolerance (1e-3) adds up to ~2% at the end (also in
+    // float64), which is below a pixel at the default zoom.
+    tolerance: 3e-2,
+  },
 ];
+
+// traceRay's result in the rows of the raytrace tests, or null if not reached
+function expectedRay(x0, u0) {
+  const ray = math.traceRay(metric, x0, u0, 1e-3);
+  return ray.status == math.RAY_REACHED ? [[...ray.x, 1], [...ray.p, 0]] : null;
+}
 
 const harness = body => `
 uniform highp sampler2D inputs;
@@ -403,8 +468,8 @@ async function checkShadowGpu(gl, vertexSource, deg) {
 // and report a slightly longer ray as fallen in.
 async function checkNearHorizonGpu(gl, vertexSource) {
   const endRadius = (x0, u0) => {
-    const xu = math.integrate(metric, math.geo_f(metric), [...x0, ...u0], 1, 1e-3);
-    return xu ? xu[1] : 0;
+    const ray = math.traceRay(metric, x0, u0, 1e-3);
+    return ray.status == math.RAY_REACHED ? ray.x[1] : 0;
   };
   const cases = [];
   for (const setup of [shadowSetups[0], shadowSetups[3]]) {
@@ -481,10 +546,12 @@ async function main() {
     await run(prefix + 'surface shader', () => checkSurfaceShader(gl, vertexSource));
     await run(prefix + 'frames (JS)', async () => checkFramesJs());
     await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
+    await run(prefix + 'ray tracer vs geodesic equation (JS)', async () => checkTraceRayJs());
+    if (type == GullstrandPainleve) await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());
     await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());
     await run(prefix + 'shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
     await run(prefix + 'near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
-    for (const test of tests) {
+    for (const test of tests.filter(t => !t.metrics || t.metrics.includes(type))) {
       await run(prefix + test.name, () => runComparison(gl, vertexSource, test));
     }
   }

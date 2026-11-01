@@ -60,6 +60,15 @@ float ray_dtdl(float r, float v, float E, float L) {
 	return (E * E + rs * L * L / (r * r * r)) / (E - sqrt(rs / r) * v);
 }
 
+// Whether a ray at y = (T, r, phi, v) went where it can't be followed.
+// Rays are traced backwards in time. A ray that crosses the horizon inwards
+// came out of the past horizon (white hole), which these coordinates don't
+// cover. Inside, rays with E > 0 head there too, never leaving; in a real
+// black hole they would come from the collapsed star.
+bool ray_terminated(vec4 y, float E) {
+	return (y.y < rs && y.w < 0.0) || (E > 0.0 && y.y > rs / HORIZON_MARGIN);
+}
+
 #else
 
 // Schwarzschild metric in Schwarzschild (t, r, phi) coordinates.
@@ -88,6 +97,12 @@ float ray_energy(vec3 x, vec3 p) {
 // dt/dl of a light ray at radius r, with dr/dl = v and conserved E, L
 float ray_dtdl(float r, float v, float E, float L) {
 	return E / (1.0 - rs / r);
+}
+
+// Whether a ray at y = (t, r, phi, v) went where it can't be followed:
+// the coordinates are singular at the horizon.
+bool ray_terminated(vec4 y, float E) {
+	return y.y < rs * HORIZON_MARGIN;
 }
 
 #endif
@@ -170,7 +185,7 @@ void rk23(vec4 y, vec4 k1, float h, float E, float L, out vec4 y1, out vec4 k4, 
 }
 
 #define RAY_REACHED 0       // traced to the end
-#define RAY_HORIZON 1       // fell behind the horizon (within HORIZON_MARGIN)
+#define RAY_HORIZON 1       // went where it can't be followed (the black hole's shadow)
 #define RAY_OUT_OF_STEPS 2  // ran out of solver steps
 
 // Trace a light ray (x0, u0 null) from affine parameter 0 to 1 with an adaptive
@@ -194,7 +209,7 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
 	bool step_accepted = true;
 	int status = RAY_OUT_OF_STEPS;
 	for (steps = 0; steps < MAX_ITERS; steps += 1) {
-		if (y.y < rs * HORIZON_MARGIN) {
+		if (ray_terminated(y, E)) {
 			status = RAY_HORIZON;
 			break;
 		}
@@ -238,7 +253,7 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
 		}
 	}
 	if (status == RAY_OUT_OF_STEPS) { // the last step may have finished it
-		if (y.y < rs * HORIZON_MARGIN) status = RAY_HORIZON;
+		if (ray_terminated(y, E)) status = RAY_HORIZON;
 		else if (l >= 1.0) status = RAY_REACHED;
 	}
 	x = y.xyz;

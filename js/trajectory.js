@@ -11,14 +11,14 @@ export class Trajectory {
     this.u = u0;
   }
 
-  // Points after the body falls behind the horizon are filled with NaN.
+  // Points after the body can't be followed (see metric.canFollow) are filled with NaN.
   simulate(n) {
     const xs = new Float32Array(n*3).fill(NaN);
     const us = new Float32Array(n*3).fill(NaN);
     const it = new Float32Array(n*2);
     const f = geo_f(this.metric);
     var xu = [...this.x, ...this.u];
-    var alive = this.metric.isOutsideHorizon(xu);
+    var alive = this.metric.canFollow(xu);
     for (var i = 0; i < n; i++) {
       if (i > 0 && alive) {
         xu = integrate(this.metric, f, xu, dtau, maxStep);

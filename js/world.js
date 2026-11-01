@@ -7,7 +7,6 @@ var gl;
 const thrust = 0.5;      // rocket acceleration in its rest frame
 const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
 const maxStep = 0.02;    // max. proper-time RK4 step for the observer
-const raySteps = 50;     // RK4 steps when raytracing on the CPU
 
 export class World {
   constructor(gl_, metric) {
@@ -115,9 +114,8 @@ export class World {
     const u0 = screenRay(this.metric, this.obsvX, this.obsvU, viewport);
 
     // raytracing along null geodesics, affine parameter from 0 to 1
-    const f = math.geo_f(this.metric);
-    const xu = math.integrate(this.metric, f, [...this.obsvX, ...u0], 1, 1 / raySteps);
-    return xu && xu.slice(0, 3);
+    const ray = math.traceRay(this.metric, this.obsvX, u0);
+    return ray.status == math.RAY_REACHED ? ray.x : null;
   }
 
   render() {

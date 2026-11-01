@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, localVelocity3, staticGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
+import { velocity3, localVelocity3, staticGamma, referenceGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -410,7 +410,7 @@ class App extends Component {
         </div>
         ${this.state.crashed && html`
         <div>
-          <button onClick=${this.reset}>You have crossed the event horizon. Press R to reset.</button>
+          <button onClick=${this.reset}>${metric.constructor.endMessage} Press R to reset.</button>
         </div>
         `}
       </div>
@@ -479,9 +479,12 @@ function printVelocity(x, u) {
   if (u === null) {
     return "n/a"
   } else {
+    // relative to a static observer; inside the horizon, where there are
+    // none, to the metric's reference observer
     const lambda = staticGamma(metric, x, u);
-    const v = Math.sqrt(1 - Math.pow(lambda, -2));
-    return "v = " + Math.floor(v * 100) + " %"
+    const speed = gamma => Math.floor(Math.sqrt(Math.max(0, 1 - Math.pow(gamma, -2))) * 100) + " %";
+    if (lambda !== null) return "v = " + speed(lambda);
+    return "v = " + speed(referenceGamma(metric, x, u)) + " (vs. free fall)";
   }
 }
 
