@@ -1,13 +1,33 @@
 import * as math from './math.js';
 
-// 3-velocity from 2-velocity (ds = -1)
+// Bodies closer than this (in multiples of rs) are considered lost behind the
+// event horizon. Schwarzschild coordinates are singular at r = rs.
+const horizonMargin = 1.02;
+
+// 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
+// in screen-aligned cartesian components (ds = -1).
+// Returns null if the velocity is not timelike.
 // (supposing diagonal metric tensor)
 export const velocity3 = (metric, x, u2_cart) => {
-  const [ux, uy] = metric.viewportToWorld(x, u2_cart).tolist();
+  const [ux, uy] = metric.viewportToWorld(x, u2_cart);
   const gx = metric.g(x);
-  console.assert(gx.get(0,1) == 0 && gx.get(0,2) == 0 && gx.get(1,2) == 0);
-  const lambda = Math.pow(-(gx.get(0,0) + gx.get(1,1) * ux*ux + gx.get(2,2) * uy*uy), -1/2);
-  return nj.array([lambda, ux*lambda, uy*lambda]);
+  const norm = -(gx[0][0] + gx[1][1] * ux*ux + gx[2][2] * uy*uy);
+  if (!(norm > 0)) return null;
+  const lambda = Math.pow(norm, -1/2);
+  return [lambda, ux*lambda, uy*lambda];
+}
+
+// 3-velocity from a physical 2-velocity measured by a static observer at x,
+// given in screen-aligned cartesian components. Returns null if |v| >= 1
+// or x is not outside the horizon.
+export const localVelocity3 = (metric, x, v2_cart) => {
+  if (!metric.isOutsideHorizon(x)) return null;
+  const [vr, vphi] = metric.cartesianToLocal(x, v2_cart);
+  const v2 = vr*vr + vphi*vphi;
+  if (!(v2 < 1)) return null;
+  const gamma = 1 / Math.sqrt(1 - v2);
+  const Tx = metric.T(x);
+  return [gamma / Tx[0][0], gamma * vr / Tx[1][1], gamma * vphi / Tx[2][2]];
 }
 
 export class Schwarzschild {
@@ -15,34 +35,26 @@ export class Schwarzschild {
     this.rs = rs;
   }
 
-  g(x) {
-    const r = x.get(1), rs = this.rs;
-    return nj.array([[-(1 - rs / r), 0, 0], [0, 1 / (1 - rs / r), 0], [0, 0, r * r]]);
+  isOutsideHorizon(x) {
+    return x[1] > this.rs * horizonMargin;
   }
 
-  Gamma0(x) {
-    const r = x.get(1), rs = this.rs;
-    return nj.array([
-      [0.0, rs / (2.0 * r * (r - rs)), 0.0],
-      [rs / (2.0 * r * (r - rs)), 0.0, 0.0],
-      [0.0, 0.0, 0.0]
-    ]);
+  g(x) {
+    const r = x[1], rs = this.rs;
+    return [[-(1 - rs / r), 0, 0], [0, 1 / (1 - rs / r), 0], [0, 0, r * r]];
   }
-  Gamma1(x) {
-    const r = x.get(1), rs = this.rs;
-    return nj.array([
-      [rs * (r - rs) / (2.0 * r*r*r), 0.0, 0.0],
-      [0.0, -rs / (2.0 * r * (r - rs)), 0.0],
-      [0.0, 0.0, rs - r]
-    ]);
-  }
-  Gamma2(x) {
-    const r = x.get(1), rs = this.rs;
-    return nj.array([
-      [0.0, 0.0, 0.0],
-      [0.0, 0.0, 1.0 / r],
-      [0.0, 1.0 / r, 0.0]
-    ]);
+
+  // Christoffel symbols contracted with u twice: Gamma^mu_ab u^a u^b
+  // (only the non-zero symbols are evaluated)
+  gammaUU(x, u) {
+    const r = x[1], rs = this.rs;
+    const [ut, ur, uphi] = u;
+    const a = rs / (2.0 * r * (r - rs)); // Gamma^t_tr = -Gamma^r_rr
+    return [
+      2.0 * a * ut * ur,
+      rs * (r - rs) / (2.0 * r*r*r) * ut*ut - a * ur*ur + (rs - r) * uphi*uphi,
+      2.0 / r * ur * uphi,
+    ];
   }
 
   // Transform metric at point x to Minkowski metric
@@ -50,92 +62,30 @@ export class Schwarzschild {
   // it's special-cased to diagonal matrices
   T(x) {
     const gx = this.g(x);
-    return nj.array([
-      [Math.sqrt(-gx.get(0,0)), 0.0, 0.0],
-      [0.0, Math.sqrt(gx.get(1,1)), 0.0],
-      [0.0, 0.0, Math.sqrt(gx.get(2,2))],
-    ]);
+    return [
+      [Math.sqrt(-gx[0][0]), 0.0, 0.0],
+      [0.0, Math.sqrt(gx[1][1]), 0.0],
+      [0.0, 0.0, Math.sqrt(gx[2][2])],
+    ];
   }
 
   // transformation from 2D screen-space element `x` into 2D world element
-  // around a given working point `x0`
+  // (dr, dphi) around a given working point `x0`
   //
   // FIXME: figure out whether this function is accurate around black holes.
   // It may be messing up our raindrop view of BH horizon angle while crossing it,
   // which should have radius of ~42 degrees.
   // FIXME: incorporate Lorentz transformation
   viewportToWorld(x0, x) {
-    const r = x0.get(1), phi = x0.get(2);
-    const A = nj.array([[Math.cos(phi), -r * Math.sin(phi)], [Math.sin(phi), r * Math.cos(phi)]]);
-    return math.inverse2(A).dot(x);
+    const r = x0[1], phi = x0[2];
+    const A = [[Math.cos(phi), -r * Math.sin(phi)], [Math.sin(phi), r * Math.cos(phi)]];
+    return math.matVec(math.inverse2(A), x);
+  }
+
+  // rotate a screen-space cartesian 2-vector into the local orthonormal
+  // (r-hat, phi-hat) basis at `x0`
+  cartesianToLocal(x0, v) {
+    const c = Math.cos(x0[2]), s = Math.sin(x0[2]);
+    return [c * v[0] + s * v[1], -s * v[0] + c * v[1]];
   }
 }
-
-// Gullstrand–Painlevé coordinates
-export class GP {
-    constructor(rs) {
-      this.rs = rs;
-    }
-
-    g(x) {
-      const r = x.get(1), rs = this.rs;
-      return nj.array([
-        [-(1-rs/r), Math.sqrt(rs/r), 0],
-        [Math.sqrt(rs/r), 1, 0],
-        [0, 0, r * r]
-      ]);
-    }
-
-    Gamma0(x) {
-      const r = x.get(1), rs = this.rs;
-      const rsr = rs / r;
-      return nj.array([
-        [rs * Math.sqrt(rsr) / (2*r*r), rs / (2*r*r), 0.0],
-        [rs / (2*r*r), Math.sqrt(rsr) / (2*r), 0.0],
-        [0.0, 0.0, -r*Math.sqrt(rsr)]
-      ]);
-    }
-    Gamma1(x) {
-      const r = x.get(1), rs = this.rs;
-      const rsr = rs / r;
-      return nj.array([
-        [rs * (r - rs) / (2*r*r*r), -rs * Math.sqrt(rsr) / (2*r*r), 0.0],
-        [-rs * Math.sqrt(rsr) / (2*r*r), -rs / (2*r*r), 0.0],
-        [0.0, 0.0, -r + rs]
-      ]);
-    }
-    Gamma2(x) {
-      const r = x.get(1), rs = this.rs;
-      return nj.array([
-        [0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0 / r],
-        [0.0, 1.0 / r, 0.0]
-      ]);
-    }
-
-    // Transform metric at point x to Minkowski metric
-    // This could be maybe made generic across matrics, but for now
-    // it's special-cased to diagonal matrices
-    T(x) {
-      // TODO: fix for GP metric
-      const gx = this.g(x);
-      return nj.array([
-        [Math.sqrt(-gx.get(0,0)), 0.0, 0.0],
-        [0.0, Math.sqrt(gx.get(1,1)), 0.0],
-        [0.0, 0.0, Math.sqrt(gx.get(2,2))],
-      ]);
-    }
-
-    // transformation from 2D screen-space element `x` into 2D world element
-    // around a given working point `x0`
-    //
-    // FIXME: figure out whether this function is accurate around black holes.
-    // It may be messing up our raindrop view of BH horizon angle while crossing it,
-    // which should have radius of ~42 degrees.
-    // FIXME: incorporate Lorentz transformation
-    viewportToWorld(x0, x) {
-      const r = x0.get(1), phi = x0.get(2);
-      const A = nj.array([[Math.cos(phi), -r * Math.sin(phi)], [Math.sin(phi), r * Math.cos(phi)]]);
-      return math.inverse2(A).dot(x);
-    }
-  }

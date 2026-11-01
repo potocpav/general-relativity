@@ -3,16 +3,33 @@ import * as math from './math.js';
 
 var gl;
 
+const thrust = 0.5;      // rocket acceleration in its rest frame
+const maxStep = 0.02;    // max. proper-time RK4 step for the observer
+const raySteps = 50;     // RK4 steps when raytracing on the CPU
+
 export class World {
   constructor(gl_, metric) {
     gl = gl_;
 
     this.lastRealTime = undefined;
     this.time = 0;
+    this.timeScale = 1;
+    this.viewportSize = 20;
     this.metric = metric;
     this.dt = 0.017;
     this.fps = 1 / this.dt;
+    this.crashed = false;
   }
+
+  reset(x, u) {
+    this.time = 0;
+    this.obsvX = x;
+    this.obsvU = u;
+    this.obsvO = [0.0, 1.0];
+    this.obsvSprite = 0;
+    this.crashed = false;
+  }
+
   compile(program) {
     this.time_loc = gl.getUniformLocation(program, 'time');
     this.obsv_x_loc = gl.getUniformLocation(program, 'obsv_x');
@@ -21,86 +38,85 @@ export class World {
     this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
     this.rs_loc = gl.getUniformLocation(program, 'rs');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
-
-    // just a debugging event
-    this.event_x_loc = gl.getUniformLocation(program, 'event_x');
   }
 
+  // `mousePos` is null when the pointer position is unknown
   update(time, mousePos, pointerDn, screenDim) {
-    var realTimeDt;
+    var realTimeDt = 0.017;
     if (this.lastRealTime !== undefined) {
-      realTimeDt = Math.max(0.005, Math.min(0.1, time - this.lastRealTime));
-    } else {
-      realTimeDt = 0.017;
+      realTimeDt = time - this.lastRealTime;
+      if (realTimeDt > 0) {
+        this.fps = 0.99 * this.fps + 0.01 / realTimeDt;
+      }
     }
     this.lastRealTime = time;
-    this.fps = 0.99 * this.fps + 0.01 / realTimeDt;
+    realTimeDt = Math.max(0.005, Math.min(0.1, realTimeDt));
     this.dt = realTimeDt * this.timeScale;
-    this.time += this.dt;
+
+    this.obsvSprite = 0;
+    if (this.crashed) return;
 
     // rocket motor
     var accel3_rest = undefined;
-    const acceleration = 0.5;
-    if (mousePos.get(0) != 0 || mousePos.get(1) != 0) {
+    if (pointerDn && mousePos) {
       const mouseViewport = screenToViewport(mousePos, screenDim, this.viewportSize);
-      const mouseRel = mouseViewport.multiply(-1);
-      const accelViewport = mouseRel.multiply(acceleration/Math.sqrt(mouseRel.dot(mouseRel).get(0)));
-      const accelPolar = this.metric.viewportToWorld(this.obsvX, accelViewport);
-      const accelWorld = nj.array([0, accelPolar.get(0), accelPolar.get(1)]);
-      if (pointerDn) {
-        this.obsvO = accelWorld.slice([1,3]);
-        accel3_rest = accelWorld;
+      const len = math.norm(mouseViewport);
+      if (len > 1e-9) {
+        // thrust away from the pointer, in the local orthonormal (r, phi) frame
+        const dir = this.metric.cartesianToLocal(this.obsvX, math.scale(mouseViewport, -1 / len));
+        const Tx = this.metric.T(this.obsvX);
+        accel3_rest = [0, thrust * dir[0] / Tx[1][1], thrust * dir[1] / Tx[2][2]];
+        this.obsvO = dir;
+        this.obsvSprite = 1;
       }
     }
 
-    const XU = nj.concatenate(this.obsvX, this.obsvU);
-    const XU1 = math.rk4(math.geo_f(this.metric, accel3_rest), XU, this.dt);
-
-    this.obsvX = XU1.slice([0, 3]);
-    this.obsvU = XU1.slice([3, 6]);
-    this.obsvSprite = pointerDn ? 1 : 0;
+    const f = math.geo_f(this.metric, accel3_rest);
+    const xu = math.integrate(this.metric, f, [...this.obsvX, ...this.obsvU], this.dt, maxStep);
+    if (xu === null) {
+      this.crashed = true;
+      return;
+    }
+    this.time += this.dt;
+    this.obsvX = xu.slice(0, 3);
+    this.obsvU = xu.slice(3, 6);
   }
 
-  // get world coordinates under the screen coordinates
+  // get world coordinates under the screen coordinates,
+  // or null if the ray doesn't reach them
   getWorldPos(screen, screenDim) {
     const viewport = screenToViewport(screen, screenDim, this.viewportSize);
     const world2 = this.metric.viewportToWorld(this.obsvX, viewport);
     const world3 = light3(this.metric.g(this.obsvX), world2);
-    const u0 = math.general_boost(this.metric.T(this.obsvX), math.neg_u(this.obsvU)).dot(world3);
+    const u0 = math.matVec(math.general_boost(this.metric.T(this.obsvX), math.neg_u(this.obsvU)), world3);
 
-    // raytracing along null geodesics
-    const max_iters = 10;
-    const dl = 1 / max_iters
-    var xu = nj.concatenate(this.obsvX, u0);
-    for (var tau = 0; tau < 1; tau += dl) {
-      xu = math.rk4(math.geo_f(this.metric, undefined), xu, dl);
-    }
-    return xu.slice([0,3]);
+    // raytracing along null geodesics, affine parameter from 0 to 1
+    const f = math.geo_f(this.metric);
+    const xu = math.integrate(this.metric, f, [...this.obsvX, ...u0], 1, 1 / raySteps);
+    return xu && xu.slice(0, 3);
   }
 
   render() {
     gl.uniform1f(this.time_loc, this.time);
-    gl.uniform3f(this.obsv_x_loc, this.obsvX.get(0), this.obsvX.get(1), this.obsvX.get(2));
-    gl.uniform3f(this.obsv_u_loc, this.obsvU.get(0), this.obsvU.get(1), this.obsvU.get(2));
-    gl.uniform2f(this.obsv_o_loc, this.obsvO.get(0), this.obsvO.get(1));
+    gl.uniform3f(this.obsv_x_loc, ...this.obsvX);
+    gl.uniform3f(this.obsv_u_loc, ...this.obsvU);
+    gl.uniform2f(this.obsv_o_loc, ...this.obsvO);
     gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
-    gl.uniform1f(this.rs_loc, this.rs);
+    gl.uniform1f(this.rs_loc, this.metric.rs);
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
-    gl.uniform3f(this.event_x_loc, this.eventX.get(0), this.eventX.get(1), this.eventX.get(2));
   }
 }
 
 // screen coords  [px] to viewport coords  [s]
 function screenToViewport(s, screenDim, viewportSize) {
-	const meanRes = (screenDim.get(0) + screenDim.get(1)) / 2.0;
-	return s.subtract(screenDim.divide(2.0)).divide(meanRes).multiply(viewportSize / 2.0);
+  const meanRes = (screenDim[0] + screenDim[1]) / 2.0;
+  return s.map((v, i) => (v - screenDim[i] / 2.0) / meanRes * viewportSize / 2.0);
 }
 
 // compute 3-vector out of a 2-vector so that ds = 0
 // (supposing a diagonal metric)
 function light3(gx, u2) {
-  const [x, y] = u2.tolist();
-  const u3 = nj.array([0, x, y]);
-	const res = gx.dot(u3).dot(u3).get(0) / gx.get(0,0);
-	return nj.array([-Math.sqrt(-res), x, y]);
+  const [x, y] = u2;
+  const res = (gx[1][1] * x*x + gx[2][2] * y*y) / gx[0][0];
+  return [-Math.sqrt(-res), x, y];
 }

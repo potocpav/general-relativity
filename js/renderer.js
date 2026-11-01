@@ -8,25 +8,19 @@ var trajectories;
 
 var surfaceProgram, screenProgram;
 var vertexBuffer;
-var vertexPosition;
-var screenVertexPosition;
 
 var screenWidth, screenHeight;
 var target;
 
-export function initGl (canvas) {
-  var gl;
-  try {
-    gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: true });
-  } catch(error) { }
-
-  if (gl) {
-
-  } else {
-    alert('WebGL not supported.');
-  }
+// Returns null if WebGL 2 is not available.
+export function initGl(canvas) {
+  const gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false, premultipliedAlpha: false });
+  if (!gl) return null;
 
   EXT_color_buffer_float = gl.getExtension('EXT_color_buffer_float');
+  if (!EXT_color_buffer_float) {
+    console.warn("HDR not supported");
+  }
   return gl;
 }
 
@@ -46,84 +40,52 @@ export async function init(gl_, world_, objectInfo_, trajectories_) {
   gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
 
   // fetch shaders
-  const surfaceVert = await fetch("glsl/surface-vert.glsl").then(r => r.text());
-  const surfaceFrag = await fetch("glsl/surface-frag.glsl").then(r => r.text());
-  const screenVert = await fetch("glsl/screen-vert.glsl").then(r => r.text());
-  const screenFrag = await fetch("glsl/screen-frag.glsl").then(r => r.text());
+  const [surfaceVert, surfaceFrag, screenVert, screenFrag] = await Promise.all([
+    "glsl/surface-vert.glsl", "glsl/surface-frag.glsl", "glsl/screen-vert.glsl", "glsl/screen-frag.glsl",
+  ].map(fetchText));
 
-  surfaceProgram = compileSurfaceProgram(surfaceVert, surfaceFrag);
-  screenProgram = compileScreenProgram(screenVert, screenFrag);
+  surfaceProgram = compileProgram(surfaceVert, surfaceFrag);
+  cacheUniformLocation(surfaceProgram, 'resolution');
+  world.compile(surfaceProgram);
+  trajectories.compile(surfaceProgram);
+  objectInfo.compile(surfaceProgram);
+
+  screenProgram = compileProgram(screenVert, screenFrag);
+  cacheUniformLocation(screenProgram, 'resolution');
+  cacheUniformLocation(screenProgram, 'color');
 }
 
-function compileSurfaceProgram(vertex, fragment) {
-  if (!gl) { return; }
+async function fetchText(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  }
+  return response.text();
+}
 
-  var program = gl.createProgram();
+// Compile & link a program, throwing on failure. Leaves the program in use.
+function compileProgram(vertex, fragment) {
+  const program = gl.createProgram();
 
-  var vs = createShader(vertex, gl.VERTEX_SHADER);
-  var fs = createShader(fragment, gl.FRAGMENT_SHADER);
+  const vs = createShader(vertex, gl.VERTEX_SHADER);
+  const fs = createShader(fragment, gl.FRAGMENT_SHADER);
 
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
 
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-
   gl.linkProgram(program);
-
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    var error = gl.getProgramInfoLog(program);
-    console.error(error);
-    console.error('VALIDATE_STATUS: ' + gl.getProgramParameter(program, gl.VALIDATE_STATUS), 'ERROR: ' + gl.getError());
-    return;
-  }
-
-  // Cache uniforms
-  cacheUniformLocation(program, 'resolution');
-  cacheUniformLocation(program, 'viewport_size');
-
-  world.compile(program);
-  trajectories.compile(program);
-  objectInfo.compile(program);
-
-  // Load program into GPU
-  gl.useProgram(program);
-
-  // Set up buffers
-  vertexPosition = gl.getAttribLocation(program, "position");
-  gl.enableVertexAttribArray(vertexPosition);
-  return program;
-}
-
-function compileScreenProgram(vertex, fragment) {
-  if (!gl) { return; }
-
-  var program = gl.createProgram();
-
-  var vs = createShader(vertex, gl.VERTEX_SHADER);
-  var fs = createShader(fragment, gl.FRAGMENT_SHADER);
-
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
 
   gl.deleteShader(vs);
   gl.deleteShader(fs);
 
-  gl.linkProgram(program);
-
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error('VALIDATE_STATUS: ' + gl.getProgramParameter(program, gl.VALIDATE_STATUS), 'ERROR: ' + gl.getError());
-    return;
+    throw new Error('Shader program failed to link: ' + gl.getProgramInfoLog(program));
   }
 
   gl.useProgram(program);
 
-  cacheUniformLocation(program, 'resolution');
-  cacheUniformLocation(program, 'color');
-
-  screenVertexPosition = gl.getAttribLocation(program, "position");
-  gl.enableVertexAttribArray(screenVertexPosition);
-
+  program.vertexPosition = gl.getAttribLocation(program, "position");
+  gl.enableVertexAttribArray(program.vertexPosition);
   return program;
 }
 
@@ -132,23 +94,25 @@ export function initializeWindow(width, height) {
   screenWidth = width;
   screenHeight = height;
   gl.viewport(0, 0, width, height);
+  if (target) {
+    gl.deleteFramebuffer(target.framebuffer);
+    gl.deleteTexture(target.texture);
+  }
   target = createTarget(width, height);
 }
 
 function createTarget(width, height) {
-  var target = {};
+  const target = {};
 
   target.framebuffer = gl.createFramebuffer();
-  target.renderbuffer = gl.createRenderbuffer();
   target.texture = gl.createTexture();
 
   // set up framebuffer
   gl.bindTexture(gl.TEXTURE_2D, target.texture);
   // enable HDR rendering if supported
   if (EXT_color_buffer_float) {
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, width, height, 0, gl.RGBA, gl.HALF_FLOAT, null);
   } else {
-    console.warn("HDR not supported");
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   }
 
@@ -159,6 +123,10 @@ function createTarget(width, height) {
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target.texture, 0);
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if (status != gl.FRAMEBUFFER_COMPLETE) {
+    console.error("Framebuffer incomplete: 0x" + status.toString(16));
+  }
 
   gl.bindTexture(gl.TEXTURE_2D, null);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -167,21 +135,15 @@ function createTarget(width, height) {
 }
 
 function createShader(src, type) {
-  var shader = gl.createShader(type);
+  const shader = gl.createShader(type);
 
   gl.shaderSource(shader, src);
   gl.compileShader(shader);
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    var error = gl.getShaderInfoLog(shader);
-
-    // Remove trailing linefeed, for FireFox's benefit.
-    while ((error.length > 1) && (error.charCodeAt(error.length - 1) < 32)) {
-      error = error.substring(0, error.length - 1);
-    }
-
-    console.error(src, error);
-    return null;
+    const error = gl.getShaderInfoLog(shader).trimEnd();
+    gl.deleteShader(shader);
+    throw new Error('Shader failed to compile: ' + error);
   }
   return shader;
 }
@@ -200,19 +162,14 @@ export function render() {
   gl.uniform2f(surfaceProgram.uniformsCache['resolution'], screenWidth, screenHeight);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-  gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(surfaceProgram.vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   world.render();
   trajectories.render();
   objectInfo.render();
 
-  gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-
-  // Render custom shader to target buffer
-
+  // Render custom shader to target buffer (covers the whole target, no clear needed)
   gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-
-  gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Set uniforms for screen shader
@@ -223,7 +180,7 @@ export function render() {
   gl.uniform1i(screenProgram.uniformsCache['color'], 1);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-  gl.vertexAttribPointer(screenVertexPosition, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribPointer(screenProgram.vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   gl.activeTexture(gl.TEXTURE1);
   gl.bindTexture(gl.TEXTURE_2D, target.texture);

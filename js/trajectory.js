@@ -1,6 +1,7 @@
-import {geo_f, rk4} from './math.js';
+import {geo_f, integrate} from './math.js';
 
-const dt = 0.1;
+const dtau = 0.1;     // proper time between stored trajectory points
+const maxStep = 0.02; // max. RK4 step
 
 export class Trajectory {
   constructor(metric, obj_i, x0, u0) {
@@ -8,26 +9,28 @@ export class Trajectory {
     this.obj_i = obj_i;
     this.x = x0;
     this.u = u0;
-    this.tau = 0;
   }
 
+  // Points after the body falls behind the horizon are filled with NaN.
   simulate(n) {
-    var xs = new Float32Array(n*3), us = new Float32Array(n*3), it = new Float32Array(n*2);
-    var xu = nj.concatenate(this.x, this.u);
+    const xs = new Float32Array(n*3).fill(NaN);
+    const us = new Float32Array(n*3).fill(NaN);
+    const it = new Float32Array(n*2);
+    const f = geo_f(this.metric);
+    var xu = [...this.x, ...this.u];
+    var alive = this.metric.isOutsideHorizon(xu);
     for (var i = 0; i < n; i++) {
-      if (i > 0) {
-        xu = rk4(geo_f(this.metric, undefined), xu, dt);
-        this.tau += dt;
+      if (i > 0 && alive) {
+        xu = integrate(this.metric, f, xu, dtau, maxStep);
+        alive = xu !== null;
       }
 
-      xs[i*3 + 0] = xu.get(0);
-      xs[i*3 + 1] = xu.get(1);
-      xs[i*3 + 2] = xu.get(2);
-      us[i*3 + 0] = xu.get(3);
-      us[i*3 + 1] = xu.get(4);
-      us[i*3 + 2] = xu.get(5);
       it[i*2 + 0] = this.obj_i;
-      it[i*2 + 1] = this.tau;
+      it[i*2 + 1] = i * dtau;
+      if (alive) {
+        xs.set(xu.slice(0, 3), i*3);
+        us.set(xu.slice(3, 6), i*3);
+      }
     }
     return {"xs": xs, "us": us, "it": it, "n": n};
   }

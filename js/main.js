@@ -1,20 +1,26 @@
 // Greetings to Iq/RGBA! ;)
 
-// import { Component, render } from 'https://unpkg.com/htm/preact/standalone.module.js';
-import { h, Component, render } from 'https://esm.sh/preact';
-import htm from 'https://esm.sh/htm';
+import { h, Component, render } from 'https://esm.sh/preact@11.1.1';
+import htm from 'https://esm.sh/htm@3.1.1';
 
 import * as renderer from './renderer.js';
+import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, Schwarzschild } from './metric.js';
+import { velocity3, localVelocity3, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
 
-var quality = 2;
+const devicePixelRatio = () => window.devicePixelRatio || 1;
+
+// Device pixels per rendered pixel. The default is about two CSS pixels.
 const quality_levels = [1, 2, 4, 8];
+var quality = quality_levels.reduce((best, q) =>
+  Math.abs(q - 2 * devicePixelRatio()) < Math.abs(best - 2 * devicePixelRatio()) ? q : best);
+
+const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
 const rs = 0.3;
 const metric = new Schwarzschild(rs);
@@ -25,7 +31,7 @@ const objectIds = {
 };
 const nextObjectId = id => {
   const keys = Object.keys(objectIds);
-  return Object.fromEntries(keys.map((k, i) => [k, keys[(i+1) % keys.length]]))[id];
+  return keys[(keys.indexOf(id) + 1) % keys.length];
 };
 
 var canvas;
@@ -34,38 +40,58 @@ var gl;
 var world;
 var objectInfo;
 var trajectories;
-var asteroid;
 
 var params = {
-  mousePos: nj.array([0, 0]),
+  mousePos: null, // [x, y] in CSS pixels, y pointing up; null until the pointer moves
   pointerDn: false,
-  screenDim: nj.array([window.innerWidth, window.innerHeight]),
+  screenDim: [window.innerWidth, window.innerHeight],
 };
 
 function initWorld() {
   const r = 10 * rs;
-  const x = nj.array([0, r, 0]);
-  // const u2 = nj.array([0.0, 0.0]); // stationary
-  // const u2 = nj.array([-(1 - rs/r) * Math.sqrt(rs/r), 0.0]); // raindrop
-  const u2 = nj.array([0.0, Math.sqrt(rs/(2*r))]); // circular orbit
+  const x = [0, r, 0];
+  // const u2 = [0.0, 0.0]; // stationary
+  // const u2 = [-(1 - rs/r) * Math.sqrt(rs/r), 0.0]; // raindrop
+  const u2 = [0.0, Math.sqrt(rs/(2*r))]; // circular orbit
 
-  world.time = 0;
   world.viewportSize = 20;
-  world.timeScale = 1.0;
-  world.rs = rs;
-
-  world.startTime = Date.now();
-  world.obsvX = x;
-  world.obsvU = velocity3(metric, x, u2);
-  world.obsvO = nj.array([0.0, 1.0]);
-  world.eventX = nj.array([0.0, 0.0, 0.0]);
+  world.reset(x, velocity3(metric, x, u2));
 
   // objects
-  const asteroid_x0 = nj.array([0, 25 * rs, 0.0]);
-  const asteroid_v0 = nj.array([0.0, -0.12]);
-  asteroid = new Trajectory(metric, photonClockId, asteroid_x0, velocity3(metric, asteroid_x0, asteroid_v0))
-  trajectories.add(asteroid);
+  trajectories.clear();
+  const clock_x0 = [0, 25 * rs, 0.0];
+  const clock_v0 = [0.0, -0.12];
+  // Start the trajectory in the past, so that the clock is visible right away.
+  const [clock_x, clock_u] = integrateBackwards(clock_x0, velocity3(metric, clock_x0, clock_v0), 40);
+  trajectories.add(new Trajectory(metric, photonClockId, clock_x, clock_u));
 }
+
+// Free-fall state `tau` proper time before (x, u). Geodesics are time-reversible:
+// integrate forward with the velocity reversed, then reverse it back.
+function integrateBackwards(x, u, tau) {
+  const xu = math.integrate(metric, math.geo_f(metric), [...x, ...math.scale(u, -1)], tau, 0.02);
+  return [xu.slice(0, 3), math.scale(xu.slice(3, 6), -1)];
+}
+
+// Velocity relative to a static observer, from a drag on the screen.
+// The magnitude saturates below the speed of light.
+function spawnVelocityFromDrag(origin, pos) {
+  const meanRes = (params.screenDim[0] + params.screenDim[1]) / 2;
+  const vLinear = math.scale(math.sub(origin, pos), 1 / meanRes);
+  const vAbs = math.norm(vLinear);
+  const vScale = vAbs > 1e-9 ? (1 - Math.exp(-vAbs * 3)) / vAbs : 3; // limit for vAbs -> 0
+  return math.scale(vLinear, vScale);
+}
+
+function spawn(objectName, screenPos, velocity) {
+  const x = world.getWorldPos(screenPos, params.screenDim);
+  if (!x) return;
+  const u = localVelocity3(metric, x, velocity);
+  if (!u) return;
+  trajectories.add(new Trajectory(metric, objectIds[objectName], x, u));
+}
+
+const timeScaleOf = state => state.pause ? 0 : Math.pow(10, state.timeSlider);
 
 class App extends Component {
   state = {
@@ -74,100 +100,116 @@ class App extends Component {
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
     timeSlider: 0,
-    timeScale: 1,
     pause: false,
     tau: null,
     obsvX: null,
     obsvU: null,
     fps: null,
+    crashed: false,
+    error: null,
   }
 
   componentDidMount () {
     canvas = document.getElementById("canvas")
     overlay = document.getElementById("overlay")
     gl = renderer.initGl(canvas);
+    if (!gl) {
+      this.setState({error: "WebGL 2 is not supported by this browser."});
+      return;
+    }
 
     document.body.onkeydown = this.onKeyDown;
 
     startup().then(() => {
       initWorld();
-      requestAnimationFrame(t => this.animate(t));
+      this.lastUiUpdate = -Infinity;
+      requestAnimationFrame(this.animate);
+    }).catch(err => {
+      console.error(err);
+      this.setState({error: "Initialization failed: " + err.message});
     });
   }
 
-  animate(t) {
-    requestAnimationFrame(t => this.animate(t));
-    world.timeScale = this.state.pause ? 0 : Math.pow(10, this.state.timeSlider);
+  animate = t => {
+    requestAnimationFrame(this.animate);
+    world.timeScale = timeScaleOf(this.state);
     world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim);
     renderer.render();
     this.renderOverlay();
 
-    this.setState({
-      tau: world.time,
-      obsvX: world.obsvX,
-      obsvU: world.obsvU,
-      fps: Math.floor(world.fps),
-      timeScale: world.timeScale,
-    });
+    if (t - this.lastUiUpdate >= uiUpdateInterval) {
+      this.lastUiUpdate = t;
+      this.setState({
+        tau: world.time,
+        obsvX: world.obsvX,
+        obsvU: world.obsvU,
+        fps: Math.round(world.fps),
+        crashed: world.crashed,
+      });
+    }
   }
 
   renderOverlay() {
-    var ctx = overlay.getContext("2d");
+    const ctx = overlay.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
-      const [originPxX, originPxY] = this.state.spawnDragOrigin.tolist();
-      const originX = originPxX / quality;
-      const originY = overlay.height - originPxY / quality;
-      const targetX = params.mousePos.get(0) / quality;
-      const targetY = overlay.height - params.mousePos.get(1) / quality;
-      const absVel = Math.sqrt(this.state.spawnVelocity.dot(this.state.spawnVelocity).get(0));
+    const {tool, spawnDragOrigin, spawnVelocity} = this.state;
+    if (tool != 'spawn' || !spawnDragOrigin || !params.mousePos) return;
 
-      ctx.beginPath();
-      ctx.strokeStyle = `#fff`;
-      ctx.moveTo(originX, originY);
-      ctx.lineTo(targetX, targetY);
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    // draw in CSS pixels
+    const s = overlay.width / window.innerWidth;
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+    const height = window.innerHeight;
+    const [originX, originY] = spawnDragOrigin;
+    const [targetX, targetY] = params.mousePos;
 
-      ctx.font = "11px serif";
-      ctx.fillStyle = `#fff`;
-      ctx.fillText(Math.round(absVel * 100) + " %", targetX, targetY);
-    }
+    ctx.beginPath();
+    ctx.strokeStyle = `#fff`;
+    ctx.moveTo(originX, height - originY);
+    ctx.lineTo(targetX, height - targetY);
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
+    ctx.font = "14px serif";
+    ctx.fillStyle = `#fff`;
+    ctx.fillText(Math.round(math.norm(spawnVelocity) * 100) + " %", targetX, height - targetY);
   }
 
   onPointerMove = ev => {
-    params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
-    if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
-      const vLinear = this.state.spawnDragOrigin.subtract(params.mousePos).divide((params.screenDim.get(0) + params.screenDim.get(1)) / 2);
-      const vAbs = Math.sqrt(vLinear.dot(vLinear).get(0));
-      const vScale = (1 - Math.exp(-vAbs * 3)) / vAbs;
-      this.setState({spawnVelocity: vLinear.multiply(vScale)});
+    params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
+    if (this.state.tool == 'spawn' && this.state.spawnDragOrigin) {
+      this.setState({spawnVelocity: spawnVelocityFromDrag(this.state.spawnDragOrigin, params.mousePos)});
     }
   }
 
   onPointerDown = ev => {
     if (ev.target.tagName != "DIV") return;
-    params.mousePos = nj.array([ev.clientX, window.innerHeight - ev.clientY]);
+    params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
+    // keep receiving events when the pointer leaves the window
+    ev.currentTarget.setPointerCapture(ev.pointerId);
 
     if (this.state.tool == 'boost') {
       params.pointerDn = true;
     } else if (this.state.tool == 'spawn') {
       this.setState({
         spawnDragOrigin: params.mousePos,
-        spawnVelocity: nj.array([0,0]),
+        spawnVelocity: [0, 0],
       });
     }
   }
 
   onPointerUp = _ => {
-    if (this.state.tool == 'boost') {
-      params.pointerDn = false;
-    } else if (this.state.tool == 'spawn' && this.state.spawnDragOrigin !== undefined) {
-      const spawnX = world.getWorldPos(this.state.spawnDragOrigin, params.screenDim);
-      asteroid = new Trajectory(metric, objectIds[this.state.spawnObject], spawnX, velocity3(metric, spawnX, this.state.spawnVelocity))
-      trajectories.add(asteroid);
+    const {tool, spawnDragOrigin, spawnVelocity, spawnObject} = this.state;
+    if (tool == 'spawn' && spawnDragOrigin) {
+      spawn(spawnObject, spawnDragOrigin, spawnVelocity);
+    }
+    this.cancelPointer();
+  }
+
+  cancelPointer = _ => {
+    params.pointerDn = false;
+    if (this.state.spawnDragOrigin) {
       this.setState({spawnDragOrigin: undefined, spawnVelocity: undefined});
     }
   }
@@ -188,7 +230,13 @@ class App extends Component {
     }
     switch (ev.key) {
       case "r": this.reset();
-      break; case " ": this.onPlayPause();
+      break; case " ":
+        // Don't let Space also activate a focused button (e.g. the pause button).
+        ev.preventDefault();
+        if (document.activeElement && document.activeElement !== document.body) {
+          document.activeElement.blur();
+        }
+        if (!ev.repeat) this.onPlayPause();
     }
   }
 
@@ -208,21 +256,26 @@ class App extends Component {
 
   zoomOut = _ => world.viewportSize *= 1.7;
 
-  activateBoost = _ => this.setState({tool: 'boost'});
+  setTool(tool) {
+    this.cancelPointer();
+    this.setState({tool});
+  }
 
-  activateSpawn = _ => this.setState({tool: 'spawn'});
+  activateBoost = _ => this.setTool('boost');
+
+  activateSpawn = _ => this.setTool('spawn');
 
   onSpawnAsteroid = _ => this.setState({spawnObject: 'asteroid'});
   onSpawnPhotonClock = _ => this.setState({spawnObject: 'photonClock'});
 
-  reset = _ => initWorld();
+  reset = _ => {
+    if (world) initWorld();
+  }
 
   selectQuality = ev => {
     quality = quality_levels[ev.target.selectedIndex];
     refreshWindow();
   }
-
-  goToGithub = _ => window.location.href = "https://github.com/potocpav/general-relativity";
 
   fullscreen = _ => {
     if (document.fullscreenElement) {
@@ -249,14 +302,19 @@ class App extends Component {
       onPointerMove=${this.onPointerMove}
       onPointerDown=${this.onPointerDown}
       onPointerUp=${this.onPointerUp}
+      onPointerCancel=${this.cancelPointer}
       onWheel=${this.onWheel}>
       <div id="top_right">
         <div>
-          <select onChange=${this.selectQuality}>
+          <select onChange=${this.selectQuality} title="Device pixels per rendered pixel">
           ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
           </select>
-          <img src="img/github-mark-white.svg" title="Go to GitHub Repository" onClick=${this.goToGithub} />
-          <img src="img/fullscreen.svg" title="Press F11 to enter or leave fullscreen mode" onClick=${this.fullscreen} />
+          <a class="icon" href="https://github.com/potocpav/general-relativity" target="_blank" rel="noopener" title="Go to GitHub Repository">
+            <img src="img/github-mark-white.svg" alt="GitHub" />
+          </a>
+          <button class="icon" title="Press F11 to enter or leave fullscreen mode" onClick=${this.fullscreen}>
+            <img src="img/fullscreen.svg" alt="Fullscreen" />
+          </button>
         </div>
         <div>
           <button onClick=${this.zoomIn}>+</button>
@@ -264,6 +322,7 @@ class App extends Component {
         </div>
       </div>
       <div id="top_left">
+        ${this.state.error && html`<div><button>${this.state.error}</button></div>`}
         <div>
           <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
           <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
@@ -281,12 +340,17 @@ class App extends Component {
           <button>${printVelocity(this.state.obsvX, this.state.obsvU)}</button>
           <button>${this.state.fps + " FPS"}</button>
         </div>
+        ${this.state.crashed && html`
+        <div>
+          <button onClick=${this.reset}>You have crossed the event horizon. Press R to reset.</button>
+        </div>
+        `}
       </div>
 
       <div id="bottom_left">
         <div>
           <button onClick=${this.reset}>τ = ${printTime(this.state.tau)}</button>
-          <button onClick=${this.onResetTimeSlider}>τ' = ${this.state.timeScale.toFixed(2)}</button>
+          <button onClick=${this.onResetTimeSlider}>τ' = ${timeScaleOf(this.state).toFixed(2)}</button>
         </div>
         <div>
           <button onClick=${this.onPlayPause} style="width: 4em; height: 3em;">${this.state.pause ? '▶' : '⏸'}</button>
@@ -322,20 +386,23 @@ async function startup() {
 }
 
 function refreshWindow() {
-  canvas.width = window.innerWidth / quality;
-  canvas.height = window.innerHeight / quality;
-  overlay.width = window.innerWidth / quality;
-  overlay.height = window.innerHeight / quality;
+  const dpr = devicePixelRatio();
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.width = Math.max(1, Math.round(w * dpr / quality));
+  canvas.height = Math.max(1, Math.round(h * dpr / quality));
+  overlay.width = Math.max(1, Math.round(w * dpr));
+  overlay.height = Math.max(1, Math.round(h * dpr));
   renderer.initializeWindow(canvas.width, canvas.height);
-  params.screenDim = nj.array([window.innerWidth, window.innerHeight]);
+  params.screenDim = [w, h];
 }
 
 function printTime(s) {
   if (s === null) {
     return "n/a"
   } else {
-    const minutes = Math.floor(s / 60);
-    const seconds = (s % 60).toFixed(2).padStart(5, '0');
+    const hundredths = Math.round(s * 100);
+    const minutes = Math.floor(hundredths / 6000);
+    const seconds = ((hundredths % 6000) / 100).toFixed(2).padStart(5, '0');
     return `${minutes}:${seconds}`;
   }
 }
@@ -344,8 +411,8 @@ function printVelocity(x, u) {
   if (u === null) {
     return "n/a"
   } else {
-    const lambda = metric.T(x).dot(u).get(0);
-    const v = Math.sqrt(1-Math.pow(lambda, -2));
+    const lambda = metric.T(x)[0][0] * u[0];
+    const v = Math.sqrt(1 - Math.pow(lambda, -2));
     return "v = " + Math.floor(v * 100) + " %"
   }
 }
@@ -354,6 +421,6 @@ function print3Vec(x) {
   if (x === null) {
     return "n/a"
   } else {
-    return `${x.get(0).toFixed(2)}, ${x.get(1).toFixed(2)}, ${x.get(2).toFixed(2)}`;
+    return x.map(v => v.toFixed(2)).join(", ");
   }
 }
