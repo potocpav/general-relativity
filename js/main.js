@@ -9,7 +9,6 @@ import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { frameLimiter } from './frame-limiter.js';
 import { velocity3, localVelocity3, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
@@ -22,8 +21,6 @@ var quality = quality_levels.reduce((best, q) =>
   Math.abs(q - 2 * devicePixelRatio()) < Math.abs(best - 2 * devicePixelRatio()) ? q : best);
 
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
-const maxFps = 60;
-const limitFrameRate = frameLimiter(maxFps);
 
 const rs = 0.3;
 const metric = new Schwarzschild(rs);
@@ -148,7 +145,6 @@ class App extends Component {
 
   animate = t => {
     requestAnimationFrame(this.animate);
-    if (!limitFrameRate(t)) return;
     world.timeScale = timeScaleOf(this.state);
     world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim, shipControls());
     renderer.render();
