@@ -1,5 +1,6 @@
 
 import * as math from './math.js';
+import { convertState } from './metric.js';
 
 var gl;
 
@@ -33,6 +34,17 @@ export class World {
     this.obsvO = this.metric.cartesianToLocal(x, headingVector(this.heading));
     this.obsvSprite = 0;
     this.crashed = false;
+  }
+
+  // Switch to the coordinates of `metric`, converting the observer's state.
+  // Returns false (and changes nothing) if the observer's position can't be
+  // represented in them.
+  setMetric(metric) {
+    const state = convertState(this.metric, metric, this.obsvX, this.obsvU);
+    if (state === null) return false;
+    [this.obsvX, this.obsvU] = state;
+    this.metric = metric;
+    return true;
   }
 
   compile(program) {

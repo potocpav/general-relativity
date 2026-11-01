@@ -33,6 +33,8 @@ const objTexMax = new Float32Array([
   191, 63, 59, -1,
   ]);
 
+const uniformBlockBinding = 0;
+
 // Number of sprites; passed to the shader as N_SPRITES.
 export const nSprites = objSize.length / 4;
 console.assert(objTexMin.length == nSprites * 4 && objTexMax.length == nSprites * 4);
@@ -64,7 +66,14 @@ export class ObjectInfo {
     }
   }
 
+  // Set up for a (new) shader program. GPU resources are created only once.
   compile(program) {
+    if (!this.spriteTexture) this.createResources(program);
+    this.spriteUniformLocation = gl.getUniformLocation(program, 'sprites');
+    gl.uniformBlockBinding(program, gl.getUniformBlockIndex(program, "objectInfo"), uniformBlockBinding);
+  }
+
+  createResources(program) {
     this.spriteTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.spriteTexture);
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, this.width, this.height, this.depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.img);
@@ -75,12 +84,10 @@ export class ObjectInfo {
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
     gl.bindTexture(gl.TEXTURE_3D, null);
 
-    this.spriteUniformLocation = gl.getUniformLocation(program, 'sprites');
-
     // set up object info UBO; its contents are constant, so upload them once.
+    // The layout is the same in every program (std140).
     // Described in detail in https://gist.github.com/jialiang/2880d4cc3364df117320e8cb324c2880
     const uboLocation = gl.getUniformBlockIndex(program, "objectInfo");
-    const uniformBlockBinding = 0;
     const blockSize = gl.getActiveUniformBlockParameter(program, uboLocation, gl.UNIFORM_BLOCK_DATA_SIZE);
 
     this.buffer = gl.createBuffer();
@@ -95,7 +102,6 @@ export class ObjectInfo {
 
     gl.bindBuffer(gl.UNIFORM_BUFFER, null);
     gl.bindBufferBase(gl.UNIFORM_BUFFER, uniformBlockBinding, this.buffer);
-    gl.uniformBlockBinding(program, uboLocation, uniformBlockBinding);
   }
 
   render() {

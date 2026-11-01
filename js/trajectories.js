@@ -1,3 +1,5 @@
+import { convertState } from './metric.js';
+import { Trajectory } from './trajectory.js';
 
 var gl;
 
@@ -32,6 +34,18 @@ export class Trajectories {
   clear() {
     this.count = 0; // number of valid columns, always the first `count` ones
     this.next = 0;  // column to be written next
+    this.items = [];  // the Trajectory objects shown, oldest first
+  }
+
+  // Convert all trajectories to the coordinates of `metric` and re-simulate
+  // them. Ones starting where the new coordinates don't reach are dropped.
+  setMetric(metric) {
+    const items = this.items;
+    this.clear();
+    for (const t of items) {
+      const state = convertState(t.metric, metric, t.x, t.u);
+      if (state) this.add(new Trajectory(metric, t.obj_i, ...state));
+    }
   }
 
   compile(program) {
@@ -42,6 +56,8 @@ export class Trajectories {
   }
 
   add(trajectory) {
+    this.items.push(trajectory);
+    if (this.items.length > this.nObjects) this.items.shift();
     const slot = this.next;
     this.next = (this.next + 1) % this.nObjects;
     this.count = Math.min(this.count + 1, this.nObjects);

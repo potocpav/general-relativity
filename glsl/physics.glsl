@@ -17,11 +17,53 @@ vec2 s2v(vec2 screen, vec2 res, float size) {
 	return ((screen - res / 2.0) / meanRes) * size / 2.0;
 }
 
-// Schwarzschild metric in Schwarzschild (t, r, phi) coordinates.
+// The metric is selected by METRIC (defined by js/shaders.js, matching the
+// metric's `glslId` in js/metric.js). Coordinates are (time, r, phi).
 //
-// The reference frame is an orthonormal frame at every point, here the static
-// observers. T(x) takes coordinate components of a vector at x to reference
-// frame components, T_inv(x) back.
+// Each metric defines a reference frame, an orthonormal frame at every point.
+// T(x) takes coordinate components of a vector at x to reference frame
+// components, T_inv(x) back.
+#define METRIC_SCHWARZSCHILD 0
+#define METRIC_GP 1
+
+#if METRIC == METRIC_GP
+
+// Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates.
+// Reference frame: raindrop observers, falling from rest at infinity,
+// e_0 = (1, -s, 0), e_r = (0, 1, 0), e_phi = (0, 0, 1/r), s = sqrt(rs/r).
+mat3 T(vec3 x) {
+	float s = sqrt(rs / x.y);
+	return mat3( // columns
+		1.0, s, 0.0,
+		0.0, 1.0, 0.0,
+		0.0, 0.0, x.y);
+}
+
+mat3 T_inv(vec3 x) {
+	float s = sqrt(rs / x.y);
+	return mat3( // columns
+		1.0, -s, 0.0,
+		0.0, 1.0, 0.0,
+		0.0, 0.0, 1.0 / x.y);
+}
+
+// conserved energy E = -p_T of a ray with momentum p at x
+float ray_energy(vec3 x, vec3 p) {
+	float a = rs / x.y;
+	return (1.0 - a) * p.x - sqrt(a) * p.y;
+}
+
+// dT/dl of a light ray at radius r, with dr/dl = v and conserved E, L:
+// (E + s v) / (1 - rs/r), rewritten using the null condition to be finite
+// at the horizon, except for rays heading into the past horizon.
+float ray_dtdl(float r, float v, float E, float L) {
+	return (E * E + rs * L * L / (r * r * r)) / (E - sqrt(rs / r) * v);
+}
+
+#else
+
+// Schwarzschild metric in Schwarzschild (t, r, phi) coordinates.
+// Reference frame: static observers.
 mat3 T(vec3 x) {
 	float s = sqrt(1.0 - rs / x.y);
 	return mat3(
@@ -37,6 +79,18 @@ mat3 T_inv(vec3 x) {
 		0.0, s, 0.0,
 		0.0, 0.0, 1.0 / x.y);
 }
+
+// conserved energy E = -p_t of a ray with momentum p at x
+float ray_energy(vec3 x, vec3 p) {
+	return (1.0 - rs / x.y) * p.x;
+}
+
+// dt/dl of a light ray at radius r, with dr/dl = v and conserved E, L
+float ray_dtdl(float r, float v, float E, float L) {
+	return E / (1.0 - rs / r);
+}
+
+#endif
 
 // normalize duplicate coordinate points
 vec3 cyclic(vec3 x) {
@@ -83,17 +137,18 @@ vec3 screen_ray(vec3 x, vec3 u, vec2 v) {
 
 // Light rays
 
-// Light rays are traced using their conserved energy E = (1 - rs/r) u^t and
-// angular momentum L = r^2 u^phi, as y = (t, r, phi, v = dr/dl):
-//   dt/dl = E / (1 - rs/r),  dr/dl = v,  dphi/dl = L / r^2,
+// Light rays are traced using their conserved energy E = -p_t and angular
+// momentum L = p_phi, as y = (t, r, phi, v = dr/dl):
+//   dt/dl = ray_dtdl(r, v, E, L),  dr/dl = v,  dphi/dl = L / r^2,
 //   dv/dl = L^2 (r - 1.5 rs) / r^4    (from v^2 = E^2 - L^2 (1 - rs/r) / r^2)
 // Unlike the geodesic equation in Schwarzschild coordinates (as in js/math.js),
-// the (r, phi, v) part is regular at the horizon: only u^t diverges there,
-// and it doesn't feed back. Rays falling in therefore reach the horizon in a
-// few steps, instead of crawling towards it with ever smaller steps.
+// the (r, phi, v) part is regular at the horizon, in any time coordinate;
+// only dt/dl may diverge there, and it doesn't feed back. Rays falling in
+// therefore reach the horizon in a few steps, instead of crawling towards it
+// with ever smaller steps.
 vec4 ray_f(vec4 y, float E, float L) {
 	float r = y.y;
-	return vec4(E / (1.0 - rs / r), y.w, L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r));
+	return vec4(ray_dtdl(r, y.w, E, L), y.w, L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r));
 }
 
 // spatial velocity (radial, tangential) of a ray state, for error control
@@ -130,7 +185,7 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
 	const float ERR_EXPONENT = -1.0/3.0;
 	const int MAX_ITERS = 40;
 
-	float E = (1.0 - rs / x0.y) * u0.x;
+	float E = ray_energy(x0, u0);
 	float L = x0.y * x0.y * u0.z;
 	vec4 y = vec4(x0, u0.y);
 	vec4 k1 = ray_f(y, E, L);
@@ -187,7 +242,7 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
 		else if (l >= 1.0) status = RAY_REACHED;
 	}
 	x = y.xyz;
-	u = vec3(E / (1.0 - rs / y.y), y.w, L / (y.y * y.y));
+	u = vec3(ray_dtdl(y.y, y.w, E, L), y.w, L / (y.y * y.y));
 	return status;
 }
 

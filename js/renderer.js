@@ -8,6 +8,7 @@ var objectInfo;
 var trajectories;
 
 var surfaceProgram, screenProgram;
+var surfaceVert, surfaceFragMain;
 var vertexBuffer;
 
 var screenWidth, screenHeight;
@@ -25,7 +26,7 @@ export function initGl(canvas) {
   return gl;
 }
 
-export async function init(gl_, world_, objectInfo_, trajectories_) {
+export async function init(gl_, world_, objectInfo_, trajectories_, metric) {
   gl = gl_;
   world = world_;
   objectInfo = objectInfo_;
@@ -41,20 +42,27 @@ export async function init(gl_, world_, objectInfo_, trajectories_) {
   gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
 
   // fetch shaders
-  const [surfaceVert, surfaceFragMain, screenVert, screenFrag] = await Promise.all([
+  var screenVert, screenFrag;
+  [surfaceVert, surfaceFragMain, screenVert, screenFrag] = await Promise.all([
     "glsl/surface-vert.glsl", "glsl/surface-frag.glsl", "glsl/screen-vert.glsl", "glsl/screen-frag.glsl",
   ].map(fetchText));
-  const surfaceFrag = await physicsFragmentShader(surfaceFragMain);
 
-  surfaceProgram = compileProgram(surfaceVert, surfaceFrag);
-  cacheUniformLocation(surfaceProgram, 'resolution');
-  world.compile(surfaceProgram);
-  trajectories.compile(surfaceProgram);
-  objectInfo.compile(surfaceProgram);
+  await setMetric(metric);
 
   screenProgram = compileProgram(screenVert, screenFrag);
   cacheUniformLocation(screenProgram, 'resolution');
   cacheUniformLocation(screenProgram, 'color');
+}
+
+// (Re)compile the raytracing program for `metric`.
+export async function setMetric(metric) {
+  const program = compileProgram(surfaceVert, await physicsFragmentShader(surfaceFragMain, metric));
+  cacheUniformLocation(program, 'resolution');
+  world.compile(program);
+  trajectories.compile(program);
+  objectInfo.compile(program);
+  if (surfaceProgram) gl.deleteProgram(surfaceProgram);
+  surfaceProgram = program;
 }
 
 // Compile & link a program, throwing on failure. Leaves the program in use.

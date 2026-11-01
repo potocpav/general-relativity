@@ -12,10 +12,12 @@ export async function fetchText(url) {
 }
 
 // Constants shared between JS and GLSL, defined once on the JS side.
-export function shaderDefines() {
+// `metric` selects the metric in glsl/physics.glsl.
+export function shaderDefines(metric) {
   return {
     N_SPRITES: nSprites,
     HORIZON_MARGIN: horizonMargin.toFixed(6),
+    METRIC: metric.constructor.glslId,
   };
 }
 
@@ -30,9 +32,9 @@ export function assembleShader(defines, parts) {
   return [header.join('\n'), ...parts.map((part, i) => `#line 1 ${i + 1}\n${part}`)].join('\n');
 }
 
-// Fragment shader made of glsl/physics.glsl followed by `mainSource`.
+// Fragment shader made of glsl/physics.glsl for `metric`, followed by `mainSource`.
 // `root` is the URL of the repository root, relative to the page.
-export async function physicsFragmentShader(mainSource, root = '') {
+export async function physicsFragmentShader(mainSource, metric, root = '') {
   const physics = await fetchText(root + 'glsl/physics.glsl');
-  return assembleShader(shaderDefines(), [physics, mainSource]);
+  return assembleShader(shaderDefines(metric), [physics, mainSource]);
 }

@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, localVelocity3, staticGamma, Schwarzschild } from './metric.js';
+import { velocity3, localVelocity3, staticGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -23,7 +23,7 @@ var quality = quality_levels.reduce((best, q) =>
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
 const rs = 0.3;
-const metric = new Schwarzschild(rs);
+var metric = new Schwarzschild(rs); // switchable, see selectMetric
 
 const objectIds = {
   'asteroid': asteroidId,
@@ -58,7 +58,8 @@ function initWorld() {
   const r = 10 * rs;
   const x = [0, r, 0];
   // const u2 = [0.0, 0.0]; // stationary
-  // const u2 = [-(1 - rs/r) * Math.sqrt(rs/r), 0.0]; // raindrop
+  // const u2 = [-(1 - rs/r) * Math.sqrt(rs/r), 0.0]; // raindrop (Schwarzschild coordinates)
+  // const u2 = [-Math.sqrt(rs/r), 0.0]; // raindrop (Gullstrand–Painlevé coordinates)
   const u2 = [0.0, Math.sqrt(rs/(2*r))]; // circular orbit
 
   world.viewportSize = 20;
@@ -116,6 +117,8 @@ class App extends Component {
     fps: null,
     crashed: false,
     showPhotonSphere: true,
+    metric: metric.constructor.id,
+    message: null, // transient notice
     error: null,
   }
 
@@ -302,6 +305,31 @@ class App extends Component {
     if (world) initWorld();
   }
 
+  // Switch the coordinates (metric) the simulation runs in.
+  selectMetric = async ev => {
+    const select = ev.target;
+    const type = metricTypes[select.selectedIndex];
+    const next = new type(rs);
+    if (convertState(metric, next, world.obsvX, world.obsvU) === null) {
+      select.selectedIndex = metricTypes.indexOf(metric.constructor);
+      this.setState({message: `${type.label} coordinates can't describe the inside of the black hole.`});
+      return;
+    }
+    try {
+      // compile first, then switch everything at once
+      await renderer.setMetric(next);
+    } catch (err) {
+      console.error(err);
+      select.selectedIndex = metricTypes.indexOf(metric.constructor);
+      this.setState({message: "Switching coordinates failed: " + err.message});
+      return;
+    }
+    world.setMetric(next);
+    trajectories.setMetric(next);
+    metric = next;
+    this.setState({metric: type.id, message: null});
+  }
+
   selectQuality = ev => {
     quality = quality_levels[ev.target.selectedIndex];
     refreshWindow();
@@ -336,6 +364,9 @@ class App extends Component {
       onWheel=${this.onWheel}>
       <div id="top_right">
         <div>
+          <select onChange=${this.selectMetric} title="Coordinates of the simulation">
+          ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric}>${t.label}</option>`)}
+          </select>
           <select onChange=${this.selectQuality} title="Device pixels per rendered pixel">
           ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
           </select>
@@ -359,6 +390,7 @@ class App extends Component {
       </div>
       <div id="top_left">
         ${this.state.error && html`<div><button>${this.state.error}</button></div>`}
+        ${this.state.message && html`<div><button onClick=${() => this.setState({message: null})}>${this.state.message} ✕</button></div>`}
         <div>
           <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
           <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
@@ -415,7 +447,7 @@ async function startup() {
 
   trajectories = new Trajectories(gl);
 
-  await renderer.init(gl, world, objectInfo, trajectories);
+  await renderer.init(gl, world, objectInfo, trajectories, metric);
 
   refreshWindow();
   window.addEventListener('resize', refreshWindow, false);

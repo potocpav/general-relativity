@@ -6,15 +6,16 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { Schwarzschild, localVelocity3, velocity3 } from '../js/metric.js';
+import { Schwarzschild, GullstrandPainleve, metricTypes, convertState, localVelocity3, velocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
 
 const root = '../';
 const nSamples = 64;
-const metric = new Schwarzschild(0.3);
-const rs = metric.rs;
+const rs = 0.3;
+// All checks run once per metric; this is the one being tested.
+let metric;
 
 // Deterministic PRNG (mulberry32), so that failures are reproducible.
 function prng(seed) {
@@ -25,7 +26,7 @@ function prng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const random = prng(42);
+let random = prng(42);
 const uniform = (a, b) => a + (b - a) * random();
 
 const randomPoint = (rMin = 1.5 * rs, rMax = 10) =>
@@ -116,6 +117,45 @@ function checkGeodesicsJs() {
     maxError = Math.max(maxError, Math.abs(c1.E - c0.E), Math.abs(c1.L - c0.L), Math.abs(n1 + 1));
   }
   return {ok: maxError < 1e-8, message: `max drift of E, L, u.u: ${maxError.toExponential(2)}`};
+}
+
+// The reference and static frames are orthonormal, and T, Tinv are inverses.
+function checkFramesJs() {
+  const transpose = m => m[0].map((_, j) => m.map(row => row[j]));
+  const eta = [[-1, 0, 0], [0, 1, 0], [0, 0, 1]], identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  let maxError = 0;
+  for (let i = 0; i < 64; i++) {
+    const x = randomPoint(1.05 * rs);
+    for (const [F, Finv] of [[metric.T(x), metric.Tinv(x)], [metric.staticT(x), metric.staticTinv(x)]]) {
+      const metricInFrame = math.matMul(math.matMul(transpose(Finv), metric.g(x)), Finv);
+      const product = math.matMul(F, Finv);
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+        maxError = Math.max(maxError, Math.abs(metricInFrame[a][b] - eta[a][b]), Math.abs(product[a][b] - identity[a][b]));
+      }
+    }
+  }
+  return {ok: maxError < 1e-12, message: `max error ${maxError.toExponential(2)}`};
+}
+
+// The same geodesics, integrated in Schwarzschild and in Gullstrand–Painlevé
+// coordinates, agree after converting between them (T = t + shift(r)).
+function checkCoordinateTransformJs() {
+  const S = new Schwarzschild(rs), G = new GullstrandPainleve(rs);
+  const rand = prng(7);
+  let maxError = 0;
+  for (let i = 0; i < 20; i++) {
+    const x = [0, rs * (4 + 20 * rand()), 6 * rand()];
+    const u = localVelocity3(S, x, [rand() - 0.5, rand() - 0.5]);
+    const [xg, ug] = convertState(S, G, x, u);
+    const a = math.integrate(S, math.geo_f(S), [...x, ...u], 3, 1e-3);
+    const b = math.integrate(G, math.geo_f(G), [...xg, ...ug], 3, 1e-3);
+    if (!a || !b) continue;
+    const [xa, ua] = convertState(S, G, a.slice(0, 3), a.slice(3));
+    for (let k = 0; k < 3; k++) {
+      maxError = Math.max(maxError, Math.abs(xa[k] - b[k]), Math.abs(ua[k] - b[3 + k]));
+    }
+  }
+  return {ok: maxError < 1e-9, message: `max difference after tau = 3: ${maxError.toExponential(2)}`};
 }
 
 // JS geodesics vs the analytic shadow edges.
@@ -272,7 +312,7 @@ const pad4 = v => [0, 1, 2, 3].map(i => v[i] ?? 0);
 
 // Evaluate the test's GLSL on all samples; returns gpu[sample][row] = vec4.
 async function runOnGpu(gl, vertexSource, test, samples, nRows) {
-  const program = compileProgram(gl, vertexSource, await physicsFragmentShader(harness(test.glsl), root));
+  const program = compileProgram(gl, vertexSource, await physicsFragmentShader(harness(test.glsl), metric, root));
   gl.useProgram(program);
 
   const nInputs = samples[0].length;
@@ -403,7 +443,7 @@ async function checkNearHorizonGpu(gl, vertexSource) {
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
-    await physicsFragmentShader(await fetchText(root + 'glsl/surface-frag.glsl'), root));
+    await physicsFragmentShader(await fetchText(root + 'glsl/surface-frag.glsl'), metric, root));
   const block = gl.getUniformBlockIndex(program, 'objectInfo');
   const size = gl.getActiveUniformBlockParameter(program, block, gl.UNIFORM_BLOCK_DATA_SIZE);
   const expectedSize = 3 * nSprites * 16; // 3 arrays of std140 vec3
@@ -433,13 +473,20 @@ async function main() {
       results.push({name, ok: false, message: String(err.message ?? err)});
     }
   };
-  await run('surface shader', () => checkSurfaceShader(gl, vertexSource));
-  await run('geodesics (JS)', async () => checkGeodesicsJs());
-  await run('shadow edges (JS)', async () => checkShadowJs());
-  await run('shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
-  await run('near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
-  for (const test of tests) {
-    await run(test.name, () => runComparison(gl, vertexSource, test));
+  await run('coordinate transformation (JS)', async () => checkCoordinateTransformJs());
+  for (const type of metricTypes) {
+    metric = new type(rs);
+    random = prng(42);
+    const prefix = `[${type.label}] `;
+    await run(prefix + 'surface shader', () => checkSurfaceShader(gl, vertexSource));
+    await run(prefix + 'frames (JS)', async () => checkFramesJs());
+    await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
+    await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());
+    await run(prefix + 'shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
+    await run(prefix + 'near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
+    for (const test of tests) {
+      await run(prefix + test.name, () => runComparison(gl, vertexSource, test));
+    }
   }
   return results;
 }
