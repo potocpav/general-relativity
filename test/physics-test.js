@@ -803,6 +803,30 @@ function checkObjectHistoryJs() {
     `finer integration to ${maxErrorFiner.toExponential(1)}`};
 }
 
+// Objects' orientation axes are parallel transported: on a circular orbit at
+// r, the orientation relative to the screen (its angle from r-hat plus phi)
+// turns by the geodetic precession 2 pi (1 - sqrt(1 - 1.5 rs / r)) per orbit;
+// and the stored angles are continuous from row to row.
+function checkObjectOrientationJs() {
+  const errors = [];
+  for (const k of [10, 4]) {
+    const objs = new Objects(null, metric), r = k * rs, x = [0, r, 0];
+    objs.spawn(asteroidId, x, velocity3(metric, x, [0, Math.sqrt(rs / (2 * r))]));
+    const period = 2 * Math.PI * Math.sqrt(2 * r ** 3 / rs); // in coordinate time
+    objs.advance(period);
+    const o = objs.objects[0], rows = rowsOf(objs, o);
+    const [, y0] = rows[0], [, y1] = rows[rows.length - 1];
+    const dPhi = y1[2] - y0[2];
+    const turned = (y1[10] + y1[2] - y0[10] - y0[2]) * 180 / Math.PI;
+    const expected = 360 * (1 - Math.sqrt(1 - 1.5 * rs / r)) * dPhi / (2 * Math.PI);
+    if (!(Math.abs(turned - expected) < 0.01)) errors.push(`${k} rs: turned ${turned.toFixed(3)} deg, expected ${expected.toFixed(3)}`);
+    for (let j = 1; j < rows.length; j++) {
+      if (Math.abs(rows[j][1][10] - rows[j - 1][1][10]) > 0.5) { errors.push(`${k} rs: angle jumps at row ${rows[j][0]}`); break; }
+    }
+  }
+  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') : 'geodetic precession at 10 and 4 rs within 0.01 deg'};
+}
+
 // Switching from Schwarzschild to Gullstrand–Painlevé coordinates regenerates
 // the histories: a regenerated row (T, r, phi) is on the old worldline at
 // Schwarzschild time t = T - shift(r).
@@ -856,7 +880,7 @@ async function checkObjectLookupGpu(gl, vertexSource) {
   const sample = (o, k) => {
     const k0 = Math.floor(k), a = k - k0, y0 = objs.rowState(o, k0), y1 = objs.rowState(o, k0 + 1);
     const y = y0.map((v, c) => (1 - a) * v + a * y1[c]);
-    return {x: [k * dt, y[1], y[2]], u: y.slice(3, 6), tau: y[6]};
+    return {x: [k * dt, y[1], y[2]], u: y.slice(3, 6), tau: y[6], angle: y[10]};
   };
   const offset = (pix, s) => {
     const d = math.sub(s.x, pix);
@@ -874,7 +898,7 @@ async function checkObjectLookupGpu(gl, vertexSource) {
     let lo = first, hi = last;
     for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; offset(pix, sample(o, mid))[0] > 0 ? hi = mid : lo = mid; }
     const e = sample(o, lo);
-    cases.push({input: [pix, [o.slot]], found: true, x: e.x, d: offset(pix, e), tau: e.tau});
+    cases.push({input: [pix, [o.slot]], found: true, x: e.x, d: offset(pix, e), tau: e.tau, angle: e.angle});
   }
   const o = objs.objects[0];
   const s = sample(o, objs.validRows(o)[0] + 3);
@@ -883,12 +907,12 @@ async function checkObjectLookupGpu(gl, vertexSource) {
 
   const test = {
     glsl: `
-      vec3 x, u, d; float tau; mat3 R;
-      bool found = object_event(int(in_(1).x), in_(0).xyz, x, u, tau, R, d);
-      return row == 0 ? vec4(x, found ? 1.0 : 0.0) : vec4(d, tau);`,
+      vec3 x, u, d; float tau, angle; mat3 R;
+      bool found = object_event(int(in_(1).x), in_(0).xyz, x, u, tau, angle, R, d);
+      return row == 0 ? vec4(x, found ? 1.0 : 0.0) : row == 1 ? vec4(d, tau) : vec4(angle, 0.0, 0.0, 0.0);`,
     setup: program => { objs.compile(program); objs.render(); },
   };
-  const gpu = await runOnGpu(gl, vertexSource, test, cases.map(c => c.input), 2);
+  const gpu = await runOnGpu(gl, vertexSource, test, cases.map(c => c.input), 3);
   const errors = [];
   let maxError = 0;
   cases.forEach((c, n) => {
@@ -896,7 +920,7 @@ async function checkObjectLookupGpu(gl, vertexSource) {
     if ((found == 1) != c.found) { errors.push(`case ${n}: found ${found == 1}, expected ${c.found}`); return; }
     if (!c.found) return;
     maxError = Math.max(maxError, Math.abs(x0 - c.x[0]), Math.abs(x1 - c.x[1]), Math.abs(x2 - c.x[2]),
-      Math.abs(d1 - c.d[1]), Math.abs(d2 - c.d[2]), Math.abs(tau - c.tau));
+      Math.abs(d1 - c.d[1]), Math.abs(d2 - c.d[2]), Math.abs(tau - c.tau), Math.abs(gpu[n][2][0] - c.angle));
   });
   if (!(maxError < 2e-4)) errors.push(`GPU event differs from the exact one by ${maxError.toExponential(1)}`);
   return {ok: errors.length == 0, message: errors.length ? errors.slice(0, 5).join('; ') :
@@ -948,6 +972,7 @@ async function main() {
     await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
     await run(prefix + 'gyroscope (JS)', async () => checkGyroscopeJs());
     await run(prefix + 'object history (JS)', async () => checkObjectHistoryJs());
+    await run(prefix + 'object orientation (JS)', async () => checkObjectOrientationJs());
     await run(prefix + 'object lookup (GPU)', () => checkObjectLookupGpu(gl, vertexSource));
     await run(prefix + 'ray tracer vs geodesic equation (JS)', async () => checkTraceRayJs());
     if (type == GullstrandPainleve) await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());

@@ -26,16 +26,20 @@ export const rowsPerRs = 6;    // history rows per rs of coordinate time
 const chunkRows = 64;          // rows per chunk of bounding boxes
 const stepsPerRs = 15;         // integration steps per rs of proper time, at least
 
-// Integrate y = [x, u, tau] of a free-falling body (or accelerated, with
-// `accel_rest` in its rest frame) to coordinate time T1, forwards or
-// backwards, with coordinate time as the parameter:
-//   dx/dT = u / u^T,  du/dT = (-Gamma(u, u) + a) / u^T,  dtau/dT = 1 / u^T.
+// Integrate y = [x, u, tau] or [x, u, tau, h] of a free-falling body (or
+// accelerated, with `accel_rest` in its rest frame) to coordinate time T1,
+// forwards or backwards, with coordinate time as the parameter:
+//   dx/dT = u / u^T,  du/dT = (-Gamma(u, u) + a) / u^T,  dtau/dT = 1 / u^T,
+// and h, the body's orientation axis, Fermi–Walker transported (see geo_fw_f):
+//   dh/dT = (-Gamma(u, h) + (h.a) u) / u^T.
 // Returns null if the body gets where it can't be followed.
 export function integrateToTime(metric, y, T1, accel_rest) {
-  const f = math.geo_f(metric, accel_rest);
+  const withAxis = y.length >= 10;
+  const f = math.geo_fw_f(metric, accel_rest);
   const g = y => {
-    const d = f(y.slice(0, 6)), ut = y[3];
-    return [...d.map(v => v / ut), 1 / ut];
+    const d = f([...y.slice(0, 6), ...(withAxis ? y.slice(7, 10) : [0, 0, 0])]), ut = y[3];
+    const dT = d.map(v => v / ut);
+    return withAxis ? [...dT.slice(0, 6), 1 / ut, ...dT.slice(6, 9)] : [...dT.slice(0, 6), 1 / ut];
   };
   const maxStepTau = metric.rs / stepsPerRs;
   for (let i = 0; Math.abs(T1 - y[0]) > 1e-12 * Math.max(1, Math.abs(T1)); i++) {
@@ -51,6 +55,9 @@ export function integrateToTime(metric, y, T1, accel_rest) {
 }
 
 const cartesian = y => [y[1] * Math.cos(y[2]), y[1] * Math.sin(y[2])];
+
+// state: [x, u, tau, h]; history rows add the orientation angle (see writeRow)
+const stateSize = 10, rowSize = 11;
 const ring = k => ((k % historyRows) + historyRows) % historyRows;
 
 class SimObject {
@@ -58,7 +65,8 @@ class SimObject {
     this.type = type;
     this.slot = slot;
     this.birth = x;          // spawn event, to limit regenerated histories
-    this.state = null;       // [x, u, tau] at row lastRow
+    this.state = null;       // [x, u, tau, h] at row lastRow
+    this.angle = undefined;  // orientation angle of the last row written, for continuity
     this.firstRow = 0;
     this.lastRow = 0;
     this.dead = false;       // can't be followed further
@@ -70,7 +78,7 @@ export class Objects {
   // `gl` may be null (no GPU textures, for tests)
   constructor(gl, metric) {
     this.gl = gl;
-    this.history = new Float64Array(maxObjects * historyRows * 7);
+    this.history = new Float64Array(maxObjects * historyRows * rowSize);
     this.dirtyRows = new Set();
     this.infoData = new Float32Array(maxObjects * 2 * 4);
     if (gl) this.createTextures();
@@ -90,20 +98,22 @@ export class Objects {
   }
 
   // Add an object at event x with 4-velocity u (x[0] may be in the past),
-  // simulating it up to now. Returns false if there is no free slot or it
-  // can't be followed from there.
+  // simulating it up to now. Its orientation axis starts pointing up on the
+  // screen. Returns false if there is no free slot or it can't be followed
+  // from there.
   spawn(type, x, u) {
     const slot = this.slots.indexOf(null);
     if (slot < 0) return false;
     const o = new SimObject(type, x, u, slot);
     const first = Math.ceil(x[0] / this.dt);
-    const y = integrateToTime(this.metric, [...x, ...u, 0], first * this.dt);
+    const up = this.metric.cartesianToLocal(x, [0, 1]);
+    const h = math.matVec(math.restToCoord(this.metric, x, u), [0, ...up]);
+    const y = integrateToTime(this.metric, [...x, ...u, 0, ...h], first * this.dt);
     if (y === null) return false;
     o.firstRow = o.lastRow = first;
-    o.state = y;
     this.slots[slot] = o;
     this.objects.push(o);
-    this.writeRow(o, first, y);
+    o.state = this.writeRow(o, first, y);
     this.advanceObject(o, this.now);
     return true;
   }
@@ -131,9 +141,8 @@ export class Objects {
       if (y === null) {
         o.dead = true;
       } else {
-        o.state = y;
         o.lastRow = k;
-        this.writeRow(o, k, y);
+        o.state = this.writeRow(o, k, y);
       }
     }
   }
@@ -146,8 +155,9 @@ export class Objects {
     }
     o.lastRow = row;
     o.dead = false;
-    const i = this.historyIndex(o.slot, row);
-    o.state = Array.from(this.history.subarray(i, i + 7));
+    const r = this.rowState(o, row);
+    o.state = r.slice(0, stateSize);
+    o.angle = r[stateSize];
     // recompute the bounding boxes of the chunks after it
     const c = Math.floor(row / chunkRows);
     for (const key of [...o.chunks.keys()]) if (key >= c) o.chunks.delete(key);
@@ -168,42 +178,56 @@ export class Objects {
     this.reset(metric, T);
     for (const o of objects) {
       const state = convertState(old, metric, o.state.slice(0, 3), o.state.slice(3, 6));
+      const axis = convertState(old, metric, o.state.slice(0, 3), o.state.slice(7, 10));
       const birth = convertState(old, metric, o.birth, [1, 0, 0]);
       if (state === null) continue;
       const n = new SimObject(o.type, birth ? birth[0] : state[0], null, o.slot);
       // the latest row: now if alive, else the last row before it got lost
       const last = o.dead ? Math.floor(state[0][0] / this.dt) : this.now;
-      let y = integrateToTime(metric, [...state[0], ...state[1], o.state[6]], last * this.dt);
+      let y = integrateToTime(metric, [...state[0], ...state[1], o.state[6], ...axis[1]], last * this.dt);
       if (y === null) continue;
       n.firstRow = n.lastRow = last;
-      n.state = y;
       n.dead = o.dead;
       this.slots[n.slot] = n;
       this.objects.push(n);
-      this.writeRow(n, last, y);
+      n.state = y = this.writeRow(n, last, y);
       const first = Math.max(Math.ceil(n.birth[0] / this.dt), this.windowStart());
       for (let k = last - 1; k >= first; k--) {
         y = integrateToTime(metric, y, k * this.dt);
         if (y === null) break;
         n.firstRow = k;
-        this.writeRow(n, k, y);
+        y = this.writeRow(n, k, y);
       }
     }
   }
 
   historyIndex(slot, k) {
-    return (ring(k) * maxObjects + slot) * 7;
+    return (ring(k) * maxObjects + slot) * rowSize;
   }
 
+  // the stored row: [x, u, tau, h, orientation angle]
   rowState(o, k) {
     const i = this.historyIndex(o.slot, k);
-    return Array.from(this.history.subarray(i, i + 7));
+    return Array.from(this.history.subarray(i, i + rowSize));
   }
 
+  // Store state y as row k of object o. The orientation axis h is
+  // re-orthonormalized against numerical drift, and stored also as its angle
+  // in the object's rest frame (from r-hat towards phi-hat), kept continuous
+  // with the previously written row so that it can be interpolated.
+  // Returns the state with the re-orthonormalized axis.
   writeRow(o, k, y) {
-    this.history.set(y, this.historyIndex(o.slot, k));
+    const x = y.slice(0, 3), u = y.slice(3, 6);
+    const hr = math.matVec(math.coordToRest(this.metric, x, u), y.slice(7, 10));
+    let angle = Math.atan2(hr[2], hr[1]);
+    if (o.angle !== undefined) angle += 2 * Math.PI * Math.round((o.angle - angle) / (2 * Math.PI));
+    o.angle = angle;
+    const h = math.matVec(math.restToCoord(this.metric, x, u), [0, Math.cos(angle), Math.sin(angle)]);
+    const state = [...y.slice(0, 7), ...h];
+    this.history.set([...state, angle], this.historyIndex(o.slot, k));
     this.dirtyRows.add(ring(k));
-    this.extendBounds(o, k, y);
+    this.extendBounds(o, k, state);
+    return state;
   }
 
   extendBounds(o, k, y) {
@@ -254,7 +278,7 @@ export class Objects {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, new Float32Array(w * h * 4));
       return tex;
     };
-    this.texA = texture(maxObjects, historyRows); // (r, phi, tau, -)
+    this.texA = texture(maxObjects, historyRows); // (r, phi, tau, orientation angle)
     this.texB = texture(maxObjects, historyRows); // (u^t, u^r, u^phi, -)
     this.texInfo = texture(maxObjects, 2);        // (first row, last row, sprite, used), bounds
     this.rowA = new Float32Array(maxObjects * 4);
@@ -276,9 +300,9 @@ export class Objects {
     const gl = this.gl;
     for (const r of this.dirtyRows) {
       for (let slot = 0; slot < maxObjects; slot++) {
-        const i = (r * maxObjects + slot) * 7;
+        const i = (r * maxObjects + slot) * rowSize;
         const h = this.history;
-        this.rowA.set([h[i + 1], h[i + 2], h[i + 6], 0], slot * 4);
+        this.rowA.set([h[i + 1], h[i + 2], h[i + 6], h[i + 10]], slot * 4);
         this.rowB.set([h[i + 3], h[i + 4], h[i + 5], 0], slot * 4);
       }
       gl.bindTexture(gl.TEXTURE_2D, this.texA);

@@ -2,14 +2,16 @@
 // Row k holds an object's state at coordinate time k * history_dt, stored in
 // texture row k mod (number of rows); one column per object.
 
-uniform highp sampler2D obj_a;    // (r, phi, tau, -)
+uniform highp sampler2D obj_a;    // (r, phi, tau, orientation angle)
 uniform highp sampler2D obj_b;    // (u^t, u^r, u^phi, -)
 uniform highp sampler2D obj_info; // row 0: (first row, last row, sprite, used); row 1: bounding box
 uniform int n_objects;            // objects are in columns below this
 uniform float history_dt;
 
 // An object's state at fractional row k, interpolating linearly between rows.
-void object_sample(int i, float k, out vec3 x, out vec3 u, out float tau) {
+// `angle` is the orientation of the object's (parallel-transported) axis in
+// its rest frame, from r-hat towards phi-hat.
+void object_sample(int i, float k, out vec3 x, out vec3 u, out float tau, out float angle) {
 	float rows = float(textureSize(obj_a, 0).y);
 	float k0 = floor(k), a = k - k0;
 	ivec2 p0 = ivec2(i, int(mod(k0, rows))), p1 = ivec2(i, int(mod(k0 + 1.0, rows)));
@@ -18,6 +20,7 @@ void object_sample(int i, float k, out vec3 x, out vec3 u, out float tau) {
 	x = vec3(k * history_dt, A.xy);
 	u = B.xyz;
 	tau = A.z;
+	angle = A.w;
 }
 
 int object_sprite(int i) {
@@ -26,8 +29,8 @@ int object_sprite(int i) {
 
 // The event on object i's worldline that is simultaneous with the pixel's
 // event `pix_x` in the object's rest frame, if the object exists then and
-// can be near the pixel. Outputs the object's position, 4-velocity and proper
-// time there, the transformation to its rest frame (`obj_rest`, coordinate
+// can be near the pixel. Outputs the object's position, 4-velocity, proper
+// time and orientation angle there, the transformation to its rest frame (`obj_rest`, coordinate
 // components to rest frame components, at the pixel), and the offset from the
 // pixel to the object in its rest frame.
 //
@@ -35,7 +38,7 @@ int object_sprite(int i) {
 // along the worldline to rest-frame simultaneity: a time offset dtau in the
 // rest frame is dtau * u^t / history_dt rows.
 bool object_event(int i, vec3 pix_x, out vec3 obj_x, out vec3 obj_u, out float obj_tau,
-		out mat3 obj_rest, out vec3 obj_deltax) {
+		out float obj_angle, out mat3 obj_rest, out vec3 obj_deltax) {
 	vec4 info = texelFetch(obj_info, ivec2(i, 0), 0);
 	if (info.w == 0.0) return false;
 	// cull: the pixel is outside the box around the object's stored history
@@ -48,7 +51,7 @@ bool object_event(int i, vec3 pix_x, out vec3 obj_x, out vec3 obj_u, out float o
 	if (k < info.x - 64.0 || k > info.y + 64.0) return false;
 	for (int n = 0; n < 3; n++) {
 		float kc = clamp(k, info.x, info.y);
-		object_sample(i, kc, obj_x, obj_u, obj_tau);
+		object_sample(i, kc, obj_x, obj_u, obj_tau, obj_angle);
 		obj_rest = coord_to_rest(pix_x, obj_u);
 		obj_deltax = obj_rest * cyclic(obj_x - pix_x);
 		k = kc - obj_deltax.x * obj_u.x / history_dt;

@@ -210,15 +210,15 @@ void main( void ) {
 	// rays that didn't arrive (the black hole's shadow) show no objects
 	for (int i = 0; i < (reached ? n_objects : 0); i++) {
 		vec3 obj_x, obj_u, obj_deltax;
-		float obj_tau;
+		float obj_tau, obj_angle;
 		mat3 obj_rest; // coordinate components -> object's rest frame components
-		if (!object_event(i, pix_x, obj_x, obj_u, obj_tau, obj_rest, obj_deltax)) continue;
+		if (!object_event(i, pix_x, obj_x, obj_u, obj_tau, obj_angle, obj_rest, obj_deltax)) continue;
 		vec4 obj_color = render_obj(
 			object_sprite(i),
 			show_redshift ? abs((obj_rest * pix_u).x) / obsv_energy : 1.0,
 			obj_tau,
 			obj_deltax,
-			vec2(0.0, 1.0)
+			vec2(cos(obj_angle), sin(obj_angle))
 			);
 		objects_color = mix(objects_color, obj_color, obj_color.a);
 	}
