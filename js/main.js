@@ -47,6 +47,13 @@ var params = {
   screenDim: [window.innerWidth, window.innerHeight],
 };
 
+// arrow keys currently held down
+const arrowKeys = new Set();
+const shipControls = () => ({
+  thrust: arrowKeys.has("ArrowUp"),
+  turn: (arrowKeys.has("ArrowLeft") ? 1 : 0) - (arrowKeys.has("ArrowRight") ? 1 : 0),
+});
+
 function initWorld() {
   const r = 10 * rs;
   const x = [0, r, 0];
@@ -91,6 +98,8 @@ function spawn(objectName, screenPos, velocity) {
   trajectories.add(new Trajectory(metric, objectIds[objectName], x, u));
 }
 
+const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
+
 const timeScaleOf = state => state.pause ? 0 : Math.pow(10, state.timeSlider);
 
 class App extends Component {
@@ -119,6 +128,9 @@ class App extends Component {
     }
 
     document.body.onkeydown = this.onKeyDown;
+    document.body.onkeyup = this.onKeyUp;
+    // keyup is not delivered when the window loses focus
+    window.addEventListener('blur', () => arrowKeys.clear());
 
     startup().then(() => {
       initWorld();
@@ -133,7 +145,7 @@ class App extends Component {
   animate = t => {
     requestAnimationFrame(this.animate);
     world.timeScale = timeScaleOf(this.state);
-    world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim);
+    world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim, shipControls());
     renderer.render();
     this.renderOverlay();
 
@@ -219,6 +231,12 @@ class App extends Component {
   }
 
   onKeyDown = ev => {
+    if (isArrowControl(ev.key)) {
+      // don't scroll, or move the focused time slider
+      ev.preventDefault();
+      arrowKeys.add(ev.key);
+      return;
+    }
     switch (ev.code) {
       case "Digit1": this.activateBoost();
       break; case "Digit2":
@@ -238,6 +256,10 @@ class App extends Component {
         }
         if (!ev.repeat) this.onPlayPause();
     }
+  }
+
+  onKeyUp = ev => {
+    arrowKeys.delete(ev.key);
   }
 
   onPlayPause = _ => {

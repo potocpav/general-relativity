@@ -4,6 +4,7 @@ import * as math from './math.js';
 var gl;
 
 const thrust = 0.5;      // rocket acceleration in its rest frame
+const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
 const maxStep = 0.02;    // max. proper-time RK4 step for the observer
 const raySteps = 50;     // RK4 steps when raytracing on the CPU
 
@@ -25,7 +26,10 @@ export class World {
     this.time = 0;
     this.obsvX = x;
     this.obsvU = u;
-    this.obsvO = [0.0, 1.0];
+    // Ship heading as an angle in screen-aligned cartesian coordinates,
+    // so that it doesn't rotate with the polar frame while orbiting.
+    this.heading = Math.PI / 2;
+    this.obsvO = this.metric.cartesianToLocal(x, headingVector(this.heading));
     this.obsvSprite = 0;
     this.crashed = false;
   }
@@ -40,8 +44,10 @@ export class World {
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
   }
 
-  // `mousePos` is null when the pointer position is unknown
-  update(time, mousePos, pointerDn, screenDim) {
+  // `mousePos` is null when the pointer position is unknown.
+  // `keys.thrust` (bool) fires the engine along the heading,
+  // `keys.turn` (-1, 0, 1) rotates the ship clockwise / counter-clockwise.
+  update(time, mousePos, pointerDn, screenDim, keys) {
     var realTimeDt = 0.017;
     if (this.lastRealTime !== undefined) {
       realTimeDt = time - this.lastRealTime;
@@ -56,19 +62,26 @@ export class World {
     this.obsvSprite = 0;
     if (this.crashed) return;
 
-    // rocket motor
-    var accel3_rest = undefined;
+    // steering
+    this.heading += keys.turn * turnRate * realTimeDt;
+    var thrusting = keys.thrust;
     if (pointerDn && mousePos) {
       const mouseViewport = screenToViewport(mousePos, screenDim, this.viewportSize);
-      const len = math.norm(mouseViewport);
-      if (len > 1e-9) {
-        // thrust away from the pointer, in the local orthonormal (r, phi) frame
-        const dir = this.metric.cartesianToLocal(this.obsvX, math.scale(mouseViewport, -1 / len));
-        const Tx = this.metric.T(this.obsvX);
-        accel3_rest = [0, thrust * dir[0] / Tx[1][1], thrust * dir[1] / Tx[2][2]];
-        this.obsvO = dir;
-        this.obsvSprite = 1;
+      if (math.norm(mouseViewport) > 1e-9) {
+        // point away from the pointer
+        this.heading = Math.atan2(-mouseViewport[1], -mouseViewport[0]);
+        thrusting = true;
       }
+    }
+    // heading in the local orthonormal (r, phi) frame
+    this.obsvO = this.metric.cartesianToLocal(this.obsvX, headingVector(this.heading));
+
+    // rocket motor
+    var accel3_rest = undefined;
+    if (thrusting) {
+      const Tx = this.metric.T(this.obsvX);
+      accel3_rest = [0, thrust * this.obsvO[0] / Tx[1][1], thrust * this.obsvO[1] / Tx[2][2]];
+      this.obsvSprite = 1;
     }
 
     const f = math.geo_f(this.metric, accel3_rest);
@@ -106,6 +119,8 @@ export class World {
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
   }
 }
+
+const headingVector = angle => [Math.cos(angle), Math.sin(angle)];
 
 // screen coords  [px] to viewport coords  [s]
 function screenToViewport(s, screenDim, viewportSize) {
