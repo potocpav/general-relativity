@@ -82,10 +82,6 @@ function spawn(objectName, screenPos, velocity) {
   objects.spawn(objectIds[objectName], x, u);
 }
 
-// keys that control the app (see onKeyDown)
-const isKeyboardControl = ev =>
-  isArrowControl(ev.key) || ev.code == "Digit1" || ev.code == "Digit2" || ["r", "p", "h", "s", " "].includes(ev.key);
-
 const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
 
 // The time slider runs from -3 to 3, with ticks at time scales -10, -1, -0.1,
@@ -267,7 +263,10 @@ class App extends Component {
   }
 
   onKeyDown = ev => {
-    if (this.state.showDisplayOptions && isKeyboardControl(ev)) this.setState({showDisplayOptions: false});
+    if (ev.key == "Escape" && this.state.showDisplayOptions) {
+      this.setState({showDisplayOptions: false});
+      return;
+    }
     if (isArrowControl(ev.key)) {
       // don't scroll, or move the focused time slider
       ev.preventDefault();
