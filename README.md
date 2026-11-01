@@ -8,11 +8,27 @@ You can play with general relativity [here](https://potocpav.github.io/general-r
 npx browser-sync start --server
 ```
 
+## Test
+
+```sh
+npm test
+```
+
+Runs `test/index.html` in headless Chromium (set `$CHROME` if it isn't found automatically).
+The page can also be opened directly in a browser via the dev server.
+
+The physics is implemented twice: in JS (`js/metric.js`, `js/math.js`, `js/world.js`) for the
+observer and object trajectories, and in GLSL (`glsl/physics.glsl`) for raytracing.
+The tests evaluate both on random inputs and check that they agree, so a change to one side
+must be mirrored in the other. Constants shared with the shaders (e.g. `N_SPRITES`) are defined
+in JS and injected by `js/shaders.js`.
+
 ## How it works
 
 - [ ] Describe the architecture
 
-Raytracing along geodesics is done inside the GLSL fragment shader.
+Raytracing along geodesics is done inside the GLSL fragment shader
+(`glsl/physics.glsl` + `glsl/surface-frag.glsl`, assembled by `js/shaders.js`).
 
 Observer and object trajectories are computed in JS.
 

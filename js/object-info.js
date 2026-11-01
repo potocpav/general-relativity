@@ -9,8 +9,6 @@ export const
   asteroidId = 2,
   photonClockId = 3;
 
-// The arrays below must have N_SPRITES entries, as defined in surface-frag.glsl.
-
 // Sprite extents in world coordinates, including time coordinate.
 const objSize = new Float32Array([
   2, 0.5, 0.5, -1,   // rocket
@@ -34,6 +32,10 @@ const objTexMax = new Float32Array([
   127, 63, 59, -1,
   191, 63, 59, -1,
   ]);
+
+// Number of sprites; passed to the shader as N_SPRITES.
+export const nSprites = objSize.length / 4;
+console.assert(objTexMin.length == nSprites * 4 && objTexMax.length == nSprites * 4);
 
 
 // Information about where objects are in the combined sprite map,

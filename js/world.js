@@ -123,14 +123,14 @@ export class World {
 const headingVector = angle => [Math.cos(angle), Math.sin(angle)];
 
 // screen coords  [px] to viewport coords  [s]
-function screenToViewport(s, screenDim, viewportSize) {
+export function screenToViewport(s, screenDim, viewportSize) {
   const meanRes = (screenDim[0] + screenDim[1]) / 2.0;
   return s.map((v, i) => (v - screenDim[i] / 2.0) / meanRes * viewportSize / 2.0);
 }
 
 // compute 3-vector out of a 2-vector so that ds = 0
 // (supposing a diagonal metric)
-function light3(gx, u2) {
+export function light3(gx, u2) {
   const [x, y] = u2;
   const res = (gx[1][1] * x*x + gx[2][2] * y*y) / gx[0][0];
   return [-Math.sqrt(-res), x, y];

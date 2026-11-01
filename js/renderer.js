@@ -1,3 +1,4 @@
+import { fetchText, physicsFragmentShader } from './shaders.js';
 
 var gl;
 var EXT_color_buffer_float;
@@ -40,9 +41,10 @@ export async function init(gl_, world_, objectInfo_, trajectories_) {
   gl.bufferData(gl.ARRAY_BUFFER, surfaceCorners, gl.STATIC_DRAW);
 
   // fetch shaders
-  const [surfaceVert, surfaceFrag, screenVert, screenFrag] = await Promise.all([
+  const [surfaceVert, surfaceFragMain, screenVert, screenFrag] = await Promise.all([
     "glsl/surface-vert.glsl", "glsl/surface-frag.glsl", "glsl/screen-vert.glsl", "glsl/screen-frag.glsl",
   ].map(fetchText));
+  const surfaceFrag = await physicsFragmentShader(surfaceFragMain);
 
   surfaceProgram = compileProgram(surfaceVert, surfaceFrag);
   cacheUniformLocation(surfaceProgram, 'resolution');
@@ -53,14 +55,6 @@ export async function init(gl_, world_, objectInfo_, trajectories_) {
   screenProgram = compileProgram(screenVert, screenFrag);
   cacheUniformLocation(screenProgram, 'resolution');
   cacheUniformLocation(screenProgram, 'color');
-}
-
-async function fetchText(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  }
-  return response.text();
 }
 
 // Compile & link a program, throwing on failure. Leaves the program in use.
