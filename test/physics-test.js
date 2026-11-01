@@ -631,9 +631,23 @@ function checkScenariosJs() {
       check(!o.fell && Math.abs(advance - 60) < 2, `precession: ${advance.toFixed(1)} deg per orbit`);
     }
     if (sc.id == 'isco') {
-      const [stable, unstable] = st.objects.map(o => follow(m, o.x, o.u, 100));
-      check(!stable.fell && stable.rMin > 3.4 * rs, `isco: the 4 rs asteroid went down to ${(stable.rMin / rs).toFixed(2)} rs`);
-      check(unstable.fell, 'isco: the 2.5 rs asteroid did not fall in');
+      // stays on the orbit; a 0.1 tau burn against the motion (the initial
+      // heading, -phi-hat) sends it in within half an orbit (4.9 tau), the
+      // same burn forwards doesn't
+      const burn = (accel, tau) => {
+        let xu = [...ship.x, ...ship.u];
+        for (let t = 0; t < tau; t += 0.05) {
+          xu = math.integrate(m, math.geo_f(m, t < 0.1 ? accel : undefined), xu, 0.05, 0.01);
+          if (xu === null) return null;
+        }
+        return xu;
+      };
+      const free = follow(m, ship.x, ship.u, 30);
+      check(!free.fell && Math.abs(free.rMin / rs - 3) < 1e-3 && Math.abs(free.rMax / rs - 3) < 1e-3,
+        `isco: without thrust r between ${(free.rMin / rs).toFixed(4)} and ${(free.rMax / rs).toFixed(4)} rs`);
+      check(burn([0, 0, -0.5], 4.9) === null, 'isco: a burn against the motion did not send it in');
+      check(burn([0, 0, 0.5], 30) !== null, 'isco: a burn forwards sent it in');
+      check(Math.abs(ship.heading + Math.PI / 2) < 1e-12, 'isco: the ship does not point against the motion');
     }
     if (sc.id == 'zoom-whirl') {
       const o = follow(m, ship.x, ship.u, 300);
