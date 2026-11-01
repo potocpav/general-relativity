@@ -24,13 +24,13 @@ export class World {
     this.showEventHorizon = true;
   }
 
-  reset(x, u) {
+  // Ship heading as an angle in screen-aligned cartesian coordinates,
+  // so that it doesn't rotate with the polar frame while orbiting.
+  reset(x, u, heading = Math.PI / 2) {
     this.time = 0;
     this.obsvX = x;
     this.obsvU = u;
-    // Ship heading as an angle in screen-aligned cartesian coordinates,
-    // so that it doesn't rotate with the polar frame while orbiting.
-    this.heading = Math.PI / 2;
+    this.heading = heading;
     this.obsvO = this.metric.cartesianToLocal(x, headingVector(this.heading));
     this.obsvSprite = 0;
     this.crashed = false;

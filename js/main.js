@@ -9,7 +9,8 @@ import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, localVelocity3, staticGamma, referenceGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
+import { scenarios } from './scenarios.js';
+import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -54,32 +55,6 @@ const shipControls = () => ({
   turn: (arrowKeys.has("ArrowLeft") ? 1 : 0) - (arrowKeys.has("ArrowRight") ? 1 : 0),
 });
 
-function initWorld() {
-  const r = 10 * rs;
-  const x = [0, r, 0];
-  // const u2 = [0.0, 0.0]; // stationary
-  // const u2 = [-(1 - rs/r) * Math.sqrt(rs/r), 0.0]; // raindrop (Schwarzschild coordinates)
-  // const u2 = [-Math.sqrt(rs/r), 0.0]; // raindrop (Gullstrand–Painlevé coordinates)
-  const u2 = [0.0, Math.sqrt(rs/(2*r))]; // circular orbit
-
-  world.viewportSize = 20;
-  world.reset(x, velocity3(metric, x, u2));
-
-  // objects
-  trajectories.clear();
-  const clock_x0 = [0, 25 * rs, 0.0];
-  const clock_v0 = [0.0, -0.12];
-  // Start the trajectory in the past, so that the clock is visible right away.
-  const [clock_x, clock_u] = integrateBackwards(clock_x0, velocity3(metric, clock_x0, clock_v0), 40);
-  trajectories.add(new Trajectory(metric, photonClockId, clock_x, clock_u));
-}
-
-// Free-fall state `tau` proper time before (x, u). Geodesics are time-reversible:
-// integrate forward with the velocity reversed, then reverse it back.
-function integrateBackwards(x, u, tau) {
-  const xu = math.integrate(metric, math.geo_f(metric), [...x, ...math.scale(u, -1)], tau, 0.02);
-  return [xu.slice(0, 3), math.scale(xu.slice(3, 6), -1)];
-}
 
 // Velocity relative to a static observer, from a drag on the screen.
 // The magnitude saturates below the speed of light.
@@ -111,6 +86,8 @@ class App extends Component {
     spawnVelocity: undefined,
     timeSlider: 0,
     pause: false,
+    scenario: scenarios[0].id,
+    showDescription: true,
     tau: null,
     obsvX: null,
     obsvU: null,
@@ -137,8 +114,7 @@ class App extends Component {
     // keyup is not delivered when the window loses focus
     window.addEventListener('blur', () => arrowKeys.clear());
 
-    startup().then(() => {
-      initWorld();
+    startup().then(() => this.loadScenario(scenarios[0])).then(() => {
       this.lastUiUpdate = -Infinity;
       requestAnimationFrame(this.animate);
     }).catch(err => {
@@ -309,9 +285,49 @@ class App extends Component {
   onSpawnAsteroid = _ => this.setState({spawnObject: 'asteroid'});
   onSpawnPhotonClock = _ => this.setState({spawnObject: 'photonClock'});
 
-  reset = _ => {
-    if (world) initWorld();
+  // Reset the world to the initial state of `scenario`, in its coordinates.
+  async loadScenario(scenario) {
+    const type = scenario.metric ?? metric.constructor;
+    if (type !== metric.constructor) {
+      const next = new type(rs);
+      await renderer.setMetric(next); // compile first, then switch everything at once
+      metric = next;
+      world.metric = next;
+    }
+    const state = scenario.setup(metric);
+    world.viewportSize = state.viewportSize;
+    world.reset(state.ship.x, state.ship.u, state.ship.heading);
+    trajectories.clear();
+    for (const o of state.objects) {
+      trajectories.add(new Trajectory(metric, o.type, o.x, o.u));
+    }
+    this.setState({
+      scenario: scenario.id,
+      metric: metric.constructor.id,
+      timeSlider: state.timeSlider,
+      pause: state.paused,
+      showDescription: true,
+      crashed: false,
+      message: null,
+    });
   }
+
+  currentScenario = () => scenarios.find(sc => sc.id == this.state.scenario);
+
+  reset = _ => {
+    if (world) this.loadScenario(this.currentScenario()).catch(err => {
+      console.error(err);
+      this.setState({message: "Loading the scenario failed: " + err.message});
+    });
+  }
+
+  selectScenario = ev => {
+    const scenario = scenarios[ev.target.selectedIndex];
+    if (!scenario.setup) return;
+    this.setState({scenario: scenario.id}, this.reset);
+  }
+
+  hideDescription = _ => this.setState({showDescription: false});
 
   // Switch the coordinates (metric) the simulation runs in.
   selectMetric = async ev => {
@@ -403,6 +419,16 @@ class App extends Component {
         </div>
       </div>
       <div id="top_left">
+        <div>
+          <select onChange=${this.selectScenario} title="Scenario (R restarts it)">
+          ${scenarios.map(sc => html`<option disabled=${!sc.setup} selected=${sc.id == this.state.scenario}>${sc.name}${sc.setup ? '' : ' (coming later)'}</option>`)}
+          </select>
+        </div>
+        ${this.state.showDescription && html`
+        <div>
+          <button class="description" title="Hide" onClick=${this.hideDescription}>${this.currentScenario().description} ✕</button>
+        </div>
+        `}
         ${this.state.error && html`<div><button>${this.state.error}</button></div>`}
         ${this.state.message && html`<div><button onClick=${() => this.setState({message: null})}>${this.state.message} ✕</button></div>`}
         <div>

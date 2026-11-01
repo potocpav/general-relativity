@@ -69,6 +69,17 @@ option {
   background-color: #000000;
 }
 
+option:disabled {
+  color: #777;
+}
+
+button.description {
+  max-width: 32em;
+  text-align: left;
+  white-space: normal;
+  cursor: default;
+}
+
 #ui {
   position: absolute;
   top: 0;

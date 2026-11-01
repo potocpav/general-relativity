@@ -10,6 +10,7 @@ import { Schwarzschild, GullstrandPainleve, metricTypes, convertState, localVelo
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
+import { scenarios } from '../js/scenarios.js';
 
 const root = '../';
 const nSamples = 64;
@@ -596,6 +597,66 @@ async function checkInfallViewGpu(gl, vertexSource) {
   };
 }
 
+// The scenarios start in valid states, and what their descriptions claim
+// holds for the JS physics.
+function checkScenariosJs() {
+  const failures = [];
+  const check = (ok, what) => { if (!ok) failures.push(what); };
+  // follow a free-fall geodesic for `tau`; returns {fell, rMin, rMax, periapsisPhis, xu}
+  const follow = (metric, x, u, tau, accel) => {
+    const f = math.geo_f(metric, accel);
+    let xu = [...x, ...u], rMin = x[1], rMax = x[1], dir = 0, periapsisPhis = [];
+    for (let t = 0; t < tau; t += 0.05) {
+      const next = math.integrate(metric, f, xu, 0.05, 0.01);
+      if (next === null) return {fell: true, rMin, rMax, periapsisPhis, xu};
+      const d = Math.sign(next[1] - xu[1]);
+      if (dir < 0 && d > 0) periapsisPhis.push(xu[2]);
+      dir = d;
+      rMin = Math.min(rMin, next[1]); rMax = Math.max(rMax, next[1]);
+      xu = next;
+    }
+    return {fell: false, rMin, rMax, periapsisPhis, xu};
+  };
+  for (const sc of scenarios.filter(sc => sc.setup)) {
+    const m = new (sc.metric ?? Schwarzschild)(rs);
+    const st = sc.setup(m);
+    for (const body of [st.ship, ...st.objects]) {
+      const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
+      check(Math.abs(norm + 1) < 1e-9 && m.canFollow(body.x), `${sc.id}: invalid initial state`);
+    }
+    const ship = st.ship;
+    if (sc.id == 'precession') {
+      const o = follow(m, ship.x, ship.u, 450);
+      const advance = (o.periapsisPhis[1] - o.periapsisPhis[0]) * 180 / Math.PI - 360;
+      check(!o.fell && Math.abs(advance - 60) < 2, `precession: ${advance.toFixed(1)} deg per orbit`);
+    }
+    if (sc.id == 'isco') {
+      const [stable, unstable] = st.objects.map(o => follow(m, o.x, o.u, 100));
+      check(!stable.fell && stable.rMin > 3.4 * rs, `isco: the 4 rs asteroid went down to ${(stable.rMin / rs).toFixed(2)} rs`);
+      check(unstable.fell, 'isco: the 2.5 rs asteroid did not fall in');
+    }
+    if (sc.id == 'zoom-whirl') {
+      const o = follow(m, ship.x, ship.u, 300);
+      check(!o.fell && o.rMin < 2.15 * rs && o.rMax > 30 * rs, `zoom-whirl: r between ${(o.rMin / rs).toFixed(2)} and ${(o.rMax / rs).toFixed(1)} rs`);
+    }
+    if (sc.id == 'fall-in') {
+      // in Gullstrand–Painlevé coordinates, bodies can only be lost at the singularity;
+      // from rest at r0 it is reached at tau = pi/2 sqrt(r0^3 / rs) (14.9 here)
+      check(m instanceof GullstrandPainleve && follow(m, ship.x, ship.u, 15.5).fell && !follow(m, ship.x, ship.u, 14.5).fell,
+        'fall-in: did not reach the singularity at tau = 14.9');
+    }
+    if (sc.id == 'no-return') {
+      // full thrust outwards (heading 0 at phi 0 is r-hat) from the start, and from below the limit
+      const accel = [0, 0.5, 0];
+      const escape = follow(m, ship.x, ship.u, 20, accel);
+      check(!escape.fell && escape.xu[1] > 3 * rs, `no-return: full thrust from 2.25 rs ended at ${(escape.xu[1] / rs).toFixed(2)} rs`);
+      const x = [0, 2.1 * rs, 0], u = localVelocity3(m, x, [0, 0]);
+      check(follow(m, x, u, 20, accel).fell, 'no-return: escaped from 2.1 rs');
+    }
+  }
+  return {ok: failures.length == 0, message: failures.length ? failures.join('; ') : `${scenarios.filter(sc => sc.setup).length} scenarios`};
+}
+
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
@@ -630,6 +691,7 @@ async function main() {
     }
   };
   await run('coordinate transformation (JS)', async () => checkCoordinateTransformJs());
+  await run('scenarios (JS)', async () => checkScenariosJs());
   for (const type of metricTypes) {
     metric = new type(rs);
     random = prng(42);
