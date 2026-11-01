@@ -104,16 +104,16 @@ export const scenarios = [
   {
     id: 'precession',
     name: 'Perihelion precession',
-    description: 'An eccentric orbit between 8 and 20 rs does not close: each closest ' +
-      'approach happens about 60° further around than the last (watch φ, the third ' +
+    description: 'An eccentric orbit between 4 and 7 rs does not close: each closest ' +
+      'approach happens about 200° further around than the last (watch φ, the third ' +
       'coordinate), so the orbit traces a rosette. This is the effect first seen in the ' +
       'orbit of Mercury, here much larger.',
     setup: metric => {
-      const rs = metric.rs, ra = 20 * rs;
-      const {E, L} = orbitConstants(rs, 8 * rs, ra);
+      const rs = metric.rs, ra = 7 * rs;
+      const {E, L} = orbitConstants(rs, 4 * rs, ra);
       return {
         ...defaults,
-        viewportSize: 30, timeScale: 10,
+        viewportSize: 11,
         ship: ship(fromSchwarzschild(metric, orbitState(rs, ra, 0, E, L))),
         objects: [],
       };
@@ -209,22 +209,6 @@ export const scenarios = [
         viewportSize: 22,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
         objects: [object(photonClockId, circularOrbit(metric, 5 * rs, Math.PI - 1.0))],
-      };
-    },
-  },
-  {
-    id: 'no-return',
-    name: 'Point of no return',
-    description: 'The ship hangs at rest at 2.25 rs, falling. Its engine can hold it up ' +
-      'only above 2.14 rs, and the thrust needed grows without bound at the horizon. ' +
-      'Press Space to start, and hold ↑ (pointing outwards) to escape.',
-    setup: metric => {
-      const rs = metric.rs;
-      return {
-        ...defaults,
-        viewportSize: 5, paused: true,
-        ship: ship(atRest(metric, 2.25 * rs, 0), 0),
-        objects: [],
       };
     },
   },
