@@ -117,6 +117,7 @@ class App extends Component {
     fps: null,
     crashed: false,
     showPhotonSphere: true,
+    showEventHorizon: true,
     metric: metric.constructor.id,
     message: null, // transient notice
     error: null,
@@ -253,6 +254,7 @@ class App extends Component {
     switch (ev.key) {
       case "r": this.reset();
       break; case "p": this.togglePhotonSphere();
+      break; case "h": this.toggleEventHorizon();
       break; case " ":
         // Don't let Space also activate a focused button (e.g. the pause button).
         ev.preventDefault();
@@ -271,6 +273,12 @@ class App extends Component {
     const show = !this.state.showPhotonSphere;
     if (world) world.showPhotonSphere = show;
     this.setState({showPhotonSphere: show});
+  }
+
+  toggleEventHorizon = _ => {
+    const show = !this.state.showEventHorizon;
+    if (world) world.showEventHorizon = show;
+    this.setState({showEventHorizon: show});
   }
 
   onPlayPause = _ => {
@@ -386,6 +394,12 @@ class App extends Component {
             class=${this.state.showPhotonSphere ? "clicked" : ""}
             title="Circular light orbits at 1.5 rs (P)"
             onClick=${this.togglePhotonSphere}>Photon sphere</button>
+        </div>
+        <div>
+          <button
+            class=${this.state.showEventHorizon ? "clicked" : ""}
+            title="The event horizon at rs (H)"
+            onClick=${this.toggleEventHorizon}>Event horizon</button>
         </div>
       </div>
       <div id="top_left">

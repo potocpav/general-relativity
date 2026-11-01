@@ -13,6 +13,7 @@ uniform int obsv_sprite;
 
 uniform float viewport_size;
 uniform bool show_photon_sphere;
+uniform bool show_event_horizon;
 
 uniform sampler3D sprites;
 
@@ -79,26 +80,26 @@ vec3 grid_color(vec3 pos) {
 	return vec3(0.3 * pow(max(grid, grid2), 1.0 / 2.2));
 }
 
-// Photon sphere: circular light orbits at r = 1.5 rs. Drawn as a line of a fixed
-// width in rendered pixels; `fwidth` is the change of r across one pixel.
-// Must be called in uniform control flow, because of `fwidth`.
-vec4 photon_sphere_color(vec3 pos, bool reached) {
+// Coverage of an antialiased line where the per-pixel radius `r` equals
+// `radius`, of a fixed width in rendered pixels; `fwidth` is the change of r
+// across one pixel. `continuous` must be false where neighbouring pixels' `r`
+// aren't comparable. Must be called in uniform control flow, because of `fwidth`.
+float radius_line(float r, float radius, bool continuous) {
 	const float width = 2.0; // [rendered pixels]
-	float d = abs(pos.y - 1.5 * rs);
-	float w = fwidth(pos.y) * width / 2.0;
+	float d = abs(r - radius);
+	float w = fwidth(r) * width / 2.0;
 	float a = 1.0 - smoothstep(0.5 * w, 1.5 * w, d);
-	// Where neighbouring rays end far apart (next to rays that didn't arrive,
-	// or around extreme lensing), `w` is meaningless and would smear the line.
-	// The threshold grows with the world size of a pixel, so that the line
-	// stays visible when zoomed out.
+	// Where neighbouring rays end far apart (around extreme lensing), `w` is
+	// meaningless and would smear the line. The threshold grows with the world
+	// size of a pixel, so that the line stays visible when zoomed out.
 	float pixel_size = viewport_size / (resolution.x + resolution.y);
-	bool discontinuous = fwidth(float(reached)) > 0.0 || w > max(0.25 * rs, 2.0 * pixel_size);
-	return vec4(1.0, 0.85, 0.2, (discontinuous || isnan(a)) ? 0.0 : a);
+	bool discontinuous = !continuous || w > max(0.25 * rs, 2.0 * pixel_size);
+	return (discontinuous || isnan(a)) ? 0.0 : a;
 }
 
-vec4 out_of_bounds(bool reached, vec4 c) {
-	return reached ? c : vec4(0.1, 0.0, 0.0, 1.0);
-}
+const vec3 shadow_color = vec3(0.1, 0.0, 0.0);
+const vec3 photon_sphere_color = vec3(1.0, 0.85, 0.2);
+const vec3 event_horizon_color = vec3(1.0, 0.15, 0.1);
 
  // a must be a heading vector, not necessarily normalized
 mat2 rot(vec2 a) {
@@ -190,7 +191,10 @@ void main( void ) {
 
 	// raytracing along null geodesics
 	vec3 pix_x, pix_u;
-	bool reached = raytrace(obsv_x, pix_u0, pix_x, pix_u);
+	float pix_l;
+	int steps;
+	int status = trace_ray(obsv_x, pix_u0, pix_x, pix_u, pix_l, steps);
+	bool reached = status == RAY_REACHED;
 
 	// Redshift: photon energy where it was emitted, measured by the reference
 	// observer there (who carries the grid), divided by the energy measured
@@ -199,12 +203,21 @@ void main( void ) {
 	float obsv_energy = length(pix_cartesian);
 	float rshift = abs((T_pix_x * pix_u).x) / obsv_energy;
 
-	// compute output colors
-	vec3 world_color = redshift(rshift, grid_color(pix_x));
+	// compute output colors; rays that didn't arrive show the black hole's shadow
+	vec3 world_color = reached ? redshift(rshift, grid_color(pix_x)) : shadow_color;
 
 	// annotations, not redshifted
-	vec4 photon_sphere = photon_sphere_color(pix_x, reached);
-	world_color = mix(world_color, photon_sphere.rgb, show_photon_sphere ? photon_sphere.a : 0.0);
+	float photon_sphere = radius_line(pix_x.y, 1.5 * rs, fwidth(float(reached)) == 0.0);
+	world_color = mix(world_color, photon_sphere_color, show_photon_sphere ? photon_sphere : 0.0);
+	// The event horizon at the edge of the shadow (from outside) or where rays
+	// cross it (from inside, Gullstrand–Painlevé only); ray_end_radius is
+	// continuous across the shadow's edge.
+	// Rays stopped while heading outwards (inside, towards the white hole) see
+	// the white hole's horizon as a whole, so no line is drawn for them.
+	bool end_radius_valid = reached || (status == RAY_HORIZON && pix_u.y < 0.0);
+	float event_horizon = radius_line(ray_end_radius(status, pix_x, pix_u, pix_l), rs,
+		fwidth(float(end_radius_valid)) == 0.0 && end_radius_valid);
+	world_color = mix(world_color, event_horizon_color, show_event_horizon ? event_horizon : 0.0);
 
 	// show objects
 	vec4 objects_color = vec4(0.0);
@@ -247,7 +260,7 @@ void main( void ) {
 	vec4 obsv_color = render_obj(
 		obsv_sprite, 1.0, time, T_pix_x * vec3(0.0, cyclic(obsv_x - pix_x).yz), obsv_o);
 
-	objects_color = mix(objects_color, obsv_color, obsv_color.a);
+	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
 
-	out_color = out_of_bounds(reached, mix(vec4(world_color, 1.0), objects_color, objects_color.a));
+	out_color = mix(vec4(world_color, 1.0), objects_color, objects_color.a);
 }

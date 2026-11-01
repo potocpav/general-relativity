@@ -189,9 +189,10 @@ void rk23(vec4 y, vec4 k1, float h, float E, float L, out vec4 y1, out vec4 k4, 
 #define RAY_OUT_OF_STEPS 2  // ran out of solver steps
 
 // Trace a light ray (x0, u0 null) from affine parameter 0 to 1 with an adaptive
-// RK23 solver. Returns one of the RAY_* statuses; `steps` is the number of
-// solver iterations used.
-int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
+// RK23 solver. Returns one of the RAY_* statuses; x, u and l_end are the ray's
+// position, momentum and affine parameter where it ended, and `steps` is the
+// number of solver iterations used.
+int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int steps) {
 	const float SAFETY = 0.9;
 	const float INITIAL_H = 0.1;
 	const float MIN_FACTOR = 0.1;
@@ -258,12 +259,22 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out int steps) {
 	}
 	x = y.xyz;
 	u = vec3(ray_dtdl(y.y, y.w, E, L), y.w, L / (y.y * y.y));
+	l_end = l;
 	return status;
 }
 
 // Trace a light ray from affine parameter 0 to 1.
 // Returns false if it didn't get there (fell in, or ran out of solver steps).
 bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
+	float l_end;
 	int steps;
-	return trace_ray(x0, u0, x, u, steps) == RAY_REACHED;
+	return trace_ray(x0, u0, x, u, l_end, steps) == RAY_REACHED;
+}
+
+// The radius of a ray traced by trace_ray at affine parameter 1. A ray stopped
+// on its way into the horizon is continued with its radial velocity, so that
+// the radius is continuous across the edge of the black hole's shadow.
+// (Meaningful for rays that reached the end or were stopped heading inwards.)
+float ray_end_radius(int status, vec3 x, vec3 u, float l_end) {
+	return (status == RAY_HORIZON && u.y < 0.0) ? x.y + u.y * (1.0 - l_end) : x.y;
 }

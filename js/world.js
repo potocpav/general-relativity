@@ -21,6 +21,7 @@ export class World {
     this.fps = 1 / this.dt;
     this.crashed = false;
     this.showPhotonSphere = true;
+    this.showEventHorizon = true;
   }
 
   reset(x, u) {
@@ -57,6 +58,7 @@ export class World {
     this.rs_loc = gl.getUniformLocation(program, 'rs');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
     this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
+    this.show_event_horizon_loc = gl.getUniformLocation(program, 'show_event_horizon');
   }
 
   // `mousePos` is null when the pointer position is unknown.
@@ -129,6 +131,7 @@ export class World {
     gl.uniform1f(this.rs_loc, this.metric.rs);
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
     gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);
+    gl.uniform1i(this.show_event_horizon_loc, this.showEventHorizon ? 1 : 0);
   }
 }
 
