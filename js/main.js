@@ -8,8 +8,8 @@ import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Objects } from './objects.js';
-import { scenarios, defaultRs } from './scenarios.js';
-import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
+import { scenarios, defaultRs, scenarioMetric } from './scenarios.js';
+import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -23,7 +23,7 @@ var quality = quality_levels.reduce((best, q) =>
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
 // switchable, see selectMetric; its black hole size is set by scenarios
-var metric = new Schwarzschild(defaultRs);
+var metric = new scenarioMetric(defaultRs);
 
 const objectIds = {
   'asteroid': asteroidId,
@@ -337,7 +337,7 @@ class App extends Component {
 
   // Reset the world to the initial state of `scenario`, in its coordinates.
   async loadScenario(scenario) {
-    const type = scenario.metric ?? metric.constructor;
+    const type = scenarioMetric;
     const rs = scenario.rs ?? defaultRs;
     if (type !== metric.constructor || rs !== metric.rs) {
       const next = new type(rs);

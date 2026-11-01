@@ -10,7 +10,7 @@ import { Schwarzschild, GullstrandPainleve, metricTypes, convertState, localVelo
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
-import { scenarios } from '../js/scenarios.js';
+import { scenarios, scenarioMetric } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { asteroidId, photonClockId, objectRadius } from '../js/object-info.js';
 
@@ -664,7 +664,7 @@ function checkScenariosJs() {
     return {fell: false, rMin, rMax, periapsisPhis, xu};
   };
   for (const sc of scenarios.filter(sc => sc.setup)) {
-    const m = new (sc.metric ?? Schwarzschild)(sc.rs ?? rs);
+    const m = new scenarioMetric(sc.rs ?? rs);
     const st = sc.setup(m);
     for (const body of [st.ship, ...st.objects]) {
       const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
@@ -677,9 +677,10 @@ function checkScenariosJs() {
       check(!o.fell && Math.abs(advance - 60) < 2, `precession: ${advance.toFixed(1)} deg per orbit`);
     }
     if (sc.id == 'isco') {
-      // stays on the orbit; a 0.1 tau burn against the motion (-phi-hat)
-      // sends it in within half an orbit (4.9 tau), the same burn forwards
-      // (the initial heading) doesn't
+      // stays on the orbit; a 0.1 tau burn against the motion (relative to a
+      // static observer: towards where the static observer moves, as seen from
+      // the ship) sends it in within half an orbit (4.9 tau), the same burn
+      // forwards doesn't
       const burn = (accel, tau) => {
         let xu = [...ship.x, ...ship.u];
         for (let t = 0; t < tau; t += 0.05) {
@@ -691,8 +692,10 @@ function checkScenariosJs() {
       const free = follow(m, ship.x, ship.u, 30);
       check(!free.fell && Math.abs(free.rMin / rs - 3) < 1e-3 && Math.abs(free.rMax / rs - 3) < 1e-3,
         `isco: without thrust r between ${(free.rMin / rs).toFixed(4)} and ${(free.rMax / rs).toFixed(4)} rs`);
-      check(burn([0, 0, -0.5], 4.9) === null, 'isco: a burn against the motion did not send it in');
-      check(burn([0, 0, 0.5], 30) !== null, 'isco: a burn forwards sent it in');
+      const st = math.matVec(math.coordToRest(m, ship.x, ship.u), math.matVec(m.staticTinv(ship.x), [1, 0, 0]));
+      const back = math.scale([0, st[1], st[2]], 0.5 / Math.hypot(st[1], st[2]));
+      check(burn(back, 4.9) === null, 'isco: a burn against the motion did not send it in');
+      check(burn(math.scale(back, -1), 30) !== null, 'isco: a burn forwards sent it in');
       check(Math.abs(ship.heading - Math.PI / 2) < 1e-12, 'isco: the ship does not point in the direction of motion');
     }
     if (sc.id == 'zoom-whirl') {

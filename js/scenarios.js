@@ -4,9 +4,12 @@
 // The black hole's Schwarzschild radius, unless a scenario sets its own `rs`.
 export const defaultRs = 0.3;
 
+// Scenarios start in Gullstrand–Painlevé coordinates, which can follow
+// everything across the horizon (the user can switch afterwards).
+export const scenarioMetric = GullstrandPainleve;
+
 // Each scenario has a `setup(metric)` returning the initial state in the
-// coordinates of `metric` (an instance of the scenario's `metric` class, or of
-// the current one if that is null):
+// coordinates of `metric` (a scenarioMetric):
 //   {ship: {x, u, heading}, objects: [{type, x, u}], viewportSize,
 //    timeScale (negative runs backwards), paused}
 // Scenarios without `setup` are placeholders, shown disabled.
@@ -87,7 +90,6 @@ export const scenarios = [
     name: 'Free play',
     description: 'A circular orbit at 10 rs, with a photon clock falling past. ' +
       'Boost with the mouse or the arrow keys, spawn objects, and explore.',
-    metric: null, // keep the current coordinates
     setup: metric => {
       const rs = metric.rs;
       const clock = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
@@ -106,7 +108,6 @@ export const scenarios = [
       'approach happens about 60° further around than the last (watch φ, the third ' +
       'coordinate), so the orbit traces a rosette. This is the effect first seen in the ' +
       'orbit of Mercury, here much larger.',
-    metric: Schwarzschild,
     setup: metric => {
       const rs = metric.rs, ra = 20 * rs;
       const {E, L} = orbitConstants(rs, 8 * rs, ra);
@@ -125,7 +126,6 @@ export const scenarios = [
       'circular orbits are unstable. The orbit is on the edge: a small slowdown sends the ' +
       'ship spiralling into the black hole within half an orbit, while a small speed-up lifts ' +
       'it into an eccentric orbit. Newtonian gravity has no such limit.',
-    metric: Schwarzschild,
     setup: metric => {
       const rs = metric.rs;
       return {
@@ -142,7 +142,6 @@ export const scenarios = [
     description: 'An orbit tuned just above capture: the ship whirls around the black hole ' +
       'about twice near 2.1 rs before zooming back out to 37 rs. Close to the black hole, ' +
       'orbits can wind around many times before leaving.',
-    metric: Schwarzschild,
     setup: metric => {
       const rs = metric.rs, L = 1.95 * rs;
       const ru = L * L / rs * (1 - Math.sqrt(1 - 3 * rs * rs / (L * L))); // unstable circular orbit
@@ -163,7 +162,6 @@ export const scenarios = [
       'horizon 9 s later (nothing special happens there locally), and spends 5 s inside ' +
       'before reaching the singularity. At the horizon, the black hole covers 42° around ' +
       'the inward direction.',
-    metric: GullstrandPainleve,
     // Free fall from infinity takes (2/3) rs of proper time from the horizon
     // to the singularity: 5 s at this size.
     rs: 7.5,
@@ -184,7 +182,6 @@ export const scenarios = [
       'crosses the horizon within seconds, but seen from the ship it slows down, reddens ' +
       'and fades out as it nears the horizon, never seen to cross: its light is redshifted ' +
       'by a further factor e every 2 rs/c, so a "frozen star" is practically black.',
-    metric: GullstrandPainleve,
     setup: metric => {
       const rs = metric.rs;
       // Dropped from rest 9.5 time units before the start (the spacetime is
@@ -205,7 +202,6 @@ export const scenarios = [
     description: 'A photon clock orbits at 5 rs. When it passes behind the black hole, ' +
       'its light bends around both sides: it appears twice, on either side of the ' +
       'black hole\'s shadow (the 2D version of an Einstein ring).',
-    metric: Schwarzschild,
     setup: metric => {
       const rs = metric.rs;
       return {
@@ -222,7 +218,6 @@ export const scenarios = [
     description: 'The ship hangs at rest at 2.25 rs, falling. Its engine can hold it up ' +
       'only above 2.14 rs, and the thrust needed grows without bound at the horizon. ' +
       'Press Space to start, and hold ↑ (pointing outwards) to escape.',
-    metric: GullstrandPainleve,
     setup: metric => {
       const rs = metric.rs;
       return {

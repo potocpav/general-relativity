@@ -40,10 +40,10 @@ Observer and object trajectories are computed in JS.
 The simulation runs in one of two coordinate systems for the same Schwarzschild black hole,
 selectable in the top right (`js/metric.js`, `METRIC` in `glsl/physics.glsl`):
 
-- **Schwarzschild** (default): the textbook coordinates. They are singular at the event horizon,
+- **Schwarzschild**: the textbook coordinates. They are singular at the event horizon,
   so the ship and objects stop there. The grid's redshift is computed for light emitted by static
   observers.
-- **Gullstrand–Painlevé**: regular across the horizon, so the ship and objects can fall in and are
+- **Gullstrand–Painlevé** (default, and for all scenarios): regular across the horizon, so the ship and objects can fall in and are
   followed until close to the singularity, and the view from inside is rendered. The grid's
   redshift is computed for light emitted by "raindrop" observers, falling freely from rest at
   infinity, so its colors differ.
