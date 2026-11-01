@@ -115,6 +115,7 @@ class App extends Component {
     obsvU: null,
     fps: null,
     crashed: false,
+    showPhotonSphere: true,
     error: null,
   }
 
@@ -248,6 +249,7 @@ class App extends Component {
     }
     switch (ev.key) {
       case "r": this.reset();
+      break; case "p": this.togglePhotonSphere();
       break; case " ":
         // Don't let Space also activate a focused button (e.g. the pause button).
         ev.preventDefault();
@@ -260,6 +262,12 @@ class App extends Component {
 
   onKeyUp = ev => {
     arrowKeys.delete(ev.key);
+  }
+
+  togglePhotonSphere = _ => {
+    const show = !this.state.showPhotonSphere;
+    if (world) world.showPhotonSphere = show;
+    this.setState({showPhotonSphere: show});
   }
 
   onPlayPause = _ => {
@@ -341,6 +349,12 @@ class App extends Component {
         <div>
           <button onClick=${this.zoomIn}>+</button>
           <button onClick=${this.zoomOut}>−</button>
+        </div>
+        <div>
+          <button
+            class=${this.state.showPhotonSphere ? "clicked" : ""}
+            title="Circular light orbits at 1.5 rs (P)"
+            onClick=${this.togglePhotonSphere}>Photon sphere</button>
         </div>
       </div>
       <div id="top_left">

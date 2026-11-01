@@ -20,6 +20,7 @@ export class World {
     this.dt = 0.017;
     this.fps = 1 / this.dt;
     this.crashed = false;
+    this.showPhotonSphere = true;
   }
 
   reset(x, u) {
@@ -42,6 +43,7 @@ export class World {
     this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
     this.rs_loc = gl.getUniformLocation(program, 'rs');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
+    this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
   }
 
   // `mousePos` is null when the pointer position is unknown.
@@ -117,6 +119,7 @@ export class World {
     gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
     gl.uniform1f(this.rs_loc, this.metric.rs);
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
+    gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);
   }
 }
 

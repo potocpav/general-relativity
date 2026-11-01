@@ -12,6 +12,7 @@ uniform vec2 obsv_o; // orientation vector in the local orthonormal (r, phi) fra
 uniform int obsv_sprite;
 
 uniform float viewport_size;
+uniform bool show_photon_sphere;
 
 uniform sampler3D sprites;
 
@@ -56,6 +57,23 @@ vec3 grid_color(vec3 pos) {
 		float(grid2_frac.x < grid2_ratio.x), float(grid2_frac.y < grid2_ratio.y), float(grid2_frac.z < grid2_ratio.z));
 	float grid2 = max(max(on_grid2.x, on_grid2.y), on_grid2.z);
 	return vec3((0.0 + max(grid, grid2))*0.3);
+}
+
+// Photon sphere: circular light orbits at r = 1.5 rs. Drawn as a line of a fixed
+// width in rendered pixels; `fwidth` is the change of r across one pixel.
+// Must be called in uniform control flow, because of `fwidth`.
+vec4 photon_sphere_color(vec3 pos, bool reached) {
+	const float width = 2.0; // [rendered pixels]
+	float d = abs(pos.y - 1.5 * rs);
+	float w = fwidth(pos.y) * width / 2.0;
+	float a = 1.0 - smoothstep(0.5 * w, 1.5 * w, d);
+	// Where neighbouring rays end far apart (next to rays that didn't arrive,
+	// or around extreme lensing), `w` is meaningless and would smear the line.
+	// The threshold grows with the world size of a pixel, so that the line
+	// stays visible when zoomed out.
+	float pixel_size = viewport_size / (resolution.x + resolution.y);
+	bool discontinuous = fwidth(float(reached)) > 0.0 || w > max(0.25 * rs, 2.0 * pixel_size);
+	return vec4(1.0, 0.85, 0.2, (discontinuous || isnan(a)) ? 0.0 : a);
 }
 
 vec4 out_of_bounds(bool reached, vec4 c) {
@@ -165,6 +183,10 @@ void main( void ) {
 
 	// compute output colors
 	vec3 world_color = redshift(rshift, grid_color(pix_x));
+
+	// annotations, not redshifted
+	vec4 photon_sphere = photon_sphere_color(pix_x, reached);
+	world_color = mix(world_color, photon_sphere.rgb, show_photon_sphere ? photon_sphere.a : 0.0);
 
 	// show objects
 	mat3 T_pix_x = T(pix_x);
