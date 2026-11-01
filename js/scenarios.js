@@ -119,7 +119,7 @@ export const scenarios = [
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 7,
+        viewportSize: 10,
         ship: ship(circularOrbit(metric, 6 * rs, 0)),
         objects: [
           object(asteroidId, circularOrbit(metric, 4 * rs, 2.0, 0.99)),
@@ -141,7 +141,7 @@ export const scenarios = [
       const E = Math.sqrt(potential(rs, ru, L) * (1 - 1e-4));
       return {
         ...defaults,
-        viewportSize: 8, timeSlider: 0.3,
+        viewportSize: 12, timeSlider: 0.3,
         ship: ship(fromSchwarzschild(metric, orbitState(rs, 10 * rs, 0, E, L))),
         objects: [],
       };
@@ -168,17 +168,22 @@ export const scenarios = [
   {
     id: 'frozen-star',
     name: 'The frozen star',
-    description: 'An asteroid dropped from 6 rs. In its own time it falls through the horizon ' +
-      'within seconds, but seen from the ship it slows down, dims and reddens, and seems ' +
-      'to freeze just above the horizon, its light ever more delayed.',
+    description: 'An asteroid falling from 6 rs, shown at 0.25× speed. In its own time it ' +
+      'crosses the horizon within seconds, but seen from the ship it slows down, reddens ' +
+      'and fades out as it nears the horizon, never seen to cross: its light is redshifted ' +
+      'by a further factor e every 2 rs/c, so a "frozen star" is practically black.',
     metric: GullstrandPainleve,
     setup: metric => {
       const rs = metric.rs;
+      // Dropped from rest 9.5 time units before the start (the spacetime is
+      // static, so shifting the time coordinate is exact): the ship then sees
+      // it fall from about 4 rs, and fade within the first ~5 time units.
+      const [x, u] = atRest(metric, 6 * rs, 0.6);
       return {
         ...defaults,
-        viewportSize: 14,
+        viewportSize: 22, timeSlider: Math.log10(0.25),
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
-        objects: [object(asteroidId, atRest(metric, 6 * rs, 0.6))],
+        objects: [object(asteroidId, [[x[0] - 9.5, x[1], x[2]], u])],
       };
     },
   },
@@ -193,7 +198,7 @@ export const scenarios = [
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 14,
+        viewportSize: 22,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
         objects: [object(photonClockId, circularOrbit(metric, 5 * rs, Math.PI - 1.0))],
       };
