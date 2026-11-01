@@ -12,40 +12,41 @@ export const matMul = (a, b) =>
 
 const epsilon = 1e-10;
 
-function inverse_diag3(m) {
+// Lorentz boost of orthonormal frame components. `w` is the unit timelike
+// 3-velocity (w[0] > 0) of an observer in some frame; boost(w) takes components
+// in that frame to components in the observer's rest frame, and
+// boost(negSpatial(w)) is its inverse.
+export function boost(w) {
+  const fac = (w[0] - 1.0) / (w[1]*w[1] + w[2]*w[2] + epsilon);
   return [
-    [1 / m[0][0], 0, 0],
-    [0, 1 / m[1][1], 0],
-    [0, 0, 1 / m[2][2]]];
-}
-
-// Lorentz boost
-function boost(u) {
-  const fac = (u[0] - 1.0) / (u[1]*u[1] + u[2]*u[2] + epsilon);
-  return [
-    [u[0], -u[1], -u[2]],
-    [-u[1], 1.0 + fac * u[1]*u[1], fac * u[1]*u[2]],
-    [-u[2], fac * u[1]*u[2], 1.0 + fac * u[2]*u[2]],
+    [w[0], -w[1], -w[2]],
+    [-w[1], 1.0 + fac * w[1]*w[1], fac * w[1]*w[2]],
+    [-w[2], fac * w[1]*w[2], 1.0 + fac * w[2]*w[2]],
   ];
 }
 
-export function neg_u(u) {
-  return [u[0], -u[1], -u[2]];
+export const negSpatial = w => [w[0], -w[1], -w[2]];
+
+// The rest frame of an observer with 4-velocity `u` at `x` is the metric's
+// reference frame (metric.T), boosted to the observer's velocity.
+// restToCoord takes rest frame components to coordinate components,
+// coordToRest the other way.
+export function restToCoord(metric, x, u) {
+  return matMul(metric.Tinv(x), boost(negSpatial(matVec(metric.T(x), u))));
 }
 
-// assuming diagonal metric.T
-export function general_boost(Tx, u) {
-  return matMul(matMul(inverse_diag3(Tx), boost(matVec(Tx, u))), Tx);
+export function coordToRest(metric, x, u) {
+  const Tx = metric.T(x);
+  return matMul(boost(matVec(Tx, u)), Tx);
 }
 
 // Geodesic ODE, solving for the [x^mu, u^mu] 6-vector.
-// `accel_rest` is an optional acceleration in the rest frame of the body,
-// given in coordinate components.
+// `accel_rest` is an optional acceleration, as components in the body's rest frame.
 export const geo_f = (metric, accel_rest) => (xu) => {
   const x = xu.slice(0, 3), u = xu.slice(3, 6);
   const gamma = metric.gammaUU(x, u);
   const accel = accel_rest !== undefined
-    ? matVec(general_boost(metric.T(x), neg_u(u)), accel_rest)
+    ? matVec(restToCoord(metric, x, u), accel_rest)
     : [0, 0, 0];
   return [
     u[0], u[1], u[2],

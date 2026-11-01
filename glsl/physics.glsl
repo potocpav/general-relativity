@@ -17,29 +17,25 @@ vec2 s2v(vec2 screen, vec2 res, float size) {
 	return ((screen - res / 2.0) / meanRes) * size / 2.0;
 }
 
-// Schwarzschild (t, r, phi) metric tensor
-mat3 g(vec3 x) {
-  float r = x.y;
-  return mat3(
-		-(1.0 - rs / r), 0.0, 0.0,
-		0.0, 1.0 / (1.0 - rs / r), 0.0,
-		0.0, 0.0, r * r);
-}
-
-// Transform metric at point x to Minkowski metric
+// Schwarzschild metric in Schwarzschild (t, r, phi) coordinates.
+//
+// The reference frame is an orthonormal frame at every point, here the static
+// observers. T(x) takes coordinate components of a vector at x to reference
+// frame components, T_inv(x) back.
 mat3 T(vec3 x) {
-	mat3 gx = g(x);
+	float s = sqrt(1.0 - rs / x.y);
 	return mat3(
-		sqrt(-gx[0][0]), 0.0, 0.0,
-		0.0, sqrt(gx[1][1]), 0.0,
-		0.0, 0.0, sqrt(gx[2][2]));
+		s, 0.0, 0.0,
+		0.0, 1.0 / s, 0.0,
+		0.0, 0.0, x.y);
 }
 
-// compute 3-vector out of a 2-vector so that ds = 0
-// (supposing a diagonal metric)
-vec3 light3(mat3 gx, vec2 u2) {
-	float res = dot(gx * vec3(0.0, u2), vec3(0.0, u2)) / gx[0][0];
-	return vec3(-sqrt(-res), u2);
+mat3 T_inv(vec3 x) {
+	float s = sqrt(1.0 - rs / x.y);
+	return mat3(
+		1.0 / s, 0.0, 0.0,
+		0.0, s, 0.0,
+		0.0, 0.0, 1.0 / x.y);
 }
 
 // normalize duplicate coordinate points
@@ -47,45 +43,42 @@ vec3 cyclic(vec3 x) {
 	return vec3(x.x, x.y, mod(x.z + pi, pi*2.0) - pi);
 }
 
-// Matrix manipulation
-
-mat3 inverse_diag3(mat3 m) {
+// Lorentz boost of orthonormal frame components. `w` is the unit timelike
+// 3-velocity of an observer in some frame; boost(w) takes components in that
+// frame to the observer's rest frame, boost(neg_spatial(w)) back.
+mat3 boost(vec3 w) {
+	float fac = (w.x - 1.0) / (dot(w.yz, w.yz) + epsilon);
 	return mat3(
-		1.0 / m[0][0], 0.0, 0.0,
-		0.0, 1.0 / m[1][1], 0.0,
-		0.0, 0.0, 1.0 / m[2][2]);
-}
-
-// 2D screen-space element `v` to world element (dr, dphi) at `x0`. The screen
-// axes are the local orthonormal frame of a static observer at `x0`, rotated
-// to screen-aligned (cartesian) directions. The observer's own motion is
-// applied afterwards, by a Lorentz boost.
-vec2 viewport2world(vec3 x0, vec2 v) {
-	float c = cos(x0.z), s = sin(x0.z);
-	vec2 local = vec2(c * v.x + s * v.y, -s * v.x + c * v.y); // (r-hat, phi-hat)
-	mat3 Tx = T(x0);
-	return local / vec2(Tx[1][1], Tx[2][2]);
-}
-
-// Lorentz boost matrix
-
-mat3 boost(vec3 u) {
-	float fac = (u.x - 1.0) / (dot(u.yz, u.yz) + epsilon);
-	return mat3(
-		u.x, -u.y, -u.z,
-		-u.y, 1.0 + fac * u.y*u.y, fac * u.y*u.z,
-		-u.z, fac * u.y*u.z, 1.0 + fac * u.z*u.z
+		w.x, -w.y, -w.z,
+		-w.y, 1.0 + fac * w.y*w.y, fac * w.y*w.z,
+		-w.z, fac * w.y*w.z, 1.0 + fac * w.z*w.z
 	);
 }
 
-// negate space coordinates of 3-velocity
-vec3 neg_u(vec3 u) {
-	return vec3(u.x, -u.yz);
+vec3 neg_spatial(vec3 w) {
+	return vec3(w.x, -w.yz);
 }
 
-// Lorentz boost in arbitrary metric
-mat3 general_boost(mat3 Tx, vec3 u) {
-	return inverse_diag3(Tx) * boost(Tx * u) * Tx;
+// The rest frame of an observer with 4-velocity `u` at `x` is the reference
+// frame boosted to the observer's velocity. rest_to_coord takes rest frame
+// components to coordinate components, coord_to_rest the other way.
+mat3 rest_to_coord(vec3 x, vec3 u) {
+	return T_inv(x) * boost(neg_spatial(T(x) * u));
+}
+
+mat3 coord_to_rest(vec3 x, vec3 u) {
+	mat3 Tx = T(x);
+	return boost(Tx * u) * Tx;
+}
+
+// The light ray (past-directed null vector, coordinate components) that the
+// observer at `x` with 4-velocity `u` sees at viewport vector `v`. The screen
+// axes are the observer's rest frame axes, rotated to screen-aligned
+// (cartesian) directions. The photon energy measured by the observer is |v|.
+vec3 screen_ray(vec3 x, vec3 u, vec2 v) {
+	float c = cos(x.z), s = sin(x.z);
+	vec2 local = vec2(c * v.x + s * v.y, -s * v.x + c * v.y); // (r-hat, phi-hat)
+	return rest_to_coord(x, u) * vec3(-length(local), local);
 }
 
 // Light rays

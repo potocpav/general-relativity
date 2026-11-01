@@ -8,7 +8,7 @@
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
 import { Schwarzschild, localVelocity3, velocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
-import { light3, screenToViewport } from '../js/world.js';
+import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
 
 const root = '../';
@@ -38,8 +38,10 @@ const randomVelocity = x => localVelocity3(metric, x, randomVector2(0.9));
 
 // Light rays with an impact parameter below this fall into the black hole.
 const bCrit = 1.5 * Math.sqrt(3) * rs;
-// b = L / E = r^2 dphi / ((1 - rs/r) dt)
-const impactParameter = (x, u) => Math.abs(x[1] * x[1] * u[2] / ((1 - rs / x[1]) * u[0]));
+// conserved energy E = -u_t and angular momentum L = u_phi of a geodesic
+const conserved = (x, u) => { const ul = math.matVec(metric.g(x), u); return {E: -ul[0], L: ul[2]}; };
+// b = L / E
+const impactParameter = (x, u) => { const {E, L} = conserved(x, u); return Math.abs(L / E); };
 
 // Shadow of the black hole, as the screen shows it.
 //
@@ -57,18 +59,20 @@ const shadowSetups = [
   {name: 'circular orbit, 10 rs', r0: 10 * rs, orbiting: true},
 ];
 
-// The observer of a shadow setup, and screen-space light rays cast by it.
+// The observer of a shadow setup, and light rays it sees.
 // Returns {x0, edges, ray(psi, length)}: `edges` are the analytic shadow edges and
-// `psi` screen angles, both as local angles from r-hat towards phi-hat.
+// `psi` directions in the observer's rest frame, as angles from r-hat towards phi-hat.
 function shadowObserver(setup) {
-  const phi0 = 0.7; // not 0, so that the rotation to screen axes is tested too
-  const x0 = [0, setup.r0, phi0];
-  const tangential = [-Math.sin(phi0), Math.cos(phi0)];
+  const x0 = [0, setup.r0, 0.7];
+  const tangential = [-Math.sin(x0[2]), Math.cos(x0[2])];
   const u = velocity3(metric, x0, setup.orbiting
     ? math.scale(tangential, Math.sqrt(rs / (2 * setup.r0)))  // circular orbit, as in the app
     : [0, 0]);
-  const Tx = metric.T(x0);
-  const beta = Tx[2][2] * u[2] / (Tx[0][0] * u[0]); // local speed, along phi-hat
+  // The observer's rest frame, as a pure boost from the static observer's frame
+  // (independent of the metric's reference frame, which the screen uses).
+  const w = math.matVec(metric.staticT(x0), u);
+  const restToCoord = math.matMul(metric.staticTinv(x0), math.boost(math.negSpatial(w)));
+  const beta = w[2] / w[0]; // speed relative to the static observer, along phi-hat
 
   const s = bCrit / setup.r0 * Math.sqrt(1 - rs / setup.r0);
   const h = setup.r0 >= 1.5 * rs ? Math.asin(s) : Math.PI - Math.asin(s);
@@ -79,11 +83,9 @@ function shadowObserver(setup) {
     const c = (Math.cos(chi) + beta) / (1 + beta * Math.cos(chi));
     return Math.PI / 2 + Math.sign(Math.sin(chi)) * Math.acos(c);
   };
-  const B = math.general_boost(Tx, math.neg_u(u));
-  const ray = (psi, length = 20) => {
-    const v = [length * Math.cos(psi + phi0), length * Math.sin(psi + phi0)]; // screen-aligned
-    return math.matVec(B, light3(metric.g(x0), metric.viewportToWorld(x0, v)));
-  };
+  // past-directed light ray seen in rest frame direction psi
+  const ray = (psi, length = 20) =>
+    math.matVec(restToCoord, [-length, length * Math.cos(psi), length * Math.sin(psi)]);
   return {x0, edges: [aberrate(Math.PI - h), aberrate(Math.PI + h)], ray};
 }
 
@@ -98,6 +100,22 @@ function shadowEdgeRays(setup, delta) {
     rays.push({x0, u0: ray(psi - inwards * delta), fallsIn: false, label: `edge ${i + 1} outside`});
   });
   return rays;
+}
+
+// JS geodesics conserve E, L and the norm of the 4-velocity, for random
+// timelike geodesics (checks the Christoffel symbols).
+function checkGeodesicsJs() {
+  let maxError = 0;
+  for (let i = 0; i < 20; i++) {
+    const x = randomPoint(2, 10), u = randomVelocity(x);
+    const xu = math.integrate(metric, math.geo_f(metric), [...x, ...u], 2, 1e-3);
+    if (xu === null) continue;
+    const x1 = xu.slice(0, 3), u1 = xu.slice(3, 6);
+    const c0 = conserved(x, u), c1 = conserved(x1, u1);
+    const n1 = math.dot(u1, math.matVec(metric.g(x1), u1));
+    maxError = Math.max(maxError, Math.abs(c1.E - c0.E), Math.abs(c1.L - c0.L), Math.abs(n1 + 1));
+  }
+  return {ok: maxError < 1e-8, message: `max drift of E, L, u.u: ${maxError.toExponential(2)}`};
 }
 
 // JS geodesics vs the analytic shadow edges.
@@ -124,14 +142,9 @@ function checkShadowJs() {
 // `expected(input)` returns the expected rows, or null to skip the sample.
 // `tolerance` bounds |gpu - js| / max(1, |js row|) for every component, i.e. the
 //   error is relative to the length of the expected row vector (if longer than 1).
+const randomObserver = () => { const x = randomPoint(); return [x, randomVelocity(x)]; };
+
 const tests = [
-  {
-    name: 'g',
-    input: () => [randomPoint()],
-    glsl: 'return mat_row(g(in_(0).xyz), row);',
-    expected: ([x]) => metric.g(x),
-    tolerance: 1e-5,
-  },
   {
     name: 'T',
     input: () => [randomPoint()],
@@ -140,24 +153,31 @@ const tests = [
     tolerance: 1e-5,
   },
   {
-    name: 'general_boost',
-    input: () => { const x = randomPoint(); return [x, randomVelocity(x)]; },
-    glsl: 'return mat_row(general_boost(T(in_(0).xyz), neg_u(in_(1).xyz)), row);',
-    expected: ([x, u]) => math.general_boost(metric.T(x), math.neg_u(u)),
-    tolerance: 1e-4,
-  },
-  {
-    name: 'light3',
-    input: () => [randomPoint(), randomVector2(2)],
-    glsl: 'return vec4(light3(g(in_(0).xyz), in_(1).xy), 0.0);',
-    expected: ([x, v]) => [light3(metric.g(x), v)],
+    name: 'T_inv',
+    input: () => [randomPoint()],
+    glsl: 'return mat_row(T_inv(in_(0).xyz), row);',
+    expected: ([x]) => metric.Tinv(x),
     tolerance: 1e-5,
   },
   {
-    name: 'viewport2world',
-    input: () => [randomPoint(), randomVector2(10)],
-    glsl: 'return vec4(viewport2world(in_(0).xyz, in_(1).xy), 0.0, 0.0);',
-    expected: ([x, v]) => [metric.viewportToWorld(x, v)],
+    name: 'rest_to_coord',
+    input: randomObserver,
+    glsl: 'return mat_row(rest_to_coord(in_(0).xyz, in_(1).xyz), row);',
+    expected: ([x, u]) => math.restToCoord(metric, x, u),
+    tolerance: 1e-4,
+  },
+  {
+    name: 'coord_to_rest',
+    input: randomObserver,
+    glsl: 'return mat_row(coord_to_rest(in_(0).xyz, in_(1).xyz), row);',
+    expected: ([x, u]) => math.coordToRest(metric, x, u),
+    tolerance: 1e-4,
+  },
+  {
+    name: 'screen_ray',
+    input: () => [...randomObserver(), randomVector2(10)],
+    glsl: 'return vec4(screen_ray(in_(0).xyz, in_(1).xyz, in_(2).xy), 0.0);',
+    expected: ([x, u, v]) => [screenRay(metric, x, u, v)],
     // GPU sin / cos are much less precise than the rest of float32 arithmetic
     tolerance: 1e-3,
   },
@@ -180,7 +200,7 @@ const tests = [
     name: 'raytrace',
     input: () => {
       const x0 = randomPoint(2, 10);
-      return [x0, light3(metric.g(x0), metric.viewportToWorld(x0, randomVector2(10)))];
+      return [x0, screenRay(metric, x0, randomVelocity(x0), randomVector2(10))];
     },
     glsl: `
       vec3 x, u;
@@ -414,6 +434,7 @@ async function main() {
     }
   };
   await run('surface shader', () => checkSurfaceShader(gl, vertexSource));
+  await run('geodesics (JS)', async () => checkGeodesicsJs());
   await run('shadow edges (JS)', async () => checkShadowJs());
   await run('shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
   await run('near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));

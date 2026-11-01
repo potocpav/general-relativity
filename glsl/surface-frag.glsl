@@ -48,9 +48,11 @@ vec3 line_coverage(vec3 frac, vec3 half_width, vec3 pixel) {
 // Must be called in uniform control flow, because of `fwidth`.
 vec3 grid_color(vec3 pos) {
 	// adaptive stride calculation
-	mat3 gx = g(pos);
+	// length of a unit coordinate step, measured in the reference frame
+	mat3 Tx = T(pos);
+	vec3 coordinate_scale = vec3(abs(Tx[0][0]), length(Tx[1]), length(Tx[2]));
 	float grids_per_screen = 20.0;
-	vec3 stride_raw = viewport_size / vec3(sqrt(-gx[0][0]), sqrt(gx[1][1]), sqrt(gx[2][2])) / grids_per_screen;
+	vec3 stride_raw = viewport_size / coordinate_scale / grids_per_screen;
 	vec3 stride_log = log2(stride_raw);
 	vec3 stride_floor = floor(stride_log);
 	vec3 stride_alpha = 1.0 - (stride_log - stride_floor);
@@ -161,9 +163,9 @@ vec3 sample_linear(sampler2D x, float i, int j) {
 	return p1 * (1.0 - a) + p2 * a;
 }
 
-vec4 render_obj(vec3 pix_x, int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
-	mat3 T_pix_x = T(pix_x);
-	vec2 obj_texcoord2 = rot(orientation) * (T_pix_x * deltax).yz / objSize[sprite_i].yz;
+// `deltax` is the pixel's offset from the object, as components in the object's frame.
+vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
+	vec2 obj_texcoord2 = rot(orientation) * deltax.yz / objSize[sprite_i].yz;
 	if (max(abs(obj_texcoord2.x), abs(obj_texcoord2.y)) < 0.5) {
 		vec3 lo = objTexMin[sprite_i], hi = objTexMax[sprite_i];
 		// Pixel coordinates -> texel centers, so that linear filtering
@@ -184,20 +186,18 @@ vec4 render_obj(vec3 pix_x, int sprite_i, float rshift, float tau, vec3 deltax, 
 void main( void ) {
 	// screen to observer space transformation
 	vec2 pix_cartesian = s2v(gl_FragCoord.xy, resolution, viewport_size);
-	vec2 pix_target = viewport2world(obsv_x, pix_cartesian);
-
-	mat3 gx = g(obsv_x);
-	vec3 pix_v3 = light3(gx, pix_target); // 3-vec pointing at pix
-
-	// boost the grid
-	vec3 pix_u0 = general_boost(T(obsv_x), neg_u(obsv_u)) * pix_v3;
+	vec3 pix_u0 = screen_ray(obsv_x, obsv_u, pix_cartesian);
 
 	// raytracing along null geodesics
 	vec3 pix_x, pix_u;
 	bool reached = raytrace(obsv_x, pix_u0, pix_x, pix_u);
-	float lorentz_rshift = pix_u0.x / pix_v3.x;
-	float grav_rshift = sqrt(gx[0][0] / g(pix_x)[0][0]);
-	float rshift = lorentz_rshift * grav_rshift;
+
+	// Redshift: photon energy where it was emitted, measured by the reference
+	// observer there (who carries the grid), divided by the energy measured
+	// by the observer, which is |pix_cartesian| (see screen_ray).
+	mat3 T_pix_x = T(pix_x);
+	float obsv_energy = length(pix_cartesian);
+	float rshift = abs((T_pix_x * pix_u).x) / obsv_energy;
 
 	// compute output colors
 	vec3 world_color = redshift(rshift, grid_color(pix_x));
@@ -207,14 +207,13 @@ void main( void ) {
 	world_color = mix(world_color, photon_sphere.rgb, show_photon_sphere ? photon_sphere.a : 0.0);
 
 	// show objects
-	mat3 T_pix_x = T(pix_x);
 	vec4 objects_color = vec4(0.0);
 	int nPoints = textureSize(obj_its, 0).y;
 	float last = float(nPoints - 1);
 	int bisect_iters = int(log2(float(nPoints)) + 7.0);
 	// rays that didn't arrive (the black hole's shadow) show no objects
 	for (int i = 0; i < (reached ? n_objects : 0); i++) { // for each object
-		mat3 obj_boost;
+		mat3 obj_rest; // coordinate components -> object's rest frame components
 		vec3 obj_deltax;
 		// bisect time for the object trajectory
 		float j0 = 0.0, j1 = last;
@@ -224,8 +223,8 @@ void main( void ) {
 			vec3 obj_x = sample_linear(obj_xs, j, i);
 			vec3 obj_u = sample_linear(obj_us, j, i);
 
-			obj_boost = general_boost(T_pix_x, obj_u);
-			obj_deltax = obj_boost * cyclic(obj_x - pix_x);
+			obj_rest = coord_to_rest(pix_x, obj_u);
+			obj_deltax = obj_rest * cyclic(obj_x - pix_x);
 
 			if (obj_deltax.x > 0.0 || isnan(obj_deltax.x))
 				j1 = j;
@@ -236,9 +235,8 @@ void main( void ) {
 		if (j0 == 0.0 || j1 == last) continue;
 
 		vec4 obj_color = render_obj(
-			pix_x,
 			int(texelFetch(obj_its, ivec2(i, int(j)), 0).x),
-			rshift * (obj_boost * pix_u).x / pix_u.x,
+			abs((obj_rest * pix_u).x) / obsv_energy,
 			sample_linear(obj_its, j, i).y,
 			obj_deltax,
 			vec2(0.0, 1.0)
@@ -247,7 +245,7 @@ void main( void ) {
 	}
 
 	vec4 obsv_color = render_obj(
-		pix_x, obsv_sprite, 1.0, time, vec3(0.0, cyclic(obsv_x-pix_x).yz), obsv_o);
+		obsv_sprite, 1.0, time, T_pix_x * vec3(0.0, cyclic(obsv_x - pix_x).yz), obsv_o);
 
 	objects_color = mix(objects_color, obsv_color, obsv_color.a);
 

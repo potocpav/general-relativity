@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { velocity3, localVelocity3, Schwarzschild } from './metric.js';
+import { velocity3, localVelocity3, staticGamma, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -447,7 +447,7 @@ function printVelocity(x, u) {
   if (u === null) {
     return "n/a"
   } else {
-    const lambda = metric.T(x)[0][0] * u[0];
+    const lambda = staticGamma(metric, x, u);
     const v = Math.sqrt(1 - Math.pow(lambda, -2));
     return "v = " + Math.floor(v * 100) + " %"
   }

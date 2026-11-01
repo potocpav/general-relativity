@@ -78,11 +78,10 @@ export class World {
     // heading in the local orthonormal (r, phi) frame
     this.obsvO = this.metric.cartesianToLocal(this.obsvX, headingVector(this.heading));
 
-    // rocket motor
+    // rocket motor, in the ship's rest frame
     var accel3_rest = undefined;
     if (thrusting) {
-      const Tx = this.metric.T(this.obsvX);
-      accel3_rest = [0, thrust * this.obsvO[0] / Tx[1][1], thrust * this.obsvO[1] / Tx[2][2]];
+      accel3_rest = [0, thrust * this.obsvO[0], thrust * this.obsvO[1]];
       this.obsvSprite = 1;
     }
 
@@ -101,9 +100,7 @@ export class World {
   // or null if the ray doesn't reach them
   getWorldPos(screen, screenDim) {
     const viewport = screenToViewport(screen, screenDim, this.viewportSize);
-    const world2 = this.metric.viewportToWorld(this.obsvX, viewport);
-    const world3 = light3(this.metric.g(this.obsvX), world2);
-    const u0 = math.matVec(math.general_boost(this.metric.T(this.obsvX), math.neg_u(this.obsvU)), world3);
+    const u0 = screenRay(this.metric, this.obsvX, this.obsvU, viewport);
 
     // raytracing along null geodesics, affine parameter from 0 to 1
     const f = math.geo_f(this.metric);
@@ -131,10 +128,12 @@ export function screenToViewport(s, screenDim, viewportSize) {
   return s.map((v, i) => (v - screenDim[i] / 2.0) / meanRes * viewportSize / 2.0);
 }
 
-// compute 3-vector out of a 2-vector so that ds = 0
-// (supposing a diagonal metric)
-export function light3(gx, u2) {
-  const [x, y] = u2;
-  const res = (gx[1][1] * x*x + gx[2][2] * y*y) / gx[0][0];
-  return [-Math.sqrt(-res), x, y];
+// The light ray (past-directed null vector, coordinate components) that the
+// observer at `x` with 4-velocity `u` sees at viewport vector `v`. The screen
+// axes are the observer's rest frame axes, rotated to screen-aligned
+// (cartesian) directions, so screen angles and short distances are the ones
+// the observer measures. The photon energy measured by the observer is |v|.
+export function screenRay(metric, x, u, v) {
+  const local = metric.cartesianToLocal(x, v);
+  return math.matVec(math.restToCoord(metric, x, u), [-math.norm(local), ...local]);
 }
