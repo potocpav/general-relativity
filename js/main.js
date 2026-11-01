@@ -8,7 +8,7 @@ import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Objects } from './objects.js';
-import { scenarios, defaultRs, scenarioMetric, defaultTimeScale } from './scenarios.js';
+import { scenarios, defaultRs, scenarioMetric } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes } from './metric.js';
 
 const html = htm.bind(h);
@@ -96,7 +96,7 @@ class App extends Component {
     spawnObject: 'asteroid',
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
-    timeSlider: timeScaleToSlider(defaultTimeScale),
+    timeSlider: timeScaleToSlider(1),
     showDisplayOptions: false,
     pause: false,
     scenario: scenarios[0].id,
@@ -315,7 +315,7 @@ class App extends Component {
   }
 
   onResetTimeSlider = _ => {
-    this.setState({timeSlider: timeScaleToSlider(defaultTimeScale), pause: false});
+    this.setState({timeSlider: timeScaleToSlider(1), pause: false});
   }
 
   onTimeSlider = ev => {
