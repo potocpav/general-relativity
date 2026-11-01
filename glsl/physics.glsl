@@ -59,13 +59,6 @@ vec3 cyclic(vec3 x) {
 
 // Matrix manipulation
 
-mat2 inverse2(mat2 m) {
-  return mat2(
-		m[1][1], -m[0][1],
-    -m[1][0], m[0][0]
-		) / (m[0][0]*m[1][1] - m[0][1]*m[1][0]);
-}
-
 mat3 inverse_diag3(mat3 m) {
 	return mat3(
 		1.0 / m[0][0], 0.0, 0.0,
@@ -73,10 +66,15 @@ mat3 inverse_diag3(mat3 m) {
 		0.0, 0.0, 1.0 / m[2][2]);
 }
 
-// 2D viewport element `x` to world element (dr, dphi) at (r, phi)
-vec2 viewport2world(float r, float phi, vec2 x) {
-	mat2 A = mat2(cos(phi), -r * sin(phi), sin(phi), r * cos(phi));
-	return x * inverse2(A);
+// 2D screen-space element `v` to world element (dr, dphi) at `x0`. The screen
+// axes are the local orthonormal frame of a static observer at `x0`, rotated
+// to screen-aligned (cartesian) directions. The observer's own motion is
+// applied afterwards, by a Lorentz boost.
+vec2 viewport2world(vec3 x0, vec2 v) {
+	float c = cos(x0.z), s = sin(x0.z);
+	vec2 local = vec2(c * v.x + s * v.y, -s * v.x + c * v.y); // (r-hat, phi-hat)
+	mat3 Tx = T(x0);
+	return local / vec2(Tx[1][1], Tx[2][2]);
 }
 
 // Lorentz boost matrix

@@ -166,7 +166,7 @@ vec4 render_obj(vec3 pix_x, int sprite_i, float rshift, float tau, vec3 deltax, 
 void main( void ) {
 	// screen to observer space transformation
 	vec2 pix_cartesian = s2v(gl_FragCoord.xy, resolution, viewport_size);
-	vec2 pix_target = viewport2world(obsv_x.y, obsv_x.z, pix_cartesian);
+	vec2 pix_target = viewport2world(obsv_x, pix_cartesian);
 
 	mat3 gx = g(obsv_x);
 	vec3 pix_v3 = light3(gx, pix_target); // 3-vec pointing at pix

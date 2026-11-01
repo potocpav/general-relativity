@@ -6,7 +6,7 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { Schwarzschild, localVelocity3 } from '../js/metric.js';
+import { Schwarzschild, localVelocity3, velocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { light3, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
@@ -35,6 +35,79 @@ const randomVector2 = (maxLength) => {
   return [length * Math.cos(angle), length * Math.sin(angle)];
 };
 const randomVelocity = x => localVelocity3(metric, x, randomVector2(0.9));
+
+// Light rays with an impact parameter below this fall into the black hole.
+const bCrit = 1.5 * Math.sqrt(3) * rs;
+// b = L / E = r^2 dphi / ((1 - rs/r) dt)
+const impactParameter = (x, u) => Math.abs(x[1] * x[1] * u[2] / ((1 - rs / x[1]) * u[0]));
+
+// Shadow of the black hole, as the screen shows it.
+//
+// The screen axes are the observer's local orthonormal frame, so the shadow
+// edges are at the analytic critical angles: a static observer at r0 sees
+// rays fall in within the half-angle h around the inward direction, where
+// sin h = b_crit / r0 * sqrt(1 - rs / r0) (h > 90 deg inside the photon
+// sphere). A moving observer sees them shifted by relativistic aberration.
+// The shadow is therefore not a circle on the screen: it is a wedge behind the
+// black hole, and only the near side of the photon sphere is ever visible.
+const shadowSetups = [
+  {name: 'static, 10 rs', r0: 10 * rs, orbiting: false},
+  {name: 'static, 3 rs', r0: 3 * rs, orbiting: false},
+  {name: 'static, 1.2 rs (inside photon sphere)', r0: 1.2 * rs, orbiting: false},
+  {name: 'circular orbit, 10 rs', r0: 10 * rs, orbiting: true},
+];
+
+// Screen-space light rays just inside and just outside each shadow edge,
+// `delta` [rad] away from it. Returns [{x0, u0, fallsIn, label}].
+function shadowEdgeRays(setup, delta) {
+  const phi0 = 0.7; // not 0, so that the rotation to screen axes is tested too
+  const x0 = [0, setup.r0, phi0];
+  const tangential = [-Math.sin(phi0), Math.cos(phi0)];
+  const u = velocity3(metric, x0, setup.orbiting
+    ? math.scale(tangential, Math.sqrt(rs / (2 * setup.r0)))  // circular orbit, as in the app
+    : [0, 0]);
+  const Tx = metric.T(x0);
+  const beta = Tx[2][2] * u[2] / (Tx[0][0] * u[0]); // local speed, along phi-hat
+
+  const s = bCrit / setup.r0 * Math.sqrt(1 - rs / setup.r0);
+  const h = setup.r0 >= 1.5 * rs ? Math.asin(s) : Math.PI - Math.asin(s);
+  // local angle psi from r-hat towards phi-hat; aberration for motion along phi-hat:
+  // a direction at angle chi from the velocity appears at chi', cos chi' = (cos chi + beta) / (1 + beta cos chi)
+  const aberrate = psi => {
+    const chi = psi - Math.PI / 2;
+    const c = (Math.cos(chi) + beta) / (1 + beta * Math.cos(chi));
+    return Math.PI / 2 + Math.sign(Math.sin(chi)) * Math.acos(c);
+  };
+  const B = math.general_boost(Tx, math.neg_u(u));
+  const ray = psi => {
+    const v = [20 * Math.cos(psi + phi0), 20 * Math.sin(psi + phi0)]; // screen-aligned
+    return math.matVec(B, light3(metric.g(x0), metric.viewportToWorld(x0, v)));
+  };
+
+  const rays = [];
+  [[Math.PI - h, +1], [Math.PI + h, -1]].forEach(([edge, inwards], i) => {
+    const psi = aberrate(edge);
+    rays.push({x0, u0: ray(psi + inwards * delta), fallsIn: true, label: `edge ${i + 1} inside`});
+    rays.push({x0, u0: ray(psi - inwards * delta), fallsIn: false, label: `edge ${i + 1} outside`});
+  });
+  return rays;
+}
+
+// JS geodesics vs the analytic shadow edges.
+function checkShadowJs() {
+  const delta = 0.1 * Math.PI / 180;
+  const failures = [];
+  for (const setup of shadowSetups) {
+    for (const ray of shadowEdgeRays(setup, delta)) {
+      const fallsIn = math.integrate(metric, math.geo_f(metric), [...ray.x0, ...ray.u0], 1, 2e-4) === null;
+      if (fallsIn != ray.fallsIn) failures.push(`${setup.name}: ${ray.label}`);
+    }
+  }
+  return {
+    ok: failures.length == 0,
+    message: `rays 0.1 deg from the analytic edges` + (failures.length ? `; wrong: ${failures.join(', ')}` : ''),
+  };
+}
 
 // Test definitions.
 //
@@ -83,7 +156,7 @@ const tests = [
   {
     name: 'viewport2world',
     input: () => [randomPoint(), randomVector2(10)],
-    glsl: 'vec3 x = in_(0).xyz; return vec4(viewport2world(x.y, x.z, in_(1).xy), 0.0, 0.0);',
+    glsl: 'return vec4(viewport2world(in_(0).xyz, in_(1).xy), 0.0, 0.0);',
     expected: ([x, v]) => [metric.viewportToWorld(x, v)],
     // GPU sin / cos are much less precise than the rest of float32 arithmetic
     tolerance: 1e-3,
@@ -101,7 +174,9 @@ const tests = [
   {
     // A light ray as cast for a screen pixel, traced to affine parameter 1
     // by the adaptive RK23 on the GPU, and by fine-step RK4 in JS.
-    // Rays that either side doesn't finish are skipped.
+    // Rays that either side doesn't finish are skipped, and so are rays
+    // close to the critical impact parameter: they wind around the photon
+    // sphere, which amplifies any integration error (see the shadow tests).
     name: 'raytrace',
     input: () => {
       const x0 = randomPoint(2, 10);
@@ -112,6 +187,7 @@ const tests = [
       bool reached = raytrace(in_(0).xyz, in_(1).xyz, x, u);
       return row == 0 ? vec4(x, reached ? 1.0 : 0.0) : vec4(u, 0.0);`,
     expected: ([x0, u0]) => {
+      if (Math.abs(impactParameter(x0, u0) / bCrit - 1) < 0.1) return null;
       const xu = math.integrate(metric, math.geo_f(metric), [...x0, ...u0], 1, 1e-3);
       return xu && [[...xu.slice(0, 3), 1], [...xu.slice(3, 6), 0]];
     },
@@ -245,6 +321,21 @@ async function runComparison(gl, vertexSource, test) {
   };
 }
 
+// The shader's `reached` flag, which paints the shadow on screen, vs the
+// analytic shadow edges. Rays that wind around the photon sphere are hard for
+// the shader's solver (max. 40 steps), so the edge is only resolved to `deg`.
+async function checkShadowGpu(gl, vertexSource, deg) {
+  const rays = shadowSetups.flatMap(setup =>
+    shadowEdgeRays(setup, deg * Math.PI / 180).map(ray => ({...ray, setup: setup.name})));
+  const test = {glsl: 'vec3 x, u; return vec4(raytrace(in_(0).xyz, in_(1).xyz, x, u) ? 1.0 : 0.0);'};
+  const gpu = await runOnGpu(gl, vertexSource, test, rays.map(r => [r.x0, r.u0]), 1);
+  const failures = rays.filter((ray, i) => (gpu[i][0][0] != 1) != ray.fallsIn).map(r => `${r.setup}: ${r.label}`);
+  return {
+    ok: failures.length == 0,
+    message: `rays ${deg} deg from the analytic edges` + (failures.length ? `; wrong: ${failures.join(', ')}` : ''),
+  };
+}
+
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
@@ -279,6 +370,8 @@ async function main() {
     }
   };
   await run('surface shader', () => checkSurfaceShader(gl, vertexSource));
+  await run('shadow edges (JS)', async () => checkShadowJs());
+  await run('shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
   for (const test of tests) {
     await run(test.name, () => runComparison(gl, vertexSource, test));
   }

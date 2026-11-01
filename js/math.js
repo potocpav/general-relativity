@@ -81,9 +81,3 @@ export function integrate(metric, f, xu, duration, maxStep) {
   }
   return xu;
 }
-
-export function inverse2(m) {
-  const [[a, b], [c, d]] = m;
-  const det = a * d - b * c;
-  return [[d / det, -b / det], [-c / det, a / det]];
-}

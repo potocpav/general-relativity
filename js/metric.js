@@ -1,5 +1,3 @@
-import * as math from './math.js';
-
 // Bodies closer than this (in multiples of rs) are considered lost behind the
 // event horizon. Schwarzschild coordinates are singular at r = rs.
 const horizonMargin = 1.02;
@@ -9,7 +7,8 @@ const horizonMargin = 1.02;
 // Returns null if the velocity is not timelike.
 // (supposing diagonal metric tensor)
 export const velocity3 = (metric, x, u2_cart) => {
-  const [ux, uy] = metric.viewportToWorld(x, u2_cart);
+  const [vr, vphi] = metric.cartesianToLocal(x, u2_cart);
+  const ux = vr, uy = vphi / x[1]; // flat-space polar coordinate velocity
   const gx = metric.g(x);
   const norm = -(gx[0][0] + gx[1][1] * ux*ux + gx[2][2] * uy*uy);
   if (!(norm > 0)) return null;
@@ -69,17 +68,15 @@ export class Schwarzschild {
     ];
   }
 
-  // transformation from 2D screen-space element `x` into 2D world element
-  // (dr, dphi) around a given working point `x0`
-  //
-  // FIXME: figure out whether this function is accurate around black holes.
-  // It may be messing up our raindrop view of BH horizon angle while crossing it,
-  // which should have radius of ~42 degrees.
-  // FIXME: incorporate Lorentz transformation
-  viewportToWorld(x0, x) {
-    const r = x0[1], phi = x0[2];
-    const A = [[Math.cos(phi), -r * Math.sin(phi)], [Math.sin(phi), r * Math.cos(phi)]];
-    return math.matVec(math.inverse2(A), x);
+  // Transformation from a 2D screen-space element `v` into a 2D world element
+  // (dr, dphi) at `x0`. The screen axes are the local orthonormal frame of a
+  // static observer at `x0`, rotated to screen-aligned (cartesian) directions,
+  // so that screen angles and lengths are the ones measured locally.
+  // The observer's own motion is applied afterwards, by a Lorentz boost.
+  viewportToWorld(x0, v) {
+    const [vr, vphi] = this.cartesianToLocal(x0, v);
+    const Tx = this.T(x0);
+    return [vr / Tx[1][1], vphi / Tx[2][2]];
   }
 
   // rotate a screen-space cartesian 2-vector into the local orthonormal

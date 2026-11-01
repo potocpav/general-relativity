@@ -29,6 +29,11 @@ in JS and injected by `js/shaders.js`.
 
 Raytracing along geodesics is done inside the GLSL fragment shader
 (`glsl/physics.glsl` + `glsl/surface-frag.glsl`, assembled by `js/shaders.js`).
+Each pixel traces a light ray backwards from the observer. The screen axes are the observer's
+local orthonormal frame, so angles and short distances around the observer are the ones the
+observer would measure. The black hole therefore appears as a shadow wedge behind it rather than
+a circle, and only the near side of the photon sphere is visible; `test/` checks the shadow edges
+against the analytic critical angles, including relativistic aberration.
 
 Observer and object trajectories are computed in JS.
 
