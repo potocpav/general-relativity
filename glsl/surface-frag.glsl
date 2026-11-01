@@ -1,5 +1,5 @@
-// Raytracing fragment shader. Appended to glsl/physics.glsl by js/shaders.js,
-// which also defines N_SPRITES.
+// Raytracing fragment shader. Appended to glsl/physics.glsl and
+// glsl/objects.glsl by js/shaders.js, which also defines N_SPRITES.
 
 precision mediump sampler3D;
 precision highp sampler2D;
@@ -18,10 +18,6 @@ uniform bool show_redshift; // otherwise, colors and brightness are as emitted
 
 uniform sampler3D sprites;
 
-uniform sampler2D obj_xs;
-uniform sampler2D obj_us;
-uniform sampler2D obj_its;
-uniform int n_objects; // number of valid columns in obj_* textures
 
 layout(std140) uniform objectInfo {
 	vec3 objSize[N_SPRITES];
@@ -154,17 +150,6 @@ vec3 redshift(float l, vec3 sRgb) {
 	return pow(max(shifted, 0.0), vec3(1.0/2.2));
 }
 
-// sample from x point [i,j] where i dimension is linearly interpolated
-vec3 sample_linear(sampler2D x, float i, int j) {
-	int last = textureSize(x, 0).y - 1;
-	int i0 = min(int(i), last);
-	int i1 = min(i0 + 1, last);
-	vec3 p1 = texelFetch(x, ivec2(j, i0), 0).xyz;
-	vec3 p2 = texelFetch(x, ivec2(j, i1), 0).xyz;
-	float a = i - floor(i);
-	return p1 * (1.0 - a) + p2 * a;
-}
-
 // `deltax` is the pixel's offset from the object, as components in the object's frame.
 vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
 	vec2 obj_texcoord2 = rot(orientation) * deltax.yz / objSize[sprite_i].yz;
@@ -222,36 +207,16 @@ void main( void ) {
 
 	// show objects
 	vec4 objects_color = vec4(0.0);
-	int nPoints = textureSize(obj_its, 0).y;
-	float last = float(nPoints - 1);
-	int bisect_iters = int(log2(float(nPoints)) + 7.0);
 	// rays that didn't arrive (the black hole's shadow) show no objects
-	for (int i = 0; i < (reached ? n_objects : 0); i++) { // for each object
+	for (int i = 0; i < (reached ? n_objects : 0); i++) {
+		vec3 obj_x, obj_u, obj_deltax;
+		float obj_tau;
 		mat3 obj_rest; // coordinate components -> object's rest frame components
-		vec3 obj_deltax;
-		// bisect time for the object trajectory
-		float j0 = 0.0, j1 = last;
-		float j;
-		for (int it = 0; it < bisect_iters; it++) {
-			j = (j0 + j1) / 2.0;
-			vec3 obj_x = sample_linear(obj_xs, j, i);
-			vec3 obj_u = sample_linear(obj_us, j, i);
-
-			obj_rest = coord_to_rest(pix_x, obj_u);
-			obj_deltax = obj_rest * cyclic(obj_x - pix_x);
-
-			if (obj_deltax.x > 0.0 || isnan(obj_deltax.x))
-				j1 = j;
-			else
-				j0 = j;
-		}
-		// The pixel's event is before the trajectory starts or after it ends.
-		if (j0 == 0.0 || j1 == last) continue;
-
+		if (!object_event(i, pix_x, obj_x, obj_u, obj_tau, obj_rest, obj_deltax)) continue;
 		vec4 obj_color = render_obj(
-			int(texelFetch(obj_its, ivec2(i, int(j)), 0).x),
+			object_sprite(i),
 			show_redshift ? abs((obj_rest * pix_u).x) / obsv_energy : 1.0,
-			sample_linear(obj_its, j, i).y,
+			obj_tau,
 			obj_deltax,
 			vec2(0.0, 1.0)
 			);

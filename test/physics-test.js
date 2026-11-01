@@ -11,6 +11,8 @@ import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
 import { scenarios } from '../js/scenarios.js';
+import { Objects, integrateToTime } from '../js/objects.js';
+import { asteroidId, photonClockId, objectRadius } from '../js/object-info.js';
 
 const root = '../';
 const nSamples = 64;
@@ -441,6 +443,9 @@ async function runOnGpu(gl, vertexSource, test, samples, nRows) {
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 
+  if (test.setup) test.setup(program);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, inputTex);
   gl.viewport(0, 0, nSamples, nRows);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -719,6 +724,185 @@ function checkScenariosJs() {
   return {ok: failures.length == 0, message: failures.length ? failures.join('; ') : `${scenarios.filter(sc => sc.setup).length} scenarios`};
 }
 
+// --- objects (js/objects.js, glsl/objects.glsl)
+
+// Objects on random bound-ish orbits, spawned in the past and advanced to
+// T = 5 in irregular steps. Returns {objs, spawned: [{x, u}]}.
+function objectsFixture(gl, rand) {
+  const objs = new Objects(gl, metric);
+  const spawned = [];
+  for (let i = 0; i < 3; i++) {
+    const x = [-3 + rand(), (4 + 6 * rand()) * rs, 6 * rand()];
+    const u = localVelocity3(metric, x, [0.2 * rand() - 0.1, 0.25 + 0.1 * rand()]);
+    objs.spawn(i % 2 ? photonClockId : asteroidId, x, u);
+    spawned.push({x, u});
+  }
+  for (let T = 0; T < 5; T += 0.37 + 0.2 * rand()) objs.advance(T);
+  objs.advance(5);
+  return {objs, spawned};
+}
+
+const rowsOf = (objs, o) => {
+  const [first, last] = objs.validRows(o), rows = [];
+  for (let k = first; k <= last; k++) rows.push([k, objs.rowState(o, k)]);
+  return rows;
+};
+
+// History rows are on the time grid; they match integrating the geodesic in
+// proper time from the spawn state (away from the black hole: close to it,
+// a tiny difference in the accumulated proper time means a large difference
+// in state), and integrating to their coordinate times with 100 times finer
+// steps (everywhere); rewinding and replaying gives the same rows; rewinding before
+// the spawn removes the objects; the culling boxes contain all stored positions.
+function checkObjectHistoryJs() {
+  const errors = [];
+  const {objs, spawned} = objectsFixture(null, prng(11));
+  const dt = objs.dt;
+  const finer = Object.create(metric);
+  finer.stepLimit = xu => Math.min(metric.stepLimit(xu), rs / 1500);
+  // relative: close to the singularity, velocities grow large
+  const rel = (a, b) => Math.max(...[0, 1, 2, 3, 4, 5].map(c => Math.abs(a[c] - b[c]) / Math.max(1, Math.abs(b[c]))));
+  let maxError = 0, maxErrorFiner = 0;
+  objs.objects.forEach((o, i) => {
+    let xu = [...spawned[i].x, ...spawned[i].u], tau = 0;
+    let yf = integrateToTime(finer, [...spawned[i].x, ...spawned[i].u, 0], rowsOf(objs, o)[0][0] * dt);
+    for (const [k, y] of rowsOf(objs, o)) {
+      if (y[0] != k * dt) errors.push(`row ${k} at T = ${y[0]}, not ${k * dt}`);
+      xu = math.integrate(metric, math.geo_f(metric), xu, y[6] - tau, 1e-3);
+      tau = y[6];
+      if (y[1] > 2 * rs) maxError = Math.max(maxError, rel(xu, y));
+      yf = integrateToTime(finer, yf, k * dt);
+      maxErrorFiner = Math.max(maxErrorFiner, rel(yf, y));
+    }
+  });
+  if (!(maxError < 1e-6)) errors.push(`rows differ from proper-time integration by ${maxError.toExponential(1)}`);
+  if (!(maxErrorFiner < 5e-4)) errors.push(`rows differ from finer integration by ${maxErrorFiner.toExponential(1)}`);
+
+  const before = objs.objects.map(o => rowsOf(objs, o));
+  objs.advance(2);
+  if (objs.objects.some(o => o.lastRow != Math.ceil(2 / dt))) errors.push('rewinding did not trim');
+  objs.advance(5);
+  const after = objs.objects.map(o => rowsOf(objs, o));
+  if (JSON.stringify(before) != JSON.stringify(after)) errors.push('rewinding and replaying changed the rows');
+
+  for (const o of objs.objects) {
+    const b = objs.bounds(o);
+    for (const [, y] of rowsOf(objs, o)) {
+      const px = y[1] * Math.cos(y[2]), py = y[1] * Math.sin(y[2]), pad = objectRadius(o.type) - 1e-9;
+      if (px < b[0] + pad || py < b[1] + pad || px > b[2] - pad || py > b[3] - pad) {
+        errors.push('a stored position is outside the culling box');
+        break;
+      }
+    }
+  }
+
+  objs.advance(-5);
+  if (objs.objects.length != 0) errors.push('rewinding before the spawn did not remove the objects');
+  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
+    `3 objects, rows match proper-time integration to ${maxError.toExponential(1)}, ` +
+    `finer integration to ${maxErrorFiner.toExponential(1)}`};
+}
+
+// Switching from Schwarzschild to Gullstrand–Painlevé coordinates regenerates
+// the histories: a regenerated row (T, r, phi) is on the old worldline at
+// Schwarzschild time t = T - shift(r).
+function checkObjectCoordinateSwitchJs() {
+  const S = new Schwarzschild(rs), G = new GullstrandPainleve(rs);
+  const saved = metric;
+  metric = S;
+  const {objs} = objectsFixture(null, prng(12));
+  metric = saved;
+  const old = objs.objects.map(o => rowsOf(objs, o)), dt = objs.dt;
+  const shipR = 10 * rs, T = 5 + convertState(S, G, [0, shipR, 0], [1, 0, 0])[0][0];
+  objs.setMetric(G, T);
+  const errors = [];
+  let maxError = 0, maxErrorDead = 0;
+  // cubic Hermite interpolation between rows, with dr/dt = u^r / u^t, dphi/dt = u^phi / u^t
+  const hermite = (y0, y1, a, c) => {
+    const d0 = y0[c + 3] / y0[3] * dt, d1 = y1[c + 3] / y1[3] * dt;
+    return (2 * a ** 3 - 3 * a ** 2 + 1) * y0[c] + (a ** 3 - 2 * a ** 2 + a) * d0 +
+      (-2 * a ** 3 + 3 * a ** 2) * y1[c] + (a ** 3 - a ** 2) * d1;
+  };
+  objs.objects.forEach((o, i) => {
+    if (!o.dead && o.lastRow != Math.ceil(T / dt)) errors.push(`object ${i} not at now`);
+    for (const [, y] of rowsOf(objs, o)) {
+      const [xs] = convertState(G, S, y.slice(0, 3), [1, 0, 0]);
+      const k = xs[0] / dt, k0 = Math.floor(k), a = k - k0;
+      const rows = old[i], j = rows.findIndex(([kk]) => kk == k0);
+      if (j < 0 || j + 1 >= rows.length) continue; // outside the old history
+      const e = Math.max(Math.abs(hermite(rows[j][1], rows[j + 1][1], a, 1) - xs[1]),
+        Math.abs(hermite(rows[j][1], rows[j + 1][1], a, 2) - xs[2]));
+      if (o.dead) maxErrorDead = Math.max(maxErrorDead, e); else maxError = Math.max(maxError, e);
+    }
+  });
+  // Objects lost at the horizon in Schwarzschild coordinates are regenerated
+  // from their last state there, where those coordinates are ill-conditioned,
+  // so their regenerated past is less accurate.
+  if (!(maxError < 1e-6)) errors.push(`regenerated rows off the old worldlines by ${maxError.toExponential(1)}`);
+  if (!(maxErrorDead < 1e-3)) errors.push(`regenerated rows of lost objects off by ${maxErrorDead.toExponential(1)}`);
+  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
+    `regenerated rows on the old worldlines to ${maxError.toExponential(1)} ` +
+    `(objects lost at the horizon: ${maxErrorDead.toExponential(1)})`};
+}
+
+// The shader's object lookup (pixel time -> row, Newton steps to rest-frame
+// simultaneity) finds the same event as an exact bisection in JS, for pixel
+// events near the objects; and nothing for pixels outside an object's box or
+// before its history.
+async function checkObjectLookupGpu(gl, vertexSource) {
+  const rand = prng(13);
+  const {objs} = objectsFixture(gl, rand);
+  const dt = objs.dt;
+  const sample = (o, k) => {
+    const k0 = Math.floor(k), a = k - k0, y0 = objs.rowState(o, k0), y1 = objs.rowState(o, k0 + 1);
+    const y = y0.map((v, c) => (1 - a) * v + a * y1[c]);
+    return {x: [k * dt, y[1], y[2]], u: y.slice(3, 6), tau: y[6]};
+  };
+  const offset = (pix, s) => {
+    const d = math.sub(s.x, pix);
+    d[2] = ((d[2] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    return math.matVec(math.coordToRest(metric, pix, s.u), d);
+  };
+  const cases = [];
+  for (let n = 0; n < nSamples - 2; n++) {
+    const i = n % objs.objects.length, o = objs.objects[i];
+    const [first, last] = objs.validRows(o);
+    const s = sample(o, first + 5 + rand() * (last - first - 10));
+    // a pixel event close to the object, displaced in its rest frame
+    const pix = math.sub(s.x, math.matVec(math.restToCoord(metric, s.x, s.u), [0.05 * rand(), 0.2 * rand() - 0.1, 0.2 * rand() - 0.1]));
+    // exact: bisection on the row for rest-frame simultaneity
+    let lo = first, hi = last;
+    for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; offset(pix, sample(o, mid))[0] > 0 ? hi = mid : lo = mid; }
+    const e = sample(o, lo);
+    cases.push({input: [pix, [o.slot]], found: true, x: e.x, d: offset(pix, e), tau: e.tau});
+  }
+  const o = objs.objects[0];
+  const s = sample(o, objs.validRows(o)[0] + 3);
+  cases.push({input: [[s.x[0], s.x[1] + 5, s.x[2]], [o.slot]], found: false}); // far away
+  cases.push({input: [[objs.validRows(o)[0] * dt - 10, s.x[1], s.x[2]], [o.slot]], found: false}); // before its history
+
+  const test = {
+    glsl: `
+      vec3 x, u, d; float tau; mat3 R;
+      bool found = object_event(int(in_(1).x), in_(0).xyz, x, u, tau, R, d);
+      return row == 0 ? vec4(x, found ? 1.0 : 0.0) : vec4(d, tau);`,
+    setup: program => { objs.compile(program); objs.render(); },
+  };
+  const gpu = await runOnGpu(gl, vertexSource, test, cases.map(c => c.input), 2);
+  const errors = [];
+  let maxError = 0;
+  cases.forEach((c, n) => {
+    const [x0, x1, x2, found] = gpu[n][0], [d0, d1, d2, tau] = gpu[n][1];
+    if ((found == 1) != c.found) { errors.push(`case ${n}: found ${found == 1}, expected ${c.found}`); return; }
+    if (!c.found) return;
+    maxError = Math.max(maxError, Math.abs(x0 - c.x[0]), Math.abs(x1 - c.x[1]), Math.abs(x2 - c.x[2]),
+      Math.abs(d1 - c.d[1]), Math.abs(d2 - c.d[2]), Math.abs(tau - c.tau));
+  });
+  if (!(maxError < 2e-4)) errors.push(`GPU event differs from the exact one by ${maxError.toExponential(1)}`);
+  return {ok: errors.length == 0, message: errors.length ? errors.slice(0, 5).join('; ') :
+    `${cases.length} pixel events; max difference ${maxError.toExponential(1)}`};
+}
+
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
@@ -754,6 +938,7 @@ async function main() {
   };
   await run('coordinate transformation (JS)', async () => checkCoordinateTransformJs());
   await run('scenarios (JS)', async () => checkScenariosJs());
+  await run('object histories across a coordinate switch (JS)', async () => checkObjectCoordinateSwitchJs());
   for (const type of metricTypes) {
     metric = new type(rs);
     random = prng(42);
@@ -762,6 +947,8 @@ async function main() {
     await run(prefix + 'frames (JS)', async () => checkFramesJs());
     await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
     await run(prefix + 'gyroscope (JS)', async () => checkGyroscopeJs());
+    await run(prefix + 'object history (JS)', async () => checkObjectHistoryJs());
+    await run(prefix + 'object lookup (GPU)', () => checkObjectLookupGpu(gl, vertexSource));
     await run(prefix + 'ray tracer vs geodesic equation (JS)', async () => checkTraceRayJs());
     if (type == GullstrandPainleve) await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());
     await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());

@@ -35,6 +35,10 @@ const objTexMax = new Float32Array([
 
 const uniformBlockBinding = 0;
 
+// Half of the diagonal of a sprite's spatial extent: the farthest it reaches
+// from the object's position.
+export const objectRadius = type => 0.5 * Math.hypot(objSize[type * 4 + 1], objSize[type * 4 + 2]);
+
 // Number of sprites; passed to the shader as N_SPRITES.
 export const nSprites = objSize.length / 4;
 console.assert(objTexMin.length == nSprites * 4 && objTexMax.length == nSprites * 4);

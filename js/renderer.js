@@ -5,7 +5,7 @@ var EXT_color_buffer_float;
 
 var world;
 var objectInfo;
-var trajectories;
+var objects;
 
 var surfaceProgram, screenProgram;
 var surfaceVert, surfaceFragMain;
@@ -26,11 +26,11 @@ export function initGl(canvas) {
   return gl;
 }
 
-export async function init(gl_, world_, objectInfo_, trajectories_, metric) {
+export async function init(gl_, world_, objectInfo_, objects_, metric) {
   gl = gl_;
   world = world_;
   objectInfo = objectInfo_;
-  trajectories = trajectories_;
+  objects = objects_;
 
   const surfaceCorners = new Float32Array([
     -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
@@ -59,7 +59,7 @@ export async function setMetric(metric) {
   const program = compileProgram(surfaceVert, await physicsFragmentShader(surfaceFragMain, metric));
   cacheUniformLocation(program, 'resolution');
   world.compile(program);
-  trajectories.compile(program);
+  objects.compile(program);
   objectInfo.compile(program);
   if (surfaceProgram) gl.deleteProgram(surfaceProgram);
   surfaceProgram = program;
@@ -167,7 +167,7 @@ export function render() {
   gl.vertexAttribPointer(surfaceProgram.vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
   world.render();
-  trajectories.render();
+  objects.render();
   objectInfo.render();
 
   // Render custom shader to target buffer (covers the whole target, no clear needed)

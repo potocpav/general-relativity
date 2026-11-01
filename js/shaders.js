@@ -32,9 +32,10 @@ export function assembleShader(defines, parts) {
   return [header.join('\n'), ...parts.map((part, i) => `#line 1 ${i + 1}\n${part}`)].join('\n');
 }
 
-// Fragment shader made of glsl/physics.glsl for `metric`, followed by `mainSource`.
-// `root` is the URL of the repository root, relative to the page.
+// Fragment shader made of glsl/physics.glsl for `metric` and glsl/objects.glsl,
+// followed by `mainSource`. `root` is the URL of the repository root,
+// relative to the page.
 export async function physicsFragmentShader(mainSource, metric, root = '') {
-  const physics = await fetchText(root + 'glsl/physics.glsl');
-  return assembleShader(shaderDefines(metric), [physics, mainSource]);
+  const [physics, objects] = await Promise.all(['glsl/physics.glsl', 'glsl/objects.glsl'].map(f => fetchText(root + f)));
+  return assembleShader(shaderDefines(metric), [physics, objects, mainSource]);
 }

@@ -7,8 +7,7 @@ import * as renderer from './renderer.js';
 import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
-import { Trajectories } from './trajectories.js';
-import { Trajectory } from './trajectory.js';
+import { Objects } from './objects.js';
 import { scenarios, defaultRs } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
 
@@ -40,7 +39,7 @@ var overlay;
 var gl;
 var world;
 var objectInfo;
-var trajectories;
+var objects;
 
 var params = {
   mousePos: null, // [x, y] in CSS pixels, y pointing up; null until the pointer moves
@@ -71,7 +70,7 @@ function spawn(objectName, screenPos, velocity) {
   if (!x) return;
   const u = localVelocity3(metric, x, velocity);
   if (!u) return;
-  trajectories.add(new Trajectory(metric, objectIds[objectName], x, u));
+  objects.spawn(objectIds[objectName], x, u);
 }
 
 const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
@@ -132,6 +131,7 @@ class App extends Component {
     requestAnimationFrame(this.animate);
     world.timeScale = timeScaleOf(this.state);
     world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim, shipControls());
+    objects.advance(world.obsvX[0]);
     renderer.render();
     this.renderOverlay();
 
@@ -311,9 +311,9 @@ class App extends Component {
     const state = scenario.setup(metric);
     world.viewportSize = state.viewportSize;
     world.reset(state.ship.x, state.ship.u, state.ship.heading);
-    trajectories.clear();
+    objects.reset(metric, world.obsvX[0]);
     for (const o of state.objects) {
-      trajectories.add(new Trajectory(metric, o.type, o.x, o.u));
+      objects.spawn(o.type, o.x, o.u);
     }
     this.setState({
       scenario: scenario.id,
@@ -363,7 +363,7 @@ class App extends Component {
       return;
     }
     world.setMetric(next);
-    trajectories.setMetric(next);
+    objects.setMetric(next, world.obsvX[0]);
     metric = next;
     this.setState({metric: type.id, message: null, crashed: world.crashed});
   }
@@ -502,9 +502,9 @@ async function startup() {
   objectInfo = new ObjectInfo(gl);
   await objectInfo.initialize();
 
-  trajectories = new Trajectories(gl);
+  objects = new Objects(gl, metric);
 
-  await renderer.init(gl, world, objectInfo, trajectories, metric);
+  await renderer.init(gl, world, objectInfo, objects, metric);
 
   refreshWindow();
   window.addEventListener('resize', refreshWindow, false);
