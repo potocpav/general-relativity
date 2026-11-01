@@ -9,7 +9,7 @@ import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
 import { Trajectories } from './trajectories.js';
 import { Trajectory } from './trajectory.js';
-import { scenarios } from './scenarios.js';
+import { scenarios, defaultRs } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes, Schwarzschild } from './metric.js';
 
 const html = htm.bind(h);
@@ -23,8 +23,8 @@ var quality = quality_levels.reduce((best, q) =>
 
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
-const rs = 0.3;
-var metric = new Schwarzschild(rs); // switchable, see selectMetric
+// switchable, see selectMetric; its black hole size is set by scenarios
+var metric = new Schwarzschild(defaultRs);
 
 const objectIds = {
   'asteroid': asteroidId,
@@ -296,9 +296,11 @@ class App extends Component {
   // Reset the world to the initial state of `scenario`, in its coordinates.
   async loadScenario(scenario) {
     const type = scenario.metric ?? metric.constructor;
-    if (type !== metric.constructor) {
+    const rs = scenario.rs ?? defaultRs;
+    if (type !== metric.constructor || rs !== metric.rs) {
       const next = new type(rs);
-      await renderer.setMetric(next); // compile first, then switch everything at once
+      // compile first (if the coordinates change), then switch everything at once
+      if (type !== metric.constructor) await renderer.setMetric(next);
       metric = next;
       world.metric = next;
     }
@@ -341,7 +343,7 @@ class App extends Component {
   selectMetric = async ev => {
     const select = ev.target;
     const type = metricTypes[select.selectedIndex];
-    const next = new type(rs);
+    const next = new type(metric.rs);
     if (convertState(metric, next, world.obsvX, world.obsvU) === null) {
       select.selectedIndex = metricTypes.indexOf(metric.constructor);
       this.setState({message: `${type.label} coordinates can't describe the inside of the black hole.`});

@@ -618,7 +618,7 @@ function checkScenariosJs() {
     return {fell: false, rMin, rMax, periapsisPhis, xu};
   };
   for (const sc of scenarios.filter(sc => sc.setup)) {
-    const m = new (sc.metric ?? Schwarzschild)(rs);
+    const m = new (sc.metric ?? Schwarzschild)(sc.rs ?? rs);
     const st = sc.setup(m);
     for (const body of [st.ship, ...st.objects]) {
       const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
@@ -654,10 +654,17 @@ function checkScenariosJs() {
       check(!o.fell && o.rMin < 2.15 * rs && o.rMax > 30 * rs, `zoom-whirl: r between ${(o.rMin / rs).toFixed(2)} and ${(o.rMax / rs).toFixed(1)} rs`);
     }
     if (sc.id == 'fall-in') {
-      // in Gullstrand–Painlevé coordinates, bodies can only be lost at the singularity;
-      // from rest at r0 it is reached at tau = pi/2 sqrt(r0^3 / rs) (14.9 here)
-      check(m instanceof GullstrandPainleve && follow(m, ship.x, ship.u, 15.5).fell && !follow(m, ship.x, ship.u, 14.5).fell,
-        'fall-in: did not reach the singularity at tau = 14.9');
+      // Free fall from infinity: tau(r) = (2/3) (r0^1.5 - r^1.5) / sqrt(rs), so
+      // 9.14 s from 2 rs to the horizon, then 5 s to the singularity (4.94 s to
+      // where bodies are followed until, in Gullstrand–Painlevé coordinates).
+      const R = m.rs, tau = r => 2 / 3 * (Math.pow(2 * R, 1.5) - Math.pow(r, 1.5)) / Math.sqrt(R);
+      const horizon = follow(m, ship.x, ship.u, tau(R) - 0.05).xu[1] / R;
+      const end = tau(singularityRadius * R);
+      check(m instanceof GullstrandPainleve && Math.abs(tau(R) - 9.14) < 0.01 && Math.abs(end - tau(R) - 4.94) < 0.01,
+        `fall-in: ${tau(R).toFixed(2)} s to the horizon, ${(end - tau(R)).toFixed(2)} s inside`);
+      check(horizon > 1 && horizon < 1.01, `fall-in: at ${(horizon).toFixed(3)} rs just before the horizon`);
+      check(follow(m, ship.x, ship.u, end + 0.1).fell && !follow(m, ship.x, ship.u, end - 0.1).fell,
+        'fall-in: not ended at the singularity radius in time');
     }
     if (sc.id == 'no-return') {
       // full thrust outwards (heading 0 at phi 0 is r-hat) from the start, and from below the limit

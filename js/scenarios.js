@@ -1,6 +1,9 @@
 // Scenarios: preset initial states showing interesting features of general
 // relativity and the Schwarzschild black hole.
 //
+// The black hole's Schwarzschild radius, unless a scenario sets its own `rs`.
+export const defaultRs = 0.3;
+
 // Each scenario has a `setup(metric)` returning the initial state in the
 // coordinates of `metric` (an instance of the scenario's `metric` class, or of
 // the current one if that is null):
@@ -52,6 +55,13 @@ function circularOrbit(metric, r, phi, factor = 1) {
 const atRest = (metric, r, phi) => {
   const x = [0, r, phi];
   return [x, localVelocity3(metric, x, [0, 0])];
+};
+
+// falling radially inwards, with the speed of a body that fell from rest at
+// infinity (a "raindrop"): sqrt(rs/r) relative to a static observer
+const raindrop = (metric, r, phi) => {
+  const x = [0, r, phi], v = Math.sqrt(metric.rs / r);
+  return [x, localVelocity3(metric, x, [-v * Math.cos(phi), -v * Math.sin(phi)])];
 };
 
 // convert a Schwarzschild-coordinates state to `metric`'s coordinates
@@ -148,17 +158,21 @@ export const scenarios = [
   {
     id: 'fall-in',
     name: 'Falling into the black hole',
-    description: 'Dropped from rest at 10 rs, the ship falls through the event horizon ' +
-      '(nothing special happens there locally) and reaches the singularity in finite time. ' +
-      'At the horizon, the black hole covers 42° around the inward direction. ' +
-      'Slow down time with the slider to watch the crossing.',
+    description: 'A black hole 25 times heavier than in the other scenarios. Falling in ' +
+      'from far away, the ship passes 2 rs at 71% of the speed of light, crosses the event ' +
+      'horizon 9 s later (nothing special happens there locally), and spends 5 s inside ' +
+      'before reaching the singularity. At the horizon, the black hole covers 42° around ' +
+      'the inward direction.',
     metric: GullstrandPainleve,
+    // Free fall from infinity takes (2/3) rs of proper time from the horizon
+    // to the singularity: 5 s at this size.
+    rs: 7.5,
     setup: metric => {
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 12,
-        ship: ship(atRest(metric, 10 * rs, 0), Math.PI),
+        viewportSize: 8 * rs,
+        ship: ship(raindrop(metric, 2 * rs, 0), Math.PI),
         objects: [],
       };
     },
