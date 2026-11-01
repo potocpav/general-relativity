@@ -47,6 +47,15 @@ var params = {
   screenDim: [window.innerWidth, window.innerHeight],
 };
 
+// Pointers (fingers, mouse) currently pressed on the view, id -> [x, y], and
+// the distance between the first two while pinching (null otherwise).
+const touches = new Map();
+var pinchDistance = null;
+const fingerDistance = () => {
+  const [a, b] = [...touches.values()];
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
+};
+
 // arrow keys currently held down
 const arrowKeys = new Set();
 const shipControls = () => ({
@@ -175,6 +184,16 @@ class App extends Component {
   }
 
   onPointerMove = ev => {
+    if (touches.has(ev.pointerId)) touches.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    if (pinchDistance !== null) {
+      // pinch-to-zoom: zoom by the change of the distance between two fingers
+      if (touches.size >= 2) {
+        const d = fingerDistance();
+        if (d > 0) world.viewportSize *= pinchDistance / d;
+        pinchDistance = d;
+      }
+      return;
+    }
     params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
     if (this.state.tool == 'spawn' && this.state.spawnDragOrigin) {
       this.setState({spawnVelocity: spawnVelocityFromDrag(this.state.spawnDragOrigin, params.mousePos)});
@@ -183,9 +202,17 @@ class App extends Component {
 
   onPointerDown = ev => {
     if (ev.target.tagName != "DIV") return;
-    params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
     // keep receiving events when the pointer leaves the window
     ev.currentTarget.setPointerCapture(ev.pointerId);
+    touches.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    if (touches.size >= 2) {
+      // a second finger: pinch-to-zoom instead of boosting or spawning
+      this.cancelPointer();
+      pinchDistance = fingerDistance();
+    }
+    // until all fingers have been lifted after a pinch, don't start anything
+    if (pinchDistance !== null) return;
+    params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
 
     if (this.state.tool == 'boost') {
       params.pointerDn = true;
@@ -197,11 +224,22 @@ class App extends Component {
     }
   }
 
-  onPointerUp = _ => {
+  onPointerUp = ev => {
+    touches.delete(ev.pointerId);
+    if (pinchDistance !== null) {
+      if (touches.size == 0) pinchDistance = null;
+      return;
+    }
     const {tool, spawnDragOrigin, spawnVelocity, spawnObject} = this.state;
     if (tool == 'spawn' && spawnDragOrigin) {
       spawn(spawnObject, spawnDragOrigin, spawnVelocity);
     }
+    this.cancelPointer();
+  }
+
+  onPointerCancel = ev => {
+    touches.delete(ev.pointerId);
+    if (touches.size == 0) pinchDistance = null;
     this.cancelPointer();
   }
 
@@ -398,7 +436,7 @@ class App extends Component {
       onPointerMove=${this.onPointerMove}
       onPointerDown=${this.onPointerDown}
       onPointerUp=${this.onPointerUp}
-      onPointerCancel=${this.cancelPointer}
+      onPointerCancel=${this.onPointerCancel}
       onWheel=${this.onWheel}>
       <div id="top_right">
         <div>

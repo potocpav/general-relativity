@@ -81,6 +81,8 @@ button.description {
 }
 
 #ui {
+  /* gestures on the view (pinch-to-zoom, dragging) are handled by the app */
+  touch-action: none;
   position: absolute;
   top: 0;
   padding: 10px;
