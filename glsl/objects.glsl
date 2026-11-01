@@ -8,6 +8,10 @@ uniform highp sampler2D obj_info; // row 0: (first row, last row, sprite, used);
 uniform int n_objects;            // objects are in columns below this
 uniform float history_dt;
 
+// largest remaining time offset (in the object's rest frame) of an accepted
+// lookup; also bounds the error in the object's position
+#define OBJECT_TIME_TOLERANCE 0.02
+
 // An object's state at fractional row k, interpolating linearly between rows.
 // `angle` is the orientation of the object's (parallel-transported) axis in
 // its rest frame, from r-hat towards phi-hat.
@@ -56,6 +60,9 @@ bool object_event(int i, vec3 pix_x, out vec3 obj_x, out vec3 obj_u, out float o
 		obj_deltax = obj_rest * cyclic(obj_x - pix_x);
 		k = kc - obj_deltax.x * obj_u.x / history_dt;
 	}
-	// the simultaneous event must be within the stored history
-	return k >= info.x - 0.01 && k <= info.y + 0.01 && !isnan(obj_deltax.x);
+	// The simultaneous event must be within the stored history, and the Newton
+	// steps must have converged: where they don't (objects falling towards the
+	// horizon, mostly in Schwarzschild coordinates), the last sample may be far
+	// from simultaneous yet have a small spatial offset, drawing a ghost copy.
+	return k >= info.x - 0.01 && k <= info.y + 0.01 && abs(obj_deltax.x) < OBJECT_TIME_TOLERANCE;
 }

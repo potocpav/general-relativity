@@ -927,6 +927,87 @@ async function checkObjectLookupGpu(gl, vertexSource) {
     `${cases.length} pixel events; max difference ${maxError.toExponential(1)}`};
 }
 
+// No ghost copies of objects falling into the black hole: every event the
+// GPU lookup accepts (inside the sprite) must also be inside the sprite for
+// one of the exact solutions. (Close to the singularity, the object's
+// velocity changes so fast that the simultaneity condition can have more
+// than one root.) Events where the lookup doesn't find the object although
+// an exact solution does (holes) are allowed. For comparison, the message
+// reports how many ghosts accepting unconverged lookups (the previous
+// behavior) would draw.
+async function checkObjectNoGhostsGpu(gl, vertexSource) {
+  const rand = prng(14);
+  const objs = new Objects(gl, metric);
+  const xc = [-3, 5 * rs, 0.35];
+  objs.spawn(photonClockId, xc, localVelocity3(metric, xc, [0, 0]));
+  objs.advance(5);
+  const o = objs.objects[0], [first, last] = objs.validRows(o), dt = objs.dt;
+  const half = 64 / 38 / 2 / 2;
+  const sample = k => {
+    const k0 = Math.floor(k), a = k - k0, y0 = objs.rowState(o, k0), y1 = objs.rowState(o, k0 + 1);
+    const y = y0.map((v, c) => (1 - a) * v + a * y1[c]);
+    return {x: [k * dt, y[1], y[2]], u: y.slice(3, 6)};
+  };
+  const offset = (pix, s) => {
+    const d = math.sub(s.x, pix);
+    d[2] = ((d[2] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    return math.matVec(math.coordToRest(metric, pix, s.u), d);
+  };
+  const inside = d => d !== null && Math.max(Math.abs(d[1]), Math.abs(d[2])) < half;
+  // inside the sprite at any root of the simultaneity condition: scan the
+  // history finely, refine sign changes by bisection, and also take
+  // near-touching minima within the shader's tolerance (0.02)
+  const exactInside = pix => {
+    const f = k => offset(pix, sample(k))[0], step = 0.05;
+    let kPrev = first, fPrev = f(first);
+    for (let k = first + step; k <= last + 1e-9; k += step) {
+      const fk = f(k);
+      if (Math.sign(fk) != Math.sign(fPrev)) {
+        let lo = kPrev, hi = k;
+        for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; Math.sign(f(mid)) == Math.sign(fPrev) ? lo = mid : hi = mid; }
+        if (inside(offset(pix, sample(lo)))) return true;
+      } else if (Math.abs(fk) < 0.02 && inside(offset(pix, sample(k)))) {
+        return true;
+      }
+      kPrev = k; fPrev = fk;
+    }
+    return false;
+  };
+  // the lookup without the convergence check, in JS
+  const unchecked = pix => {
+    let k = pix[0] / dt, d;
+    if (k < first - 64 || k > last + 64) return null;
+    for (let n = 0; n < 3; n++) { const kc = Math.min(Math.max(k, first), last), s = sample(kc); d = offset(pix, s); k = kc - d[0] * s.u[0] / dt; }
+    return (k >= first - 0.01 && k <= last + 0.01) ? d : null;
+  };
+  const test = {
+    glsl: `
+      vec3 x, u, d; float tau, angle; mat3 R;
+      bool found = object_event(int(in_(1).x), in_(0).xyz, x, u, tau, angle, R, d);
+      return vec4(d, found ? 1.0 : 0.0);`,
+    setup: program => { objs.compile(program); objs.render(); },
+  };
+  let events = 0, ghosts = 0, oldGhosts = 0, drawn = 0;
+  for (let batch = 0; batch < 8; batch++) {
+    // events around the clock's path, while it approaches the horizon
+    const pixes = [...Array(nSamples)].map(() => [-1 + 4 * rand(), (1.05 + 6 * rand()) * rs, 0.7 * rand()]);
+    const gpu = await runOnGpu(gl, vertexSource, test, pixes.map(p => [p, [o.slot]]), 1);
+    pixes.forEach((pix, i) => {
+      const [d0, d1, d2, found] = gpu[i][0];
+      const gpuInside = found == 1 && Math.max(Math.abs(d1), Math.abs(d2)) < half;
+      const exact = exactInside(pix);
+      events++;
+      if (gpuInside) drawn++;
+      if (gpuInside && !exact) ghosts++;
+      if (inside(unchecked(pix)) && !exact) oldGhosts++;
+    });
+  }
+  return {
+    ok: ghosts == 0,
+    message: `${events} events, ${drawn} drawn, ${ghosts} ghosts (${oldGhosts} without the convergence check)`,
+  };
+}
+
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
   const program = compileProgram(gl, vertexSource,
@@ -974,6 +1055,7 @@ async function main() {
     await run(prefix + 'object history (JS)', async () => checkObjectHistoryJs());
     await run(prefix + 'object orientation (JS)', async () => checkObjectOrientationJs());
     await run(prefix + 'object lookup (GPU)', () => checkObjectLookupGpu(gl, vertexSource));
+    await run(prefix + 'no ghosts of infalling objects (GPU)', () => checkObjectNoGhostsGpu(gl, vertexSource));
     await run(prefix + 'ray tracer vs geodesic equation (JS)', async () => checkTraceRayJs());
     if (type == GullstrandPainleve) await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());
     await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());
