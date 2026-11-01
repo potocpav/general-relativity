@@ -100,5 +100,6 @@ button.description {
 }
 
 #time_slider {
+  width: 16em;
   vertical-align: text-bottom;
 }

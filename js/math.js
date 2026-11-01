@@ -65,17 +65,18 @@ export const rk4 = (f, y, h) => {
 }
 
 // Integrate the geodesic ODE `f` (see geo_f) over the parameter interval
-// `duration` with RK4 steps of at most `maxStep`. Steps are shortened where
-// the body approaches a place it can't be followed (metric.stepLimit), so
-// that a long step doesn't jump across it. Returns null if the body gets
-// there (metric.canFollow).
+// `duration` (backwards if negative) with RK4 steps of at most `maxStep`.
+// Steps are shortened where the body approaches a place it can't be followed
+// (metric.stepLimit), so that a long step doesn't jump across it. Returns null
+// if the body gets there (metric.canFollow).
 export function integrate(metric, f, xu, duration, maxStep) {
   const maxIters = 100000;
+  const sign = Math.sign(duration), total = Math.abs(duration);
   var done = 0;
-  for (var i = 0; duration - done > 1e-12; i++) {
+  for (var i = 0; total - done > 1e-12; i++) {
     if (i >= maxIters) return null;
-    const h = Math.min(maxStep, metric.stepLimit(xu), duration - done);
-    const next = rk4(f, xu, h);
+    const h = Math.min(maxStep, metric.stepLimit(xu), total - done);
+    const next = rk4(f, xu, sign * h);
     if (!metric.canFollow(next)) return null;
     xu = next;
     done += h;

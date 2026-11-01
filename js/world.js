@@ -79,7 +79,9 @@ export class World {
     this.dt = realTimeDt * this.timeScale;
 
     this.obsvSprite = 0;
-    if (this.crashed) return;
+    // after a crash, running backwards in time can bring the ship back
+    if (this.crashed && !(this.dt < 0)) return;
+    this.crashed = false;
 
     // steering
     this.heading += keys.turn * turnRate * realTimeDt;

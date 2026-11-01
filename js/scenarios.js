@@ -8,7 +8,7 @@ export const defaultRs = 0.3;
 // coordinates of `metric` (an instance of the scenario's `metric` class, or of
 // the current one if that is null):
 //   {ship: {x, u, heading}, objects: [{type, x, u}], viewportSize,
-//    timeSlider (log10 of the time scale), paused}
+//    timeScale (negative runs backwards), paused}
 // Scenarios without `setup` are placeholders, shown disabled.
 
 import * as math from './math.js';
@@ -77,7 +77,7 @@ function backwards(metric, [x, u], tau) {
 const ship = ([x, u], heading = Math.PI / 2) => ({x, u, heading});
 const object = (type, [x, u]) => ({type, x, u});
 
-const defaults = {viewportSize: 20, timeSlider: 0, paused: false};
+const defaults = {viewportSize: 20, timeScale: 1, paused: false};
 
 // --- scenarios
 
@@ -112,7 +112,7 @@ export const scenarios = [
       const {E, L} = orbitConstants(rs, 8 * rs, ra);
       return {
         ...defaults,
-        viewportSize: 30, timeSlider: 1,
+        viewportSize: 30, timeScale: 10,
         ship: ship(fromSchwarzschild(metric, orbitState(rs, ra, 0, E, L))),
         objects: [],
       };
@@ -149,7 +149,7 @@ export const scenarios = [
       const E = Math.sqrt(potential(rs, ru, L) * (1 - 1e-4));
       return {
         ...defaults,
-        viewportSize: 12, timeSlider: 0.3,
+        viewportSize: 12, timeScale: 2,
         ship: ship(fromSchwarzschild(metric, orbitState(rs, 10 * rs, 0, E, L))),
         objects: [],
       };
@@ -193,7 +193,7 @@ export const scenarios = [
       const [x, u] = atRest(metric, 6 * rs, 0.6);
       return {
         ...defaults,
-        viewportSize: 22, timeSlider: Math.log10(0.25),
+        viewportSize: 22, timeScale: 0.25,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
         objects: [object(asteroidId, [[x[0] - 9.5, x[1], x[2]], u])],
       };

@@ -76,7 +76,11 @@ function spawn(objectName, screenPos, velocity) {
 
 const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
 
-const timeScaleOf = state => state.pause ? 0 : Math.pow(10, state.timeSlider);
+// The time slider runs from -3 to 3, with ticks at time scales -10, -1, -0.1,
+// 0, 0.1, 1 and 10: linear between -0.1 and 0.1, exponential outside.
+const sliderToTimeScale = s => Math.abs(s) <= 1 ? 0.1 * s : Math.sign(s) * Math.pow(10, Math.abs(s) - 2);
+const timeScaleToSlider = scale => Math.abs(scale) <= 0.1 ? 10 * scale : Math.sign(scale) * (Math.log10(Math.abs(scale)) + 2);
+const timeScaleOf = state => state.pause ? 0 : sliderToTimeScale(state.timeSlider);
 
 class App extends Component {
   state = {
@@ -84,7 +88,7 @@ class App extends Component {
     spawnObject: 'asteroid',
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
-    timeSlider: 0,
+    timeSlider: timeScaleToSlider(1),
     pause: false,
     scenario: scenarios[0].id,
     showDescription: true,
@@ -270,7 +274,7 @@ class App extends Component {
   }
 
   onResetTimeSlider = _ => {
-    this.setState({timeSlider: 0, pause: false});
+    this.setState({timeSlider: timeScaleToSlider(1), pause: false});
   }
 
   onTimeSlider = ev => {
@@ -314,7 +318,7 @@ class App extends Component {
     this.setState({
       scenario: scenario.id,
       metric: metric.constructor.id,
-      timeSlider: state.timeSlider,
+      timeSlider: timeScaleToSlider(state.timeScale),
       pause: state.paused,
       showDescription: true,
       crashed: false,
@@ -478,13 +482,10 @@ class App extends Component {
         </div>
         <div>
           <button onClick=${this.onPlayPause} style="width: 4em; height: 3em;">${this.state.pause ? '▶' : '⏸'}</button>
-          <input type="range" min="-2" max="2" value="${this.state.timeSlider}" id="time_slider" step="0.1" list="values" onInput=${this.onTimeSlider} />
+          <input type="range" min="-3" max="3" value="${this.state.timeSlider}" id="time_slider" step="0.05" list="values" onInput=${this.onTimeSlider}
+            title="Time scale: backwards (left) or forwards (right), ticks at ±10, ±1, ±0.1 and 0" />
           <datalist id="values">
-            <option value="-2" label="-2"></option>
-            <option value="-1" label="-1"></option>
-            <option value="0" label="0"></option>
-            <option value="1" label="1"></option>
-            <option value="2" label="2"></option>
+            ${[-3, -2, -1, 0, 1, 2, 3].map(s => html`<option value=${s} label=${sliderToTimeScale(s) + "x"}></option>`)}
           </datalist>
         </div>
       </div>
