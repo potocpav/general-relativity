@@ -631,9 +631,9 @@ function checkScenariosJs() {
       check(!o.fell && Math.abs(advance - 60) < 2, `precession: ${advance.toFixed(1)} deg per orbit`);
     }
     if (sc.id == 'isco') {
-      // stays on the orbit; a 0.1 tau burn against the motion (the initial
-      // heading, -phi-hat) sends it in within half an orbit (4.9 tau), the
-      // same burn forwards doesn't
+      // stays on the orbit; a 0.1 tau burn against the motion (-phi-hat)
+      // sends it in within half an orbit (4.9 tau), the same burn forwards
+      // (the initial heading) doesn't
       const burn = (accel, tau) => {
         let xu = [...ship.x, ...ship.u];
         for (let t = 0; t < tau; t += 0.05) {
@@ -647,7 +647,7 @@ function checkScenariosJs() {
         `isco: without thrust r between ${(free.rMin / rs).toFixed(4)} and ${(free.rMax / rs).toFixed(4)} rs`);
       check(burn([0, 0, -0.5], 4.9) === null, 'isco: a burn against the motion did not send it in');
       check(burn([0, 0, 0.5], 30) !== null, 'isco: a burn forwards sent it in');
-      check(Math.abs(ship.heading + Math.PI / 2) < 1e-12, 'isco: the ship does not point against the motion');
+      check(Math.abs(ship.heading - Math.PI / 2) < 1e-12, 'isco: the ship does not point in the direction of motion');
     }
     if (sc.id == 'zoom-whirl') {
       const o = follow(m, ship.x, ship.u, 300);

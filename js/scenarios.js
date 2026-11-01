@@ -112,18 +112,17 @@ export const scenarios = [
     id: 'isco',
     name: 'Innermost stable circular orbit',
     description: 'The ship is on the innermost stable circular orbit, at 3 rs; below it, ' +
-      'circular orbits are unstable. It stays there, but it is on the edge. Press Space to ' +
-      'start, and right away tap ↑: the ship points against its motion, and the short burn ' +
-      'sends it spiralling into the black hole within half an orbit. (Turned around, the ' +
-      'same burn lifts it into an eccentric orbit.) Newtonian gravity has no such limit.',
+      'circular orbits are unstable. The orbit is on the edge: a small slowdown sends the ' +
+      'ship spiralling into the black hole within half an orbit, while a small speed-up lifts ' +
+      'it into an eccentric orbit. Newtonian gravity has no such limit.',
     metric: Schwarzschild,
     setup: metric => {
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 10, timeSlider: -0.5, paused: true,
-        // moving towards +phi (up on the screen), pointing against the motion
-        ship: ship(circularOrbit(metric, 3 * rs, 0), -Math.PI / 2),
+        viewportSize: 10,
+        // moving towards +phi, up on the screen, and pointing that way
+        ship: ship(circularOrbit(metric, 3 * rs, 0), Math.PI / 2),
         objects: [],
       };
     },
