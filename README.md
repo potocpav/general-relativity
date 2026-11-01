@@ -41,10 +41,15 @@ The simulation runs in one of two coordinate systems for the same Schwarzschild 
 selectable in the top right (`js/metric.js`, `METRIC` in `glsl/physics.glsl`):
 
 - **Schwarzschild** (default): the textbook coordinates. They are singular at the event horizon,
-  so the ship and objects stop there. The grid is carried by static observers.
+  so the ship and objects stop there. The grid's redshift is computed for light emitted by static
+  observers.
 - **Gullstrand–Painlevé**: regular across the horizon, so the ship and objects can fall in and are
-  followed until close to the singularity, and the view from inside is rendered. The grid is
-  carried by "raindrop" observers, falling freely from rest at infinity, so its colors differ.
+  followed until close to the singularity, and the view from inside is rendered. The grid's
+  redshift is computed for light emitted by "raindrop" observers, falling freely from rest at
+  infinity, so its colors differ.
+
+In both, the grid lines are at constant r and φ, which are the same in both coordinate systems
+(only the time coordinate differs), so they don't move.
 
 Switching converts the ship and objects between the coordinates. Light rays are traced with their
 conserved energy and angular momentum, which keeps them regular at the horizon. Rays that end in
