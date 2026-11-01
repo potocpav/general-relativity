@@ -95,6 +95,7 @@ class App extends Component {
     crashed: false,
     showPhotonSphere: true,
     showEventHorizon: true,
+    showRedshift: true,
     metric: metric.constructor.id,
     message: null, // transient notice
     error: null,
@@ -231,6 +232,7 @@ class App extends Component {
       case "r": this.reset();
       break; case "p": this.togglePhotonSphere();
       break; case "h": this.toggleEventHorizon();
+      break; case "s": this.toggleRedshift();
       break; case " ":
         // Don't let Space also activate a focused button (e.g. the pause button).
         ev.preventDefault();
@@ -249,6 +251,12 @@ class App extends Component {
     const show = !this.state.showPhotonSphere;
     if (world) world.showPhotonSphere = show;
     this.setState({showPhotonSphere: show});
+  }
+
+  toggleRedshift = _ => {
+    const show = !this.state.showRedshift;
+    if (world) world.showRedshift = show;
+    this.setState({showRedshift: show});
   }
 
   toggleEventHorizon = _ => {
@@ -416,6 +424,12 @@ class App extends Component {
             class=${this.state.showEventHorizon ? "clicked" : ""}
             title="The event horizon at rs (H)"
             onClick=${this.toggleEventHorizon}>Event horizon</button>
+        </div>
+        <div>
+          <button
+            class=${this.state.showRedshift ? "clicked" : ""}
+            title="Gravitational and Doppler redshift of colors and brightness (S)"
+            onClick=${this.toggleRedshift}>Redshift</button>
         </div>
       </div>
       <div id="top_left">
