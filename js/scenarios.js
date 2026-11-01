@@ -120,7 +120,6 @@ export const scenarios = [
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 10,
         // moving towards +phi, up on the screen, and pointing that way
         ship: ship(circularOrbit(metric, 3 * rs, 0), Math.PI / 2),
         objects: [],
