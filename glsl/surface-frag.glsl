@@ -62,7 +62,7 @@ vec3 grid_color(vec3 pos) {
 	// so a pixel is 2 * pos_pixel / stride wide in these units.
 
 	// coarse grid which doesn't fade in
-	vec3 grid_ratio = vec3(0.0, 0.1, 0.1) * (1.0 - stride_alpha * 0.5);
+	vec3 grid_ratio = vec3(0.0, 0.05, 0.05) * (1.0 - stride_alpha * 0.5);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
 	vec3 on_grid = line_coverage(grid_frac, grid_ratio, 2.0 * pos_pixel / stride);
 	float grid = max(max(on_grid.x, on_grid.y), on_grid.z);
