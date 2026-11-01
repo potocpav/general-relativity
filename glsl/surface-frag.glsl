@@ -35,6 +35,17 @@ out vec4 out_color;
 
 // Grid visualization
 
+// Antialiased line coverage: the fraction of a pixel covered by a line.
+// `frac` is the distance from the line center and `half_width` the line's
+// half-width, both in units where the pixel is `pixel` wide. The pixel is
+// treated as a box, so lines thinner than a pixel fade out instead of
+// flickering, and zero-width lines are invisible.
+vec3 line_coverage(vec3 frac, vec3 half_width, vec3 pixel) {
+	vec3 overlap = min(frac + 0.5 * pixel, half_width) - max(frac - 0.5 * pixel, -half_width);
+	return clamp(overlap / max(pixel, 1e-20), 0.0, 1.0);
+}
+
+// Must be called in uniform control flow, because of `fwidth`.
 vec3 grid_color(vec3 pos) {
 	// adaptive stride calculation
 	mat3 gx = g(pos);
@@ -44,19 +55,26 @@ vec3 grid_color(vec3 pos) {
 	vec3 stride_floor = floor(stride_log);
 	vec3 stride_alpha = 1.0 - (stride_log - stride_floor);
 	vec3 stride = exp2(stride_floor);
+	// change of `pos` across one pixel (not of pos / stride, which jumps where the stride changes)
+	vec3 pos_pixel = fwidth(pos);
+
+	// `grid_frac` is twice the distance to the nearest line, in units of stride,
+	// so a pixel is 2 * pos_pixel / stride wide in these units.
 
 	// coarse grid which doesn't fade in
 	vec3 grid_ratio = vec3(0.0, 0.1, 0.1) * (1.0 - stride_alpha * 0.5);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
-	float grid = float((grid_frac.x < grid_ratio.x) || (grid_frac.y < grid_ratio.y) || (grid_frac.z < grid_ratio.z));
+	vec3 on_grid = line_coverage(grid_frac, grid_ratio, 2.0 * pos_pixel / stride);
+	float grid = max(max(on_grid.x, on_grid.y), on_grid.z);
 
 	// fine grid which fades in
 	vec3 grid2_ratio = 2.0 * grid_ratio;
 	vec3 grid2_frac = abs(mod(pos / (stride/2.0) + 0.5, 1.0) * 2.0 - 1.0);
-	vec3 on_grid2 = stride_alpha * vec3(
-		float(grid2_frac.x < grid2_ratio.x), float(grid2_frac.y < grid2_ratio.y), float(grid2_frac.z < grid2_ratio.z));
+	vec3 on_grid2 = stride_alpha * line_coverage(grid2_frac, grid2_ratio, 4.0 * pos_pixel / stride);
 	float grid2 = max(max(on_grid2.x, on_grid2.y), on_grid2.z);
-	return vec3((0.0 + max(grid, grid2))*0.3);
+	// Coverage blends light linearly, while the returned color is sRGB
+	// (linearized in `redshift`), so the coverage is gamma-encoded.
+	return vec3(0.3 * pow(max(grid, grid2), 1.0 / 2.2));
 }
 
 // Photon sphere: circular light orbits at r = 1.5 rs. Drawn as a line of a fixed
