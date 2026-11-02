@@ -20,6 +20,33 @@ const quality_levels = [1, 2, 4, 8];
 var quality = quality_levels.reduce((best, q) =>
   Math.abs(q - devicePixelRatio()) < Math.abs(best - devicePixelRatio()) ? q : best);
 
+// Settings remembered across visits, in local storage: the quality, the
+// scenario and the overlays. (Storage may be unavailable, e.g. in some
+// private browsing modes; then nothing is remembered.)
+const settingsKey = 'general-relativity-settings';
+function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(settingsKey)) ?? {};
+  } catch {
+    return {};
+  }
+}
+function saveSettings(changes) {
+  try {
+    localStorage.setItem(settingsKey, JSON.stringify({...loadSettings(), ...changes}));
+  } catch {
+    // not remembered
+  }
+}
+const savedSettings = loadSettings();
+if (quality_levels.includes(savedSettings.quality)) quality = savedSettings.quality;
+
+// The initial scenario: from the URL (?scenario=<id>, so that it can be
+// linked), else the last one chosen, else the first.
+const findScenario = id => scenarios.find(sc => sc.id == id && sc.setup);
+const initialScenario = findScenario(new URLSearchParams(location.search).get('scenario'))
+  ?? findScenario(savedSettings.scenario) ?? scenarios[0];
+
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
 // switchable, see selectMetric; its black hole size is set by scenarios
@@ -99,16 +126,16 @@ class App extends Component {
     timeSlider: timeScaleToSlider(1),
     showDisplayOptions: false,
     pause: false,
-    scenario: scenarios[0].id,
+    scenario: initialScenario.id,
     showDescription: true,
     tau: null,
     obsvX: null,
     obsvU: null,
     fps: null,
     crashed: false,
-    showPhotonSphere: true,
-    showEventHorizon: true,
-    showRedshift: true,
+    showPhotonSphere: savedSettings.showPhotonSphere ?? true,
+    showEventHorizon: savedSettings.showEventHorizon ?? true,
+    showRedshift: savedSettings.showRedshift ?? true,
     metric: metric.constructor.id,
     message: null, // transient notice
     error: null,
@@ -128,7 +155,12 @@ class App extends Component {
     // keyup is not delivered when the window loses focus
     window.addEventListener('blur', () => arrowKeys.clear());
 
-    startup().then(() => this.loadScenario(scenarios[0])).then(() => {
+    startup().then(() => {
+      world.showPhotonSphere = this.state.showPhotonSphere;
+      world.showEventHorizon = this.state.showEventHorizon;
+      world.showRedshift = this.state.showRedshift;
+      return this.loadScenario(initialScenario);
+    }).then(() => {
       this.lastUiUpdate = -Infinity;
       requestAnimationFrame(this.animate);
     }).catch(err => {
@@ -305,18 +337,21 @@ class App extends Component {
     const show = !this.state.showPhotonSphere;
     if (world) world.showPhotonSphere = show;
     this.setState({showPhotonSphere: show});
+    saveSettings({showPhotonSphere: show});
   }
 
   toggleRedshift = _ => {
     const show = !this.state.showRedshift;
     if (world) world.showRedshift = show;
     this.setState({showRedshift: show});
+    saveSettings({showRedshift: show});
   }
 
   toggleEventHorizon = _ => {
     const show = !this.state.showEventHorizon;
     if (world) world.showEventHorizon = show;
     this.setState({showEventHorizon: show});
+    saveSettings({showEventHorizon: show});
   }
 
   toggleDisplayOptions = _ => this.setState({showDisplayOptions: !this.state.showDisplayOptions});
@@ -367,6 +402,10 @@ class App extends Component {
     for (const o of state.objects) {
       objects.spawn(o.type, o.x, o.u);
     }
+    saveSettings({scenario: scenario.id});
+    const url = new URL(location.href);
+    url.searchParams.set('scenario', scenario.id);
+    history.replaceState(null, '', url);
     this.setState({
       scenario: scenario.id,
       metric: metric.constructor.id,
@@ -422,6 +461,7 @@ class App extends Component {
 
   selectQuality = ev => {
     quality = quality_levels[ev.target.selectedIndex];
+    saveSettings({quality});
     refreshWindow();
   }
 
