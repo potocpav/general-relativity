@@ -41,8 +41,8 @@ function saveSettings(changes) {
 const savedSettings = loadSettings();
 if (quality_levels.includes(savedSettings.quality)) quality = savedSettings.quality;
 
-// The initial scenario: from the URL (?scenario=<id>, so that it can be
-// linked), else the last one chosen, else the first.
+// The initial scenario: from the URL (?scenario=<id>, set when a scenario is
+// chosen, so that it can be linked), else the last one chosen, else the first.
 const findScenario = id => scenarios.find(sc => sc.id == id && sc.setup);
 const initialScenario = findScenario(new URLSearchParams(location.search).get('scenario'))
   ?? findScenario(savedSettings.scenario) ?? scenarios[0];
@@ -403,9 +403,6 @@ class App extends Component {
       objects.spawn(o.type, o.x, o.u);
     }
     saveSettings({scenario: scenario.id});
-    const url = new URL(location.href);
-    url.searchParams.set('scenario', scenario.id);
-    history.replaceState(null, '', url);
     this.setState({
       scenario: scenario.id,
       metric: metric.constructor.id,
@@ -429,6 +426,10 @@ class App extends Component {
   selectScenario = ev => {
     const scenario = scenarios[ev.target.selectedIndex];
     if (!scenario.setup) return;
+    // put it into the URL (only once chosen), so that it can be linked
+    const url = new URL(location.href);
+    url.searchParams.set('scenario', scenario.id);
+    history.replaceState(null, '', url);
     this.setState({scenario: scenario.id}, this.reset);
   }
 
