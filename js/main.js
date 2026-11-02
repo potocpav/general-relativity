@@ -15,10 +15,10 @@ const html = htm.bind(h);
 
 const devicePixelRatio = () => window.devicePixelRatio || 1;
 
-// Device pixels per rendered pixel. The default is about two CSS pixels.
+// Device pixels per rendered pixel. The default is about one CSS pixel.
 const quality_levels = [1, 2, 4, 8];
 var quality = quality_levels.reduce((best, q) =>
-  Math.abs(q - 2 * devicePixelRatio()) < Math.abs(best - 2 * devicePixelRatio()) ? q : best);
+  Math.abs(q - devicePixelRatio()) < Math.abs(best - devicePixelRatio()) ? q : best);
 
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
