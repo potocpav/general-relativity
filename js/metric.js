@@ -7,7 +7,7 @@ export const horizonMargin = 1.02;
 
 // In Gullstrand–Painlevé coordinates, bodies are followed until this radius
 // (in multiples of rs), close to the singularity at r = 0.
-export const singularityRadius = 0.05;
+export const singularityRadius = 0.005;
 
 // 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
 // in screen-aligned cartesian components, i.e. flat-space polar (dr/dt, r dphi/dt).

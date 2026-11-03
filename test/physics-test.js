@@ -704,12 +704,12 @@ function checkScenariosJs() {
     }
     if (sc.id == 'fall-in') {
       // Free fall from infinity: tau(r) = (2/3) (r0^1.5 - r^1.5) / sqrt(rs), so
-      // 9.14 s from 2 rs to the horizon, then 5 s to the singularity (4.94 s to
+      // 9.14 s from 2 rs to the horizon, then 5 s to the singularity (5.00 s to
       // where bodies are followed until, in Gullstrand–Painlevé coordinates).
       const R = m.rs, tau = r => 2 / 3 * (Math.pow(2 * R, 1.5) - Math.pow(r, 1.5)) / Math.sqrt(R);
       const horizon = follow(m, ship.x, ship.u, tau(R) - 0.05).xu[1] / R;
       const end = tau(singularityRadius * R);
-      check(m instanceof GullstrandPainleve && Math.abs(tau(R) - 9.14) < 0.01 && Math.abs(end - tau(R) - 4.94) < 0.01,
+      check(m instanceof GullstrandPainleve && Math.abs(tau(R) - 9.14) < 0.01 && Math.abs(end - tau(R) - 5.00) < 0.01,
         `fall-in: ${tau(R).toFixed(2)} s to the horizon, ${(end - tau(R)).toFixed(2)} s inside`);
       check(horizon > 1 && horizon < 1.01, `fall-in: at ${(horizon).toFixed(3)} rs just before the horizon`);
       check(follow(m, ship.x, ship.u, end + 0.1).fell && !follow(m, ship.x, ship.u, end - 0.1).fell,
