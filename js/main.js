@@ -140,6 +140,7 @@ class App extends Component {
     crashed: false,
     showPhotonSphere: savedSettings.showPhotonSphere ?? true,
     showEventHorizon: savedSettings.showEventHorizon ?? true,
+    showInterior: savedSettings.showInterior ?? true,
     showRedshift: savedSettings.showRedshift ?? true,
     metric: metric.constructor.id,
     message: null, // transient notice
@@ -163,6 +164,7 @@ class App extends Component {
     startup().then(() => {
       world.showPhotonSphere = this.state.showPhotonSphere;
       world.showEventHorizon = this.state.showEventHorizon;
+      world.showInterior = this.state.showInterior;
       world.showRedshift = this.state.showRedshift;
       return this.loadScenario(initialScenario);
     }).then(() => {
@@ -323,6 +325,7 @@ class App extends Component {
       case "r": this.reset();
       break; case "p": this.togglePhotonSphere();
       break; case "h": this.toggleEventHorizon();
+      break; case "i": this.toggleInterior();
       break; case "s": this.toggleRedshift();
       break; case " ":
         // Don't let Space also activate a focused button (e.g. the pause button).
@@ -357,6 +360,13 @@ class App extends Component {
     if (world) world.showEventHorizon = show;
     this.setState({showEventHorizon: show});
     saveSettings({showEventHorizon: show});
+  }
+
+  toggleInterior = _ => {
+    const show = !this.state.showInterior;
+    if (world) world.showInterior = show;
+    this.setState({showInterior: show});
+    saveSettings({showInterior: show});
   }
 
   toggleDisplayOptions = _ => this.setState({showDisplayOptions: !this.state.showDisplayOptions});
@@ -535,6 +545,12 @@ class App extends Component {
               class=${this.state.showEventHorizon ? "clicked" : ""}
               title="The event horizon at rs, visible from inside the black hole (H)"
               onClick=${this.toggleEventHorizon}>Event horizon</button>
+          </div>
+          <div>
+            <button
+              class=${this.state.showInterior ? "clicked" : ""}
+              title="Tint the black hole's shadow instead of showing it black (I)"
+              onClick=${this.toggleInterior}>BH interior</button>
           </div>
           <div>
             <button

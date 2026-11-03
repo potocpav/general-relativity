@@ -14,6 +14,7 @@ uniform int obsv_sprite;
 uniform float viewport_size;
 uniform bool show_photon_sphere;
 uniform bool show_event_horizon;
+uniform bool show_interior; // otherwise, the black hole's shadow is black
 uniform bool show_redshift; // otherwise, colors and brightness are as emitted
 
 uniform sampler3D sprites;
@@ -190,7 +191,8 @@ void main( void ) {
 	float rshift = abs((T_pix_x * pix_u).x) / obsv_energy;
 
 	// compute output colors; rays that didn't arrive show the black hole's shadow
-	vec3 world_color = reached ? redshift(show_redshift ? rshift : 1.0, grid_color(pix_x)) : shadow_color;
+	vec3 world_color = reached ? redshift(show_redshift ? rshift : 1.0, grid_color(pix_x))
+		: show_interior ? shadow_color : vec3(0.0);
 
 	// annotations, not redshifted
 	float photon_sphere = radius_line(pix_x.y, 1.5 * rs, fwidth(float(reached)) == 0.0 && reached);

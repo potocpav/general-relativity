@@ -22,6 +22,7 @@ export class World {
     this.crashed = false;
     this.showPhotonSphere = true;
     this.showEventHorizon = true;
+    this.showInterior = true;
     this.showRedshift = true;
   }
 
@@ -78,6 +79,7 @@ export class World {
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
     this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
     this.show_event_horizon_loc = gl.getUniformLocation(program, 'show_event_horizon');
+    this.show_interior_loc = gl.getUniformLocation(program, 'show_interior');
     this.show_redshift_loc = gl.getUniformLocation(program, 'show_redshift');
   }
 
@@ -157,6 +159,7 @@ export class World {
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
     gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);
     gl.uniform1i(this.show_event_horizon_loc, this.showEventHorizon ? 1 : 0);
+    gl.uniform1i(this.show_interior_loc, this.showInterior ? 1 : 0);
     gl.uniform1i(this.show_redshift_loc, this.showRedshift ? 1 : 0);
   }
 }
