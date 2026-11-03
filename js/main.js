@@ -533,7 +533,7 @@ class App extends Component {
           <div>
             <button
               class=${this.state.showEventHorizon ? "clicked" : ""}
-              title="The event horizon at rs (H)"
+              title="The event horizon at rs, visible from inside the black hole (H)"
               onClick=${this.toggleEventHorizon}>Event horizon</button>
           </div>
           <div>

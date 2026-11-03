@@ -270,11 +270,3 @@ bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
 	int steps;
 	return trace_ray(x0, u0, x, u, l_end, steps) == RAY_REACHED;
 }
-
-// The radius of a ray traced by trace_ray at affine parameter 1. A ray stopped
-// on its way into the horizon is continued with its radial velocity, so that
-// the radius is continuous across the edge of the black hole's shadow.
-// (Meaningful for rays that reached the end or were stopped heading inwards.)
-float ray_end_radius(int status, vec3 x, vec3 u, float l_end) {
-	return (status == RAY_HORIZON && u.y < 0.0) ? x.y + u.y * (1.0 - l_end) : x.y;
-}

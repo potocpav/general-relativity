@@ -195,14 +195,13 @@ void main( void ) {
 	// annotations, not redshifted
 	float photon_sphere = radius_line(pix_x.y, 1.5 * rs, fwidth(float(reached)) == 0.0 && reached);
 	world_color = mix(world_color, photon_sphere_color, show_photon_sphere ? photon_sphere : 0.0);
-	// The event horizon at the edge of the shadow (from outside) or where rays
-	// cross it (from inside, Gullstrand–Painlevé only); ray_end_radius is
-	// continuous across the shadow's edge.
-	// Rays stopped while heading outwards (inside, towards the white hole) see
-	// the white hole's horizon as a whole, so no line is drawn for them.
-	bool end_radius_valid = reached || (status == RAY_HORIZON && pix_u.y < 0.0);
-	float event_horizon = radius_line(ray_end_radius(status, pix_x, pix_u, pix_l), rs,
-		fwidth(float(end_radius_valid)) == 0.0 && end_radius_valid);
+	// The (future) event horizon, where rays traced back from inside cross it
+	// outwards (Gullstrand–Painlevé only). The past light cone of an observer
+	// outside never reaches it: rays falling in there end on the white hole's
+	// horizon instead, which isn't drawn, nor is it for rays heading inwards.
+	bool on_future_horizon = reached && pix_u.y > 0.0;
+	float event_horizon = radius_line(pix_x.y, rs,
+		fwidth(float(on_future_horizon)) == 0.0 && on_future_horizon);
 	world_color = mix(world_color, event_horizon_color, show_event_horizon ? event_horizon : 0.0);
 
 	// show objects
