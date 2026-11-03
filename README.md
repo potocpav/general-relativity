@@ -53,7 +53,7 @@ In both, the grid lines are at constant r and φ, which are the same in both coo
 
 Switching converts the ship and objects between the coordinates. Light rays are traced with their
 conserved energy and angular momentum, which keeps them regular at the horizon. Rays that end in
-the black hole's shadow are dark red; from inside, that includes light that would come from the
+the black hole's shadow are black (dark red with "BH interior" on); from inside, that includes light that would come from the
 white hole (in a real black hole, from the collapsed star). `test/` checks the inside view against
 analytic results, e.g. that at the horizon the black hole covers 42° around the inward direction.
 

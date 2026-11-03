@@ -138,9 +138,9 @@ class App extends Component {
     obsvU: null,
     fps: null,
     crashed: false,
-    showPhotonSphere: savedSettings.showPhotonSphere ?? true,
+    showPhotonSphere: savedSettings.showPhotonSphere ?? false,
     showEventHorizon: savedSettings.showEventHorizon ?? true,
-    showInterior: savedSettings.showInterior ?? true,
+    showInterior: savedSettings.showInterior ?? false,
     showRedshift: savedSettings.showRedshift ?? true,
     metric: metric.constructor.id,
     message: null, // transient notice

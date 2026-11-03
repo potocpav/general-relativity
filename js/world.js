@@ -20,9 +20,9 @@ export class World {
     this.dt = 0.017;
     this.fps = 1 / this.dt;
     this.crashed = false;
-    this.showPhotonSphere = true;
+    this.showPhotonSphere = false;
     this.showEventHorizon = true;
-    this.showInterior = true;
+    this.showInterior = false;
     this.showRedshift = true;
   }
 
