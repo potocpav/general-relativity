@@ -28,10 +28,6 @@ layout(std140) uniform objectInfo {
 
 out vec4 out_color;
 
-// Set to 1 to shift hues with wavelength. Disabled, because it looks too wrong ATM;
-// with it disabled, only intensity changes with redshift.
-#define COLOR_SHIFT 0
-
 // Grid visualization
 
 // Antialiased line coverage: the fraction of a pixel covered by a line.
@@ -123,48 +119,54 @@ mat2 rot(vec2 a) {
 
 // redshift calculation
 
-#if COLOR_SHIFT
-float x(float l) {
-	return 1.065 * exp(-0.5 * pow((l - 595.8) / 33.33, 2.0)) + 0.366 * exp(-0.5 * pow((l - 446.8) / 19.44, 2.0));
-}
-
-float y(float l) {
-	return 1.014 * exp(-0.5 * pow((log(l) - log(556.3)) / 0.075, 2.0));
-}
-
-float z(float l) {
-	return 1.839 * exp(-0.5 * pow((log(l) - log(449.8)) / 0.051, 2.0));
-}
-#endif
-
-vec3 redshift(float l, vec3 sRgb) {
+// Redshift factor l: photon energy where emitted / where seen. Light is seen
+// l^-3 times as bright as emitted (`tint` = 1), or with its color multiplied
+// by `tint` (linear, of luminance 1).
+vec3 redshift(float l, vec3 sRgb, vec3 tint) {
 	const float power_exp = 3.0;
-	vec3 linear = pow(sRgb, vec3(2.2));
-#if COLOR_SHIFT
-	const mat3 sRgbToSpectral = mat3(
-		0.4148, 0.0140, 0.0129,
- 		0.0580, 0.6812, 0.0797,
- 		0.0191, 0.0257, 0.6391
-	);
-	vec3 spectral = sRgbToSpectral * linear;
-	float R = 610.0, G = 550.0, B = 465.0;
-	mat3 shift = mat3(
-		x(R*l), y(R*l), z(R*l),
-		x(G*l), y(G*l), z(G*l),
-		x(B*l), y(B*l), z(B*l)
-	);
+	vec3 linear = pow(sRgb, vec3(2.2)) * tint * pow(l, -power_exp);
+	return pow(max(linear, 0.0), vec3(1.0/2.2));
+}
+
+// Chromaticity (x, y) of a blackbody at temperature T [K], for
+// 1667 K <= T <= 25000 K: Kim et al., "Design of advanced color temperature
+// control system for HDTV applications" (2002), a cubic spline fit of the
+// Planckian locus.
+vec2 planckian_xy(float T) {
+	float t = 1e3 / T, t2 = t * t, t3 = t2 * t;
+	float x = T <= 4000.0
+		? -0.2661239 * t3 - 0.2343589 * t2 + 0.8776956 * t + 0.179910
+		: -3.0258469 * t3 + 2.1070379 * t2 + 0.2226347 * t + 0.240390;
+	float x2 = x * x, x3 = x2 * x;
+	float y = T <= 2222.0 ? -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683
+		: T <= 4000.0 ? -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867
+		: 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483;
+	return vec2(x, y);
+}
+
+// Linear sRGB color of luminance 1 of a blackbody at temperature T [K],
+// clamped to 1667..25000 K (deep orange .. pale blue); colors outside the
+// sRGB gamut are clipped.
+vec3 blackbody_rgb(float T) {
+	vec2 xy = planckian_xy(clamp(T, 1667.0, 25000.0));
+	vec3 XYZ = vec3(xy.x / xy.y, 1.0, (1.0 - xy.x - xy.y) / xy.y);
 	const mat3 xyzToSrgb = mat3(
 		 3.2406,-0.9689,  0.0557,
 		-1.5372, 1.8757, -0.2040,
 		-0.4986, 0.0415,  1.0569
 	);
-	vec3 shifted = xyzToSrgb * shift * spectral * pow(l, -power_exp);
-#else
-	// Without the wavelength shift, the spectral round-trip above is
-	// the identity matrix to within 2e-4, so it is skipped.
-	vec3 shifted = linear * pow(l, -power_exp);
-#endif
-	return pow(max(shifted, 0.0), vec3(1.0/2.2));
+	vec3 rgb = max(xyzToSrgb * XYZ, 0.0);
+	return rgb / dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// The grid as a blackbody, shown grey where unshifted: the color of a
+// blackbody at grid_temperature / l relative to (white-balanced against) the
+// one at grid_temperature, of luminance 1. Doppler and gravitational shifts
+// map a blackbody spectrum exactly to another blackbody's, at T / l.
+const float grid_temperature = 6500.0; // [K]
+vec3 grid_tint(float l) {
+	vec3 rgb = blackbody_rgb(grid_temperature / l) / blackbody_rgb(grid_temperature);
+	return rgb / dot(rgb, vec3(0.2126, 0.7152, 0.0722));
 }
 
 // `deltax` is the pixel's offset from the object, as components in the object's frame.
@@ -181,7 +183,7 @@ vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orienta
 		float frame = min(floor(fract(tau / objSize[sprite_i].x) * n_frames), n_frames - 1.0);
 		vec3 obj_texcoord = vec3(xy, lo.z + frame + 0.5);
 		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
-		return vec4(redshift(rshift, obj_color.xyz), obj_color.a);
+		return vec4(redshift(rshift, obj_color.xyz, vec3(1.0)), obj_color.a);
 	} else {
 		return vec4(0.0);
 	}
@@ -207,7 +209,8 @@ void main( void ) {
 	float rshift = abs((T_pix_x * pix_u).x) / obsv_energy;
 
 	// compute output colors; rays that didn't arrive show the black hole's shadow
-	vec3 world_color = reached ? redshift(show_redshift ? rshift : 1.0, grid_color(pix_x))
+	float grid_l = show_redshift ? rshift : 1.0;
+	vec3 world_color = reached ? redshift(grid_l, grid_color(pix_x), grid_tint(grid_l))
 		: show_interior ? shadow_color : vec3(0.0);
 
 	// annotations, not redshifted
