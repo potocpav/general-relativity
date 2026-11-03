@@ -2,8 +2,12 @@
   box-sizing: border-box;
 }
 
+/* The page fills the visible viewport: 100dvh excludes browser bars (such as
+   Android Chrome's address bar, which may be at the bottom), unlike 100%,
+   which is used where dvh isn't supported. */
 html {
   height: 100%;
+  height: 100dvh;
 }
 
 body {
@@ -11,6 +15,7 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 canvas {
@@ -98,15 +103,16 @@ button.description {
   z-index: 1;
 }
 
+/* above the home indicator / gesture area, where there is one */
 #bottom_left {
   position: absolute;
-  bottom: 0;
+  bottom: env(safe-area-inset-bottom, 0);
 }
 
 #bottom_right {
   position: absolute;
-  bottom: 0;
-  right: 10px;
+  bottom: env(safe-area-inset-bottom, 0);
+  right: max(10px, env(safe-area-inset-right));
   text-align: right;
 }
 

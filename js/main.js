@@ -15,6 +15,11 @@ const html = htm.bind(h);
 
 const devicePixelRatio = () => window.devicePixelRatio || 1;
 
+// The view's size in CSS pixels: the canvas's size on the page (which, unlike
+// window.innerWidth / innerHeight, excludes browser bars on mobile).
+const viewWidth = () => (canvas && canvas.clientWidth) || window.innerWidth;
+const viewHeight = () => (canvas && canvas.clientHeight) || window.innerHeight;
+
 // Device pixels per rendered pixel. The default is about one CSS pixel.
 const quality_levels = [1, 2, 4, 8];
 var quality = quality_levels.reduce((best, q) =>
@@ -71,7 +76,7 @@ var objects;
 var params = {
   mousePos: null, // [x, y] in CSS pixels, y pointing up; null until the pointer moves
   pointerDn: false,
-  screenDim: [window.innerWidth, window.innerHeight],
+  screenDim: [window.innerWidth, window.innerHeight], // set from the view in refreshWindow
 };
 
 // Pointers (fingers, mouse) currently pressed on the view, id -> [x, y], and
@@ -198,9 +203,9 @@ class App extends Component {
     if (tool != 'spawn' || !spawnDragOrigin || !params.mousePos) return;
 
     // draw in CSS pixels
-    const s = overlay.width / window.innerWidth;
+    const s = overlay.width / viewWidth();
     ctx.setTransform(s, 0, 0, s, 0, 0);
-    const height = window.innerHeight;
+    const height = viewHeight();
     const [originX, originY] = spawnDragOrigin;
     const [targetX, targetY] = params.mousePos;
 
@@ -227,7 +232,7 @@ class App extends Component {
       }
       return;
     }
-    params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
+    params.mousePos = [ev.clientX, viewHeight() - ev.clientY];
     if (this.state.tool == 'spawn' && this.state.spawnDragOrigin) {
       this.setState({spawnVelocity: spawnVelocityFromDrag(this.state.spawnDragOrigin, params.mousePos)});
     }
@@ -252,7 +257,7 @@ class App extends Component {
     }
     // until all fingers have been lifted after a pinch, don't start anything
     if (pinchDistance !== null) return;
-    params.mousePos = [ev.clientX, window.innerHeight - ev.clientY];
+    params.mousePos = [ev.clientX, viewHeight() - ev.clientY];
 
     if (this.state.tool == 'boost') {
       params.pointerDn = true;
@@ -619,7 +624,7 @@ async function startup() {
 
 function refreshWindow() {
   const dpr = devicePixelRatio();
-  const w = window.innerWidth, h = window.innerHeight;
+  const w = viewWidth(), h = viewHeight();
   canvas.width = Math.max(1, Math.round(w * dpr / quality));
   canvas.height = Math.max(1, Math.round(h * dpr / quality));
   overlay.width = Math.max(1, Math.round(w * dpr));
