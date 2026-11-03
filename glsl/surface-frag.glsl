@@ -61,21 +61,37 @@ vec3 grid_color(vec3 pos) {
 
 	// `grid_frac` is twice the distance to the nearest line, in units of stride,
 	// so a pixel is 2 * pos_pixel / stride wide in these units.
+	vec3 pixel = 2.0 * pos_pixel / stride;
+	vec3 pixel2 = 2.0 * pixel; // for the fine grid
+
+	// Lines are a fixed width in rendered pixels (no lines of constant t).
+	const float width = 2.0; // [rendered pixels]
+	const vec3 has_lines = vec3(0.0, 1.0, 1.0);
+	vec3 half_width = has_lines * 0.5 * width * pixel;
+	vec3 half_width2 = 2.0 * half_width;
+	// Their brightness is scaled so that the mean brightness of the grid doesn't
+	// depend on how dense it is on screen (where lensing squeezes or stretches
+	// it), which could be mistaken for beaming: as for lines whose half-width
+	// is `grid_ratio` of the spacing (the mean coverage of a line family is
+	// proportional to its half-width as a fraction of the spacing). The fine
+	// grid, twice as dense with twice the half-width, gets the same factor.
+	vec3 grid_ratio = has_lines * 0.05 * (1.0 - stride_alpha * 0.5);
+	vec3 brightness = grid_ratio / max(half_width, 1e-20);
 
 	// coarse grid which doesn't fade in
-	vec3 grid_ratio = vec3(0.0, 0.05, 0.05) * (1.0 - stride_alpha * 0.5);
 	vec3 grid_frac = abs(mod(pos / stride + 0.5, 1.0) * 2.0 - 1.0);
-	vec3 on_grid = line_coverage(grid_frac, grid_ratio, 2.0 * pos_pixel / stride);
+	vec3 on_grid = brightness * line_coverage(grid_frac, half_width, pixel);
 	float grid = max(max(on_grid.x, on_grid.y), on_grid.z);
 
 	// fine grid which fades in
-	vec3 grid2_ratio = 2.0 * grid_ratio;
 	vec3 grid2_frac = abs(mod(pos / (stride/2.0) + 0.5, 1.0) * 2.0 - 1.0);
-	vec3 on_grid2 = stride_alpha * line_coverage(grid2_frac, grid2_ratio, 4.0 * pos_pixel / stride);
+	vec3 on_grid2 = brightness * stride_alpha * line_coverage(grid2_frac, half_width2, pixel2);
 	float grid2 = max(max(on_grid2.x, on_grid2.y), on_grid2.z);
 	// Coverage blends light linearly, while the returned color is sRGB
-	// (linearized in `redshift`), so the coverage is gamma-encoded.
-	return vec3(0.3 * pow(max(grid, grid2), 1.0 / 2.2));
+	// (linearized in `redshift`), so the coverage is gamma-encoded. Lines are
+	// 0.3 in sRGB at full coverage and brightness 1, and at most white.
+	const float line_linear = pow(0.3, 2.2);
+	return vec3(pow(min(line_linear * max(grid, grid2), 1.0), 1.0 / 2.2));
 }
 
 // Coverage of an antialiased line where the per-pixel radius `r` equals
