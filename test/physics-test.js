@@ -6,7 +6,7 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { GullstrandPainleve, metricTypes, localVelocity3, velocity3, singularityRadius } from '../js/metric.js';
+import { Schwarzschild, GullstrandPainleve, metricTypes, localVelocity3, velocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
@@ -173,8 +173,36 @@ function checkFreeFallJs() {
     const xu = fall(tau(r));
     if (xu === null || Math.abs(xu[1] - r) > 1e-6) errors.push(`r at tau(${r / rs} rs) = ${xu && xu[1] / rs} rs`);
   }
-  if (fall(tau(0.9 * singularityRadius * rs)) !== null) errors.push('followed past the singularity radius');
-  return {ok: errors.length == 0, message: errors.length ? errors.join(', ') : 'r(tau) matches down to 0.1 rs'};
+  if (fall(tau(1e-3 * rs)) === null) errors.push('not followed down to 0.001 rs');
+  if (fall(tau(0)) !== null) errors.push('followed into the singularity');
+  return {ok: errors.length == 0, message: errors.length ? errors.join(', ') : 'r(tau) matches down to 0.1 rs; followed to 0.001 rs'};
+}
+
+// Bodies are stopped where the coordinates break down (frame condition
+// number, Lorentz factor relative to the reference observer): a raindrop
+// falling from 10 rs is followed until just in front of the horizon in
+// Schwarzschild coordinates, and close to the singularity in
+// Gullstrand–Painlevé coordinates. Light rays falling in are stopped at the
+// horizon (Schwarzschild) or the past horizon (Gullstrand–Painlevé).
+function checkBreakdownJs() {
+  const x0 = [0, 10 * rs, 0.3];
+  const u0 = localVelocity3(metric, x0, [-Math.sqrt(0.1) * Math.cos(0.3), -Math.sqrt(0.1) * Math.sin(0.3)]);
+  const fall = t => math.integrate(metric, math.geo_f(metric), [...x0, ...u0], t, 1e-3);
+  // bisect the proper time where it stops
+  let lo = 0, hi = 100;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    fall(mid) === null ? hi = mid : lo = mid;
+  }
+  const rStop = fall(lo)[1] / rs;
+  // a radial light ray, inwards (traced back in time)
+  const ray = math.traceRay(metric, x0, math.matVec(math.restToCoord(metric, x0, u0), [-20, -20, 0]));
+  const ok = metric instanceof Schwarzschild
+    ? rStop > 1 && rStop < 1 + 1e-3
+    : rStop < 1e-3;
+  return {ok: ok && ray.status == math.RAY_HORIZON,
+    message: `raindrop stopped at ${rStop.toPrecision(6)} rs, after tau = ${lo.toFixed(4)}; radial ray ` +
+      (ray.status == math.RAY_HORIZON ? 'stopped' : 'not stopped')};
 }
 
 // The ship's heading is Fermi–Walker transported: on a circular orbit at r,
@@ -647,7 +675,7 @@ function checkScenariosJs() {
     const st = sc.setup(m);
     for (const body of [st.ship, ...st.objects]) {
       const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
-      check(Math.abs(norm + 1) < 1e-9 && m.canFollow(body.x), `${sc.id}: invalid initial state`);
+      check(Math.abs(norm + 1) < 1e-9 && m.canFollow([...body.x, ...body.u]), `${sc.id}: invalid initial state`);
     }
     const ship = st.ship;
     if (sc.id == 'precession') {
@@ -683,16 +711,16 @@ function checkScenariosJs() {
     }
     if (sc.id == 'fall-in') {
       // Free fall from infinity: tau(r) = (2/3) (r0^1.5 - r^1.5) / sqrt(rs), so
-      // 9.14 s from 2 rs to the horizon, then 5 s to the singularity (5.00 s to
-      // where bodies are followed until, in Gullstrand–Painlevé coordinates).
+      // 9.14 s from 2 rs to the horizon, then 5 s to the singularity (followed
+      // until close to it, in Gullstrand–Painlevé coordinates).
       const R = m.rs, tau = r => 2 / 3 * (Math.pow(2 * R, 1.5) - Math.pow(r, 1.5)) / Math.sqrt(R);
       const horizon = follow(m, ship.x, ship.u, tau(R) - 0.05).xu[1] / R;
-      const end = tau(singularityRadius * R);
+      const end = tau(0);
       check(m instanceof GullstrandPainleve && Math.abs(tau(R) - 9.14) < 0.01 && Math.abs(end - tau(R) - 5.00) < 0.01,
         `fall-in: ${tau(R).toFixed(2)} s to the horizon, ${(end - tau(R)).toFixed(2)} s inside`);
       check(horizon > 1 && horizon < 1.01, `fall-in: at ${(horizon).toFixed(3)} rs just before the horizon`);
       check(follow(m, ship.x, ship.u, end + 0.1).fell && !follow(m, ship.x, ship.u, end - 0.1).fell,
-        'fall-in: not ended at the singularity radius in time');
+        'fall-in: not ended at the singularity in time');
     }
   }
   return {ok: failures.length == 0, message: failures.length ? failures.join('; ') : `${scenarios.filter(sc => sc.setup).length} scenarios`};
@@ -981,6 +1009,7 @@ async function main() {
     await run(prefix + 'surface shader', () => checkSurfaceShader(gl, vertexSource));
     await run(prefix + 'frames (JS)', async () => checkFramesJs());
     await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
+    await run(prefix + 'where the coordinates break down (JS)', async () => checkBreakdownJs());
     await run(prefix + 'gyroscope (JS)', async () => checkGyroscopeJs());
     await run(prefix + 'object history (JS)', async () => checkObjectHistoryJs());
     await run(prefix + 'object orientation (JS)', async () => checkObjectOrientationJs());

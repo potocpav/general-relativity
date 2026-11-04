@@ -55,18 +55,11 @@ float ray_energy(vec3 x, vec3 p) {
 
 // dT/dl of a light ray at radius r, with dr/dl = v and conserved E, L:
 // (E + s v) / (1 - rs/r), rewritten using the null condition to be finite
-// at the horizon, except for rays heading into the past horizon.
+// at the horizon, except for rays heading into the past horizon (white hole),
+// which these coordinates don't cover: there it diverges, and the ray is
+// stopped (see ray_terminated).
 float ray_dtdl(float r, float v, float E, float L) {
 	return (E * E + rs * L * L / (r * r * r)) / (E - sqrt(rs / r) * v);
-}
-
-// Whether a ray at y = (T, r, phi, v) went where it can't be followed.
-// Rays are traced backwards in time. A ray that crosses the horizon inwards
-// came out of the past horizon (white hole), which these coordinates don't
-// cover. Inside, rays with E > 0 head there too, never leaving; in a real
-// black hole they would come from the collapsed star.
-bool ray_terminated(vec4 y, float E) {
-	return (y.y < rs && y.w < 0.0) || (E > 0.0 && y.y > rs / HORIZON_MARGIN);
 }
 
 #else
@@ -99,13 +92,33 @@ float ray_dtdl(float r, float v, float E, float L) {
 	return E / (1.0 - rs / r);
 }
 
-// Whether a ray at y = (t, r, phi, v) went where it can't be followed:
-// the coordinates are singular at the horizon.
-bool ray_terminated(vec4 y, float E) {
-	return y.y < rs * HORIZON_MARGIN;
+#endif
+
+// Where the coordinates break down, from local quantities only (the same for
+// all metrics, see maxFrameCondition in js/metric.js): the reference frame
+// becomes degenerate, or a light ray's energy measured by the reference
+// observer changes sign or by more than MAX_RAY_ENERGY_RATIO. Non-finite
+// values fail the comparisons too.
+float frobenius(mat3 m) {
+	return sqrt(dot(m[0], m[0]) + dot(m[1], m[1]) + dot(m[2], m[2]));
 }
 
-#endif
+float frame_condition(vec3 x) {
+	return frobenius(T(x)) * frobenius(T_inv(x));
+}
+
+// energy of a ray at x with momentum p, measured by the reference observer
+float frame_energy(vec3 x, vec3 p) {
+	return (T(x) * p).x;
+}
+
+// Whether a ray at x with momentum p, which started with reference frame
+// energy e0, can't be followed further.
+bool ray_terminated(vec3 x, vec3 p, float e0) {
+	float ratio = frame_energy(x, p) / e0;
+	return !(frame_condition(x) < MAX_FRAME_CONDITION
+		&& ratio > 1.0 / MAX_RAY_ENERGY_RATIO && ratio < MAX_RAY_ENERGY_RATIO);
+}
 
 // normalize duplicate coordinate points
 vec3 cyclic(vec3 x) {
@@ -166,6 +179,11 @@ vec4 ray_f(vec4 y, float E, float L) {
 	return vec4(ray_dtdl(r, y.w, E, L), y.w, L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r));
 }
 
+// momentum (coordinate components) of a ray state
+vec3 ray_momentum(vec4 y, float E, float L) {
+	return vec3(ray_dtdl(y.y, y.w, E, L), y.w, L / (y.y * y.y));
+}
+
 // spatial velocity (radial, tangential) of a ray state, for error control
 vec2 ray_velocity(vec4 y, float L) {
 	return vec2(y.w, L / y.y);
@@ -203,14 +221,16 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 
 	float E = ray_energy(x0, u0);
 	float L = x0.y * x0.y * u0.z;
+	float e0 = frame_energy(x0, u0);
 	vec4 y = vec4(x0, u0.y);
+	float e = e0; // frame energy at y
 	vec4 k1 = ray_f(y, E, L);
 	float l = 0.0;
 	float h = INITIAL_H;
 	bool step_accepted = true;
 	int status = RAY_OUT_OF_STEPS;
 	for (steps = 0; steps < MAX_ITERS; steps += 1) {
-		if (ray_terminated(y, E)) {
+		if (ray_terminated(y.xyz, ray_momentum(y, E, L), e0)) {
 			status = RAY_HORIZON;
 			break;
 		}
@@ -228,6 +248,20 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 		vec2 w1 = ray_velocity(y1, L);
 		float scale = max(length(ray_velocity(y, L)), length(w1)) * RTOL + 1e-30;
 		float error = length(ray_velocity(z1, L) - w1) / scale;
+		// Don't step across where the coordinates break down: the step size is
+		// also controlled by how much the reference frame changes over the step,
+		// |T(y1) T^-1(y) - 1| <= FRAME_STEP, and the ray's frame energy, by at
+		// most a factor of ENERGY_STEP (each as an error of 1, scaling like the
+		// RK23 error); a change of sign, or non-finite values, reject the step.
+		// This also covers rays without an error estimate (radial ones).
+		const float FRAME_STEP = 0.5;
+		const float ENERGY_STEP = 2.0;
+		float frame_change = frobenius(T(y1.xyz) * T_inv(y.xyz) - mat3(1.0)) / FRAME_STEP;
+		float e1 = frame_energy(y1.xyz, ray_momentum(y1, E, L));
+		float change = e1 / e;
+		float energy_change = change > 0.0 ? abs(log(change)) / log(ENERGY_STEP) : 1e3;
+		float breakdown_error = pow(max(frame_change, energy_change), 3.0);
+		error = max(error, breakdown_error < 1e3 ? breakdown_error : 1e3);
 
 		float factor;
 		if (error < 1.0) {
@@ -251,14 +285,15 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 			l = l1;
 			y = y1;
 			k1 = k4;
+			e = e1;
 		}
 	}
 	if (status == RAY_OUT_OF_STEPS) { // the last step may have finished it
-		if (ray_terminated(y, E)) status = RAY_HORIZON;
+		if (ray_terminated(y.xyz, ray_momentum(y, E, L), e0)) status = RAY_HORIZON;
 		else if (l >= 1.0) status = RAY_REACHED;
 	}
 	x = y.xyz;
-	u = vec3(ray_dtdl(y.y, y.w, E, L), y.w, L / (y.y * y.y));
+	u = ray_momentum(y, E, L);
 	l_end = l;
 	return status;
 }

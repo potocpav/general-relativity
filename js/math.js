@@ -87,9 +87,9 @@ export const rk4 = (f, y, h) => {
 
 // Integrate the geodesic ODE `f` (see geo_f) over the parameter interval
 // `duration` (backwards if negative) with RK4 steps of at most `maxStep`.
-// Steps are shortened where the body approaches a place it can't be followed
-// (metric.stepLimit), so that a long step doesn't jump across it. Returns null
-// if the body gets there (metric.canFollow).
+// Steps are shortened where the coordinates break down (metric.stepLimit),
+// so that a long step doesn't jump across it. Returns null if the body gets
+// where it can't be followed (metric.canFollow).
 export function integrate(metric, f, xu, duration, maxStep) {
   const maxIters = 100000;
   const sign = Math.sign(duration), total = Math.abs(duration);
@@ -115,7 +115,8 @@ export const RAY_HORIZON = 1;  // went where it can't be followed (the black hol
 //   dt/dl = metric.rayDtdl(r, v, E, L),  dr/dl = v,  dphi/dl = L / r^2,
 //   dv/dl = L^2 (r - 1.5 rs) / r^4,
 // which (except for t) is regular at the horizon. Steps are at most
-// `maxStep`, and short enough to move by a small fraction of r.
+// `maxStep`, and short enough to move by a small fraction of r. The ray is
+// stopped where it can't be followed (metric.rayCanFollow).
 // Returns {status, x, p}, with x and p at the end if it was reached.
 export function traceRay(metric, x0, p0, maxStep = 1e-3) {
   const rs = metric.rs;
@@ -124,15 +125,17 @@ export function traceRay(metric, x0, p0, maxStep = 1e-3) {
     const r = y[1];
     return [metric.rayDtdl(r, y[3], E, L), y[3], L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r)];
   };
+  const momentum = y => [metric.rayDtdl(y[1], y[3], E, L), y[3], L / (y[1] * y[1])];
+  const e0 = matVec(metric.T(x0), p0)[0];
+  const canFollow = y => metric.rayCanFollow(y.slice(0, 3), momentum(y), e0);
   var y = [...x0, p0[1]], l = 0;
   for (var i = 0; 1 - l > 1e-12; i++) {
-    if (metric.rayTerminated(y, E) || i > 1e6) return {status: RAY_HORIZON};
+    if (!canFollow(y) || i > 1e6) return {status: RAY_HORIZON};
     const speed = Math.abs(y[3]) + Math.abs(L) / y[1];
     const h = Math.min(maxStep, 1 - l, 0.02 * y[1] / (speed + 1e-12));
     y = rk4(f, y, h);
     l += h;
   }
-  if (metric.rayTerminated(y, E)) return {status: RAY_HORIZON};
-  const r = y[1];
-  return {status: RAY_REACHED, x: y.slice(0, 3), p: [metric.rayDtdl(r, y[3], E, L), y[3], L / (r * r)]};
+  if (!canFollow(y)) return {status: RAY_HORIZON};
+  return {status: RAY_REACHED, x: y.slice(0, 3), p: momentum(y)};
 }

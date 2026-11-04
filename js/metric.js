@@ -1,13 +1,36 @@
-import { matVec, dot, scale } from './math.js';
+import { matVec, dot, scale, norm } from './math.js';
 
-// In Schwarzschild coordinates, which are singular at r = rs, bodies closer
-// than this (in multiples of rs) are considered lost behind the event horizon.
-// Light rays use it in both coordinates, see rayTerminated.
-export const horizonMargin = 1.02;
+// Where the coordinates break down, detected from local quantities only (the
+// same for every metric; light rays use the first and last, see glsl/physics.glsl):
+// - the reference frame becomes degenerate: the condition number of T,
+//   estimated as |T| |T^-1| (Frobenius norms), exceeds maxFrameCondition
+//   (e.g. Schwarzschild coordinates at the horizon, or near the singularity);
+// - a body moves faster than this Lorentz factor relative to the reference
+//   observer (e.g. falling into the horizon in Schwarzschild coordinates);
+// - a light ray's energy measured by the reference observer changes sign, or
+//   by more than this factor from where it started (e.g. a ray heading into
+//   the past horizon, which Gullstrand–Painlevé coordinates don't cover).
+// Non-finite values count as a breakdown too.
+export const maxFrameCondition = 1e6;
+export const maxGamma = 1e3;
+export const maxRayEnergyRatio = 1e3;
 
-// In Gullstrand–Painlevé coordinates, bodies are followed until this radius
-// (in multiples of rs), close to the singularity at r = 0.
-export const singularityRadius = 0.005;
+// Integration steps are limited so that a body's velocity changes by at most
+// this fraction per step (measured in the reference frame), which makes them
+// shrink where the coordinates break down.
+const stepFraction = 0.1;
+
+const frobenius = m => Math.sqrt(m.reduce((s, row) => s + dot(row, row), 0));
+export const frameCondition = (metric, x) => frobenius(metric.T(x)) * frobenius(metric.Tinv(x));
+
+// Whether a light ray at x with momentum p, which started with reference
+// frame energy e0, can be followed further.
+export function rayCanFollow(metric, x, p, e0) {
+  if (![...x, ...p].every(Number.isFinite)) return false;
+  if (!(frameCondition(metric, x) < maxFrameCondition)) return false;
+  const ratio = matVec(metric.T(x), p)[0] / e0;
+  return ratio > 1 / maxRayEnergyRatio && ratio < maxRayEnergyRatio;
+}
 
 // 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
 // in screen-aligned cartesian components, i.e. flat-space polar (dr/dt, r dphi/dt).
@@ -71,19 +94,37 @@ function cartesianToLocal(x0, v) {
 // observers, or null where there are none (inside the horizon).
 // `glslId` selects the metric in glsl/physics.glsl (METRIC).
 //
-// canFollow(x): whether bodies at x can be followed; stepLimit(xu): max.
-// integration step for a body there, approaching where it can't.
+// canFollow(xu) and stepLimit(xu) are the same for all metrics (see Metric).
 //
 // Light rays are traced with their conserved energy E = -p_t and angular
 // momentum L = p_phi (see traceRay in js/math.js and glsl/physics.glsl):
-// rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dt/dl, with v = dr/dl, and
-// rayTerminated(y, E) whether a ray at y = [t, r, phi, v] went where it can't
-// be followed (into the black hole's shadow).
+// rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dt/dl, with v = dr/dl.
+
+class Metric {
+  // Whether a body at xu = [x, u, ...] can be followed (see maxFrameCondition).
+  canFollow(xu) {
+    const x = xu.slice(0, 3), u = xu.slice(3, 6);
+    if (![...x, ...u].every(Number.isFinite)) return false;
+    if (!(frameCondition(this, x) < maxFrameCondition)) return false;
+    return matVec(this.T(x), u)[0] < maxGamma;
+  }
+
+  rayCanFollow(x, p, e0) {
+    return rayCanFollow(this, x, p, e0);
+  }
+
+  // Max. proper-time step for a body at xu = [x, u, ...]: its velocity
+  // changes by at most stepFraction, du/dtau = -Gamma(u, u) in free fall.
+  stepLimit(xu) {
+    const x = xu.slice(0, 3), u = xu.slice(3, 6), Tx = this.T(x);
+    return stepFraction * norm(matVec(Tx, u)) / (norm(matVec(Tx, this.gammaUU(x, u))) + 1e-300);
+  }
+}
 
 // Schwarzschild metric in Schwarzschild (t, r, phi) coordinates.
 // The reference frame is that of static observers. The coordinates are
 // singular at the horizon, so nothing can be followed across it.
-export class Schwarzschild {
+export class Schwarzschild extends Metric {
   static id = 'schwarzschild';
   static label = 'Schwarzschild';
   static glslId = 0;
@@ -91,15 +132,8 @@ export class Schwarzschild {
   static endMessage = "You have reached the event horizon: Schwarzschild coordinates can't follow you inside;";
 
   constructor(rs) {
+    super();
     this.rs = rs;
-  }
-
-  canFollow(x) {
-    return x[1] > this.rs * horizonMargin;
-  }
-
-  stepLimit(xu) {
-    return 0.1 * (xu[1] - this.rs) / (Math.abs(xu[4]) + 1e-12);
   }
 
   rayEnergy(x, p) {
@@ -108,10 +142,6 @@ export class Schwarzschild {
 
   rayDtdl(r, v, E, L) {
     return E / (1 - this.rs / r);
-  }
-
-  rayTerminated(y, E) {
-    return y[1] < this.rs * horizonMargin;
   }
 
   g(x) {
@@ -171,7 +201,7 @@ export class Schwarzschild {
 //
 // The reference frame is that of "raindrop" observers, falling freely from
 // rest at infinity, u = (1, -sqrt(rs/r), 0); they exist everywhere.
-export class GullstrandPainleve {
+export class GullstrandPainleve extends Metric {
   static id = 'gp';
   static label = 'Gullstrand–Painlevé';
   static glslId = 1;
@@ -179,15 +209,8 @@ export class GullstrandPainleve {
   static endMessage = "You have hit the singularity:";
 
   constructor(rs) {
+    super();
     this.rs = rs;
-  }
-
-  canFollow(x) {
-    return x[1] > this.rs * singularityRadius;
-  }
-
-  stepLimit(xu) {
-    return 0.1 * xu[1] / (Math.abs(xu[4]) + 1e-12);
   }
 
   rayEnergy(x, p) {
@@ -196,17 +219,15 @@ export class GullstrandPainleve {
   }
 
   // (E + s v) / (1 - rs/r), rewritten using the null condition to be finite
-  // at the horizon, except for rays heading into the past horizon
+  // at the horizon, except for rays heading into the past horizon (white
+  // hole), which these coordinates don't cover: there dT/dl diverges, and
+  // the ray's energy measured by the raindrop observer with it, so the ray
+  // is stopped (see rayCanFollow). Rays are traced backwards in time: those
+  // crossing the horizon inwards came out of the white hole, and inside, rays
+  // with E > 0 head there too; in a real black hole they would come from the
+  // collapsed star.
   rayDtdl(r, v, E, L) {
     return (E * E + this.rs * L * L / (r * r * r)) / (E - Math.sqrt(this.rs / r) * v);
-  }
-
-  // Rays are traced backwards in time. A ray that crosses the horizon inwards
-  // came out of the past horizon (white hole), which these coordinates don't
-  // cover. Inside, rays with E > 0 head there too, never leaving; in a real
-  // black hole they would come from the collapsed star.
-  rayTerminated(y, E) {
-    return (y[1] < this.rs && y[3] < 0) || (E > 0 && y[1] > this.rs / horizonMargin);
   }
 
   g(x) {
