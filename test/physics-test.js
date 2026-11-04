@@ -195,14 +195,29 @@ function checkBreakdownJs() {
     fall(mid) === null ? hi = mid : lo = mid;
   }
   const rStop = fall(lo)[1] / rs;
+  // integrated in chunks (like frames) of different lengths, it ends at the
+  // same place, where the breakdown measure is 1
+  const ends = [0.017, 0.05, 0.31].map(chunk => {
+    let xu = [...x0, ...u0];
+    for (let i = 0; i < 10000; i++) {
+      const r = math.integrateToEdge(metric, math.geo_f(metric), xu, chunk, 1e-3);
+      xu = r.xu;
+      if (r.ended) return xu;
+    }
+    return null;
+  });
+  const endR = ends.map(xu => xu && xu[1]), endB = ends.map(xu => xu && metric.breakdown(xu));
+  const spread = Math.max(...endR) / Math.min(...endR) - 1;
+  const atEdge = endB.every(b => b > 1 - 1e-6 && b < 1);
   // a radial light ray, inwards (traced back in time)
   const ray = math.traceRay(metric, x0, math.matVec(math.restToCoord(metric, x0, u0), [-20, -20, 0]));
   const ok = metric instanceof Schwarzschild
     ? rStop > 1 && rStop < 1 + 1e-3
     : rStop < 1e-3;
-  return {ok: ok && ray.status == math.RAY_HORIZON,
-    message: `raindrop stopped at ${rStop.toPrecision(6)} rs, after tau = ${lo.toFixed(4)}; radial ray ` +
-      (ray.status == math.RAY_HORIZON ? 'stopped' : 'not stopped')};
+  return {ok: ok && ray.status == math.RAY_HORIZON && atEdge && spread < 1e-6,
+    message: `raindrop stopped at ${rStop.toPrecision(6)} rs, after tau = ${lo.toFixed(4)}; ` +
+      `in chunks, at breakdown ${endB.map(b => b && b.toPrecision(8)).join(', ')}, r spread ${spread.toExponential(1)}; ` +
+      `radial ray ` + (ray.status == math.RAY_HORIZON ? 'stopped' : 'not stopped')};
 }
 
 // The ship's heading is Fermi–Walker transported: on a circular orbit at r,

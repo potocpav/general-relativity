@@ -101,12 +101,19 @@ function cartesianToLocal(x0, v) {
 // rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dt/dl, with v = dr/dl.
 
 class Metric {
-  // Whether a body at xu = [x, u, ...] can be followed (see maxFrameCondition).
-  canFollow(xu) {
+  // How close a body at xu = [x, u, ...] is to where the coordinates break
+  // down (see maxFrameCondition): it can be followed while this is below 1.
+  // Continuous, so that the point where it reaches 1 can be found exactly
+  // (integrateToEdge); infinite for non-finite values.
+  breakdown(xu) {
     const x = xu.slice(0, 3), u = xu.slice(3, 6);
-    if (![...x, ...u].every(Number.isFinite)) return false;
-    if (!(frameCondition(this, x) < maxFrameCondition)) return false;
-    return matVec(this.T(x), u)[0] < maxGamma;
+    if (![...x, ...u].every(Number.isFinite)) return Infinity;
+    const b = Math.max(frameCondition(this, x) / maxFrameCondition, matVec(this.T(x), u)[0] / maxGamma);
+    return Number.isFinite(b) ? b : Infinity;
+  }
+
+  canFollow(xu) {
+    return this.breakdown(xu) < 1;
   }
 
   rayCanFollow(x, p, e0) {

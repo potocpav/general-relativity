@@ -91,18 +91,36 @@ export const rk4 = (f, y, h) => {
 // so that a long step doesn't jump across it. Returns null if the body gets
 // where it can't be followed (metric.canFollow).
 export function integrate(metric, f, xu, duration, maxStep) {
+  const r = integrateToEdge(metric, f, xu, duration, maxStep);
+  return r.ended ? null : r.xu;
+}
+
+// The same, but a body that gets where it can't be followed is stopped
+// exactly where metric.breakdown reaches 1 (the last step is bisected), so
+// that it always ends at the same threshold, however the integration is
+// split into calls. Returns {xu, done, ended}: the state, the parameter
+// interval integrated (|done| <= |duration|), and whether it ended there.
+export function integrateToEdge(metric, f, xu, duration, maxStep) {
   const maxIters = 100000;
   const sign = Math.sign(duration), total = Math.abs(duration);
   var done = 0;
   for (var i = 0; total - done > 1e-12; i++) {
-    if (i >= maxIters) return null;
+    if (i >= maxIters) return {xu, done: sign * done, ended: true};
     const h = Math.min(maxStep, metric.stepLimit(xu), total - done);
     const next = rk4(f, xu, sign * h);
-    if (!metric.canFollow(next)) return null;
+    if (!metric.canFollow(next)) {
+      // the step length where breakdown reaches 1
+      let lo = 0, hi = h;
+      for (let k = 0; k < 60; k++) {
+        const mid = (lo + hi) / 2;
+        metric.canFollow(rk4(f, xu, sign * mid)) ? lo = mid : hi = mid;
+      }
+      return {xu: rk4(f, xu, sign * lo), done: sign * (done + lo), ended: true};
+    }
     xu = next;
     done += h;
   }
-  return xu;
+  return {xu, done: sign * done, ended: false};
 }
 
 export const RAY_REACHED = 0;  // traced to the end
