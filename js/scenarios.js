@@ -73,7 +73,7 @@ const raindrop = (metric, r, phi) => {
 // free-fall state `tau` proper time before (x, u): geodesics are
 // time-reversible, so integrate forward with the velocity reversed
 function backwards(metric, [x, u], tau) {
-  const xu = math.integrate(metric, math.geo_f(metric), [...x, ...math.scale(u, -1)], tau, 0.02);
+  const {xu} = math.integrate(metric, math.geo_f(metric), [...x, ...math.scale(u, -1)], tau, 0.02);
   return [xu.slice(0, 3), math.scale(xu.slice(3, 6), -1)];
 }
 

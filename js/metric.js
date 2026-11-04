@@ -109,7 +109,7 @@ class Metric {
   // How close a body at xu = [x, u, ...] is to where the coordinates break
   // down (see maxFrameCondition): it can be followed while this is below 1.
   // Continuous, so that the point where it reaches 1 can be found exactly
-  // (integrateToEdge); infinite for non-finite values.
+  // (math.integrate); infinite for non-finite values.
   breakdown(xu) {
     const b = frameCondition(this, xu.slice(0, 3)) / maxFrameCondition;
     return xu.slice(0, 6).every(Number.isFinite) && Number.isFinite(b) ? b : Infinity;

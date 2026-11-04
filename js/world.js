@@ -110,7 +110,7 @@ export class World {
 
     const f = math.geo_fw_f(this.metric, accel3_rest);
     // where it can't be followed, it stops exactly at the threshold
-    const {xu: xuh, done, ended} = math.integrateToEdge(
+    const {xu: xuh, done, ended} = math.integrate(
       this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], this.dt, math.maxProperStep);
     if (ended) this.crashed = true;
     this.time += done;

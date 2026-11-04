@@ -112,8 +112,8 @@ function checkGeodesicsJs() {
   let maxError = 0;
   for (let i = 0; i < 20; i++) {
     const x = randomPoint(2, 10), u = randomVelocity(x);
-    const xu = math.integrate(metric, math.geo_f(metric), [...x, ...u], 2, 1e-3);
-    if (xu === null) continue;
+    const {xu, ended} = math.integrate(metric, math.geo_f(metric), [...x, ...u], 2, 1e-3);
+    if (ended) continue;
     const x1 = xu.slice(0, 3), u1 = xu.slice(3, 6);
     const c0 = conserved(x, u), c1 = conserved(x1, u1);
     const n1 = math.dot(u1, math.matVec(metric.g(x1), u1));
@@ -149,8 +149,8 @@ function checkTraceRayJs() {
     const p0 = screenRay(metric, x0, randomVelocity(x0), randomVector2(10));
     if (Math.abs(impactParameter(x0, p0) / bCrit - 1) < 0.1) continue;
     const ray = math.traceRay(metric, x0, p0, 1e-4);
-    const xu = math.integrate(metric, math.geo_f(metric), [...x0, ...p0], 1, 1e-4);
-    if (ray.status != math.RAY_REACHED || xu === null) continue;
+    const {xu, ended} = math.integrate(metric, math.geo_f(metric), [...x0, ...p0], 1, 1e-4);
+    if (ray.status != math.RAY_REACHED || ended) continue;
     compared++;
     for (let k = 0; k < 3; k++) {
       maxError = Math.max(maxError, Math.abs(ray.x[k] - xu[k]) / Math.max(1, Math.abs(xu[k])),
@@ -167,7 +167,8 @@ function checkFreeFallJs() {
   const r0 = 10 * rs, x0 = [0, r0, 0.3];
   const u0 = math.matVec(metric.Tinv(x0), [1, 0, 0]); // the reference (raindrop) observer
   const tau = r => 2 / (3 * Math.sqrt(rs)) * (Math.pow(r0, 1.5) - Math.pow(r, 1.5));
-  const fall = t => math.integrate(metric, math.geo_f(metric), [...x0, ...u0], t, 1e-3);
+  // the state after proper time t, or null if it ended before
+  const fall = t => { const {xu, ended} = math.integrate(metric, math.geo_f(metric), [...x0, ...u0], t, 1e-3); return ended ? null : xu; };
   const errors = [];
   for (const r of [2 * rs, rs, 0.5 * rs, 0.1 * rs]) {
     const xu = fall(tau(r));
@@ -187,7 +188,7 @@ function checkFreeFallJs() {
 function checkBreakdownJs() {
   const x0 = [0, 10 * rs, 0.3];
   const u0 = localVelocity3(metric, x0, [-Math.sqrt(0.1) * Math.cos(0.3), -Math.sqrt(0.1) * Math.sin(0.3)]);
-  const fall = t => math.integrate(metric, math.geo_f(metric), [...x0, ...u0], t, 1e-3);
+  const fall = t => { const {xu, ended} = math.integrate(metric, math.geo_f(metric), [...x0, ...u0], t, 1e-3); return ended ? null : xu; };
   // bisect the proper time where it stops
   let lo = 0, hi = 100;
   for (let i = 0; i < 50; i++) {
@@ -200,7 +201,7 @@ function checkBreakdownJs() {
   const ends = [0.017, 0.05, 0.31].map(chunk => {
     let xu = [...x0, ...u0];
     for (let i = 0; i < 10000; i++) {
-      const r = math.integrateToEdge(metric, math.geo_f(metric), xu, chunk, 1e-3);
+      const r = math.integrate(metric, math.geo_f(metric), xu, chunk, 1e-3);
       xu = r.xu;
       if (r.ended) return xu;
     }
@@ -243,7 +244,7 @@ function checkGyroscopeJs() {
     // proper time of one orbit: coordinate period 2 pi sqrt(r^3 / M), M = rs / 2, times sqrt(1 - 1.5 rs / r)
     const period = 2 * Math.PI * Math.sqrt(2 * r ** 3 / rs) * Math.sqrt(1 - 1.5 * rs / r);
     const y0 = [...x, ...u, ...h];
-    const y = math.integrate(metric, math.geo_fw_f(metric), y0, period, 0.005);
+    const {xu: y} = math.integrate(metric, math.geo_fw_f(metric), y0, period, 0.005);
     const turned = (screenAngle(y) - screenAngle(y0) - 2 * Math.PI) * 180 / Math.PI;
     const expected = 360 * (1 - Math.sqrt(1 - 1.5 * rs / r));
     if (!(Math.abs(turned - expected) < 0.01)) errors.push(`${k} rs: ${turned.toFixed(3)} deg, expected ${expected.toFixed(3)}`);
@@ -254,7 +255,7 @@ function checkGyroscopeJs() {
   const rand = prng(3);
   const x = [0, (3 + 7 * rand()) * rs, 6 * rand()], u = localVelocity3(metric, x, [0.5 * rand() - 0.25, 0.5 * rand() - 0.25]);
   const h = math.matVec(math.restToCoord(metric, x, u), [0, 0.6, 0.8]);
-  const y = math.integrate(metric, math.geo_fw_f(metric, [0, 0.4, -0.3]), [...x, ...u, ...h], 3, 0.005);
+  const {xu: y} = math.integrate(metric, math.geo_fw_f(metric, [0, 0.4, -0.3]), [...x, ...u, ...h], 3, 0.005);
   maxDrift = Math.max(maxDrift, drift(y));
   if (!(maxDrift < 1e-8)) errors.push(`h.u or h.h - 1 drifted by ${maxDrift.toExponential(1)}`);
   return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
@@ -675,8 +676,8 @@ function checkScenariosJs() {
     const f = math.geo_f(metric, accel);
     let xu = [...x, ...u], rMin = x[1], rMax = x[1], dir = 0, periapsisPhis = [];
     for (let t = 0; t < tau; t += 0.05) {
-      const next = math.integrate(metric, f, xu, 0.05, 0.01);
-      if (next === null) return {fell: true, rMin, rMax, periapsisPhis, xu};
+      const {xu: next, ended} = math.integrate(metric, f, xu, 0.05, 0.01);
+      if (ended) return {fell: true, rMin, rMax, periapsisPhis, xu};
       const d = Math.sign(next[1] - xu[1]);
       if (dir < 0 && d > 0) periapsisPhis.push(xu[2]);
       dir = d;
@@ -706,8 +707,9 @@ function checkScenariosJs() {
       const burn = (accel, tau) => {
         let xu = [...ship.x, ...ship.u];
         for (let t = 0; t < tau; t += 0.05) {
-          xu = math.integrate(m, math.geo_f(m, t < 0.1 ? accel : undefined), xu, 0.05, 0.01);
-          if (xu === null) return null;
+          const r = math.integrate(m, math.geo_f(m, t < 0.1 ? accel : undefined), xu, 0.05, 0.01);
+          if (r.ended) return null;
+          xu = r.xu;
         }
         return xu;
       };
@@ -785,7 +787,7 @@ function checkObjectHistoryJs() {
     let yf = integrateToTime(finer, [...spawned[i].x, ...spawned[i].u, 0], rowsOf(objs, o)[0][0] * dt);
     for (const [k, y] of rowsOf(objs, o)) {
       if (y[0] != k * dt) errors.push(`row ${k} at T = ${y[0]}, not ${k * dt}`);
-      xu = math.integrate(metric, math.geo_f(metric), xu, y[6] - tau, 1e-3);
+      xu = math.integrate(metric, math.geo_f(metric), xu, y[6] - tau, 1e-3).xu;
       tau = y[6];
       if (y[1] > 2 * rs) maxError = Math.max(maxError, rel(xu, y));
       yf = integrateToTime(finer, yf, k * dt);

@@ -92,19 +92,13 @@ export const maxProperStep = 0.02;
 // Integrate the geodesic ODE `f` (see geo_f) over the parameter interval
 // `duration` (backwards if negative) with RK4 steps of at most `maxStep`.
 // Steps are shortened where the coordinates break down (metric.stepLimit),
-// so that a long step doesn't jump across it. Returns null if the body gets
-// where it can't be followed (metric.canFollow).
+// so that a long step doesn't jump across it. A body that gets where it
+// can't be followed (metric.canFollow) is stopped exactly where
+// metric.breakdown reaches 1 (the last step is bisected), so that it always
+// ends at the same threshold, however the integration is split into calls.
+// Returns {xu, done, ended}: the state, the parameter interval integrated
+// (|done| <= |duration|), and whether it ended there.
 export function integrate(metric, f, xu, duration, maxStep) {
-  const r = integrateToEdge(metric, f, xu, duration, maxStep);
-  return r.ended ? null : r.xu;
-}
-
-// The same, but a body that gets where it can't be followed is stopped
-// exactly where metric.breakdown reaches 1 (the last step is bisected), so
-// that it always ends at the same threshold, however the integration is
-// split into calls. Returns {xu, done, ended}: the state, the parameter
-// interval integrated (|done| <= |duration|), and whether it ended there.
-export function integrateToEdge(metric, f, xu, duration, maxStep) {
   const maxIters = 100000;
   const sign = Math.sign(duration), total = Math.abs(duration);
   var done = 0;
