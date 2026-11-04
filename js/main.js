@@ -8,8 +8,8 @@ import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId, projectileId } from './object-info.js';
 import { Objects } from './objects.js';
-import { scenarios, defaultRs, scenarioMetric } from './scenarios.js';
-import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes } from './metric.js';
+import { scenarios, scenariosOf, defaultRs } from './scenarios.js';
+import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
 
 const html = htm.bind(h);
 
@@ -54,8 +54,8 @@ const initialScenario = findScenario(new URLSearchParams(location.search).get('s
 
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
-// switchable, see selectMetric; its black hole size is set by scenarios
-var metric = new scenarioMetric(defaultRs);
+// set by the scenario (its metric class and black hole size), see loadScenario
+var metric = new initialScenario.metric(initialScenario.rs ?? defaultRs);
 
 // projectiles fired with Space: speed in the ship's rest frame, and how many
 // are kept (the oldest are dropped)
@@ -421,9 +421,9 @@ class App extends Component {
   onSpawnAsteroid = _ => this.setState({spawnObject: 'asteroid'});
   onSpawnPhotonClock = _ => this.setState({spawnObject: 'photonClock'});
 
-  // Reset the world to the initial state of `scenario`, in its coordinates.
+  // Reset the world to the initial state of `scenario`, in its metric.
   async loadScenario(scenario) {
-    const type = scenarioMetric;
+    const type = scenario.metric;
     const rs = scenario.rs ?? defaultRs;
     if (type !== metric.constructor || rs !== metric.rs) {
       const next = new type(rs);
@@ -461,7 +461,10 @@ class App extends Component {
   }
 
   selectScenario = ev => {
-    const scenario = scenarios[ev.target.selectedIndex];
+    this.startScenario(scenariosOf(metric.constructor)[ev.target.selectedIndex]);
+  }
+
+  startScenario(scenario) {
     if (!scenario.setup) return;
     // put it into the URL (only once chosen), so that it can be linked
     const url = new URL(location.href);
@@ -472,29 +475,11 @@ class App extends Component {
 
   hideDescription = _ => this.setState({showDescription: false});
 
-  // Switch the coordinates (metric) the simulation runs in.
-  selectMetric = async ev => {
-    const select = ev.target;
-    const type = metricTypes[select.selectedIndex];
-    const next = new type(metric.rs);
-    if (convertState(metric, next, world.obsvX, world.obsvU) === null) {
-      select.selectedIndex = metricTypes.indexOf(metric.constructor);
-      this.setState({message: `${type.label} coordinates can't describe the inside of the black hole.`});
-      return;
-    }
-    try {
-      // compile first, then switch everything at once
-      await renderer.setMetric(next);
-    } catch (err) {
-      console.error(err);
-      select.selectedIndex = metricTypes.indexOf(metric.constructor);
-      this.setState({message: "Switching coordinates failed: " + err.message});
-      return;
-    }
-    world.setMetric(next);
-    objects.setMetric(next, world.obsvX[0]);
-    metric = next;
-    this.setState({metric: type.id, message: null, crashed: world.crashed});
+  // Switch the coordinates (metric) the simulation runs in: start its first
+  // scenario. (States aren't carried over between metrics.)
+  selectMetric = ev => {
+    const type = metricTypes[ev.target.selectedIndex];
+    this.startScenario(scenariosOf(type).find(sc => sc.setup));
   }
 
   selectQuality = ev => {
@@ -589,7 +574,7 @@ class App extends Component {
       <div id="top_left">
         <div>
           <select onChange=${this.selectScenario} title="Scenario (R restarts it)">
-          ${scenarios.map(sc => html`<option disabled=${!sc.setup} selected=${sc.id == this.state.scenario}>${sc.name}${sc.setup ? '' : ' (coming later)'}</option>`)}
+          ${scenariosOf(metric.constructor).map(sc => html`<option disabled=${!sc.setup} selected=${sc.id == this.state.scenario}>${sc.name}${sc.setup ? '' : ' (coming later)'}</option>`)}
           </select>
         </div>
         ${this.state.showDescription && html`

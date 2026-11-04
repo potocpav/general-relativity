@@ -1,6 +1,5 @@
 
 import * as math from './math.js';
-import { convertState } from './metric.js';
 
 var gl;
 
@@ -52,21 +51,6 @@ export class World {
   restHeading() {
     const h = math.matVec(math.coordToRest(this.metric, this.obsvX, this.obsvU), this.obsvH);
     return [h[1], h[2]];
-  }
-
-  // Switch to the coordinates of `metric`, converting the observer's state.
-  // Returns false (and changes nothing) if the observer's position can't be
-  // represented in them.
-  setMetric(metric) {
-    const state = convertState(this.metric, metric, this.obsvX, this.obsvU);
-    if (state === null) return false;
-    const h = convertState(this.metric, metric, this.obsvX, this.obsvH);
-    [this.obsvX, this.obsvU] = state;
-    this.obsvH = h[1];
-    this.metric = metric;
-    // continue if the new coordinates can follow the observer further
-    if (this.crashed && metric.canFollow(this.obsvX)) this.crashed = false;
-    return true;
   }
 
   compile(program) {

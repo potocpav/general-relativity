@@ -6,11 +6,11 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { Schwarzschild, GullstrandPainleve, metricTypes, convertState, localVelocity3, velocity3, singularityRadius } from '../js/metric.js';
+import { GullstrandPainleve, metricTypes, localVelocity3, velocity3, singularityRadius } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
-import { scenarios, scenarioMetric } from '../js/scenarios.js';
+import { scenarios } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { asteroidId, photonClockId, objectRadius } from '../js/object-info.js';
 
@@ -138,27 +138,6 @@ function checkFramesJs() {
     }
   }
   return {ok: maxError < 1e-12, message: `max error ${maxError.toExponential(2)}`};
-}
-
-// The same geodesics, integrated in Schwarzschild and in Gullstrand–Painlevé
-// coordinates, agree after converting between them (T = t + shift(r)).
-function checkCoordinateTransformJs() {
-  const S = new Schwarzschild(rs), G = new GullstrandPainleve(rs);
-  const rand = prng(7);
-  let maxError = 0;
-  for (let i = 0; i < 20; i++) {
-    const x = [0, rs * (4 + 20 * rand()), 6 * rand()];
-    const u = localVelocity3(S, x, [rand() - 0.5, rand() - 0.5]);
-    const [xg, ug] = convertState(S, G, x, u);
-    const a = math.integrate(S, math.geo_f(S), [...x, ...u], 3, 1e-3);
-    const b = math.integrate(G, math.geo_f(G), [...xg, ...ug], 3, 1e-3);
-    if (!a || !b) continue;
-    const [xa, ua] = convertState(S, G, a.slice(0, 3), a.slice(3));
-    for (let k = 0; k < 3; k++) {
-      maxError = Math.max(maxError, Math.abs(xa[k] - b[k]), Math.abs(ua[k] - b[3 + k]));
-    }
-  }
-  return {ok: maxError < 1e-9, message: `max difference after tau = 3: ${maxError.toExponential(2)}`};
 }
 
 // The JS ray tracer (conserved quantities) agrees with integrating the
@@ -664,7 +643,7 @@ function checkScenariosJs() {
     return {fell: false, rMin, rMax, periapsisPhis, xu};
   };
   for (const sc of scenarios.filter(sc => sc.setup)) {
-    const m = new scenarioMetric(sc.rs ?? rs);
+    const m = new sc.metric(sc.rs ?? rs);
     const st = sc.setup(m);
     for (const body of [st.ship, ...st.objects]) {
       const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
@@ -820,48 +799,6 @@ function checkObjectOrientationJs() {
     }
   }
   return {ok: errors.length == 0, message: errors.length ? errors.join('; ') : 'geodetic precession at 10 and 4 rs within 0.01 deg'};
-}
-
-// Switching from Schwarzschild to Gullstrand–Painlevé coordinates regenerates
-// the histories: a regenerated row (T, r, phi) is on the old worldline at
-// Schwarzschild time t = T - shift(r).
-function checkObjectCoordinateSwitchJs() {
-  const S = new Schwarzschild(rs), G = new GullstrandPainleve(rs);
-  const saved = metric;
-  metric = S;
-  const {objs} = objectsFixture(null, prng(12));
-  metric = saved;
-  const old = objs.objects.map(o => rowsOf(objs, o)), dt = objs.dt;
-  const shipR = 10 * rs, T = 5 + convertState(S, G, [0, shipR, 0], [1, 0, 0])[0][0];
-  objs.setMetric(G, T);
-  const errors = [];
-  let maxError = 0, maxErrorDead = 0;
-  // cubic Hermite interpolation between rows, with dr/dt = u^r / u^t, dphi/dt = u^phi / u^t
-  const hermite = (y0, y1, a, c) => {
-    const d0 = y0[c + 3] / y0[3] * dt, d1 = y1[c + 3] / y1[3] * dt;
-    return (2 * a ** 3 - 3 * a ** 2 + 1) * y0[c] + (a ** 3 - 2 * a ** 2 + a) * d0 +
-      (-2 * a ** 3 + 3 * a ** 2) * y1[c] + (a ** 3 - a ** 2) * d1;
-  };
-  objs.objects.forEach((o, i) => {
-    if (!o.dead && o.lastRow != Math.ceil(T / dt)) errors.push(`object ${i} not at now`);
-    for (const [, y] of rowsOf(objs, o)) {
-      const [xs] = convertState(G, S, y.slice(0, 3), [1, 0, 0]);
-      const k = xs[0] / dt, k0 = Math.floor(k), a = k - k0;
-      const rows = old[i], j = rows.findIndex(([kk]) => kk == k0);
-      if (j < 0 || j + 1 >= rows.length) continue; // outside the old history
-      const e = Math.max(Math.abs(hermite(rows[j][1], rows[j + 1][1], a, 1) - xs[1]),
-        Math.abs(hermite(rows[j][1], rows[j + 1][1], a, 2) - xs[2]));
-      if (o.dead) maxErrorDead = Math.max(maxErrorDead, e); else maxError = Math.max(maxError, e);
-    }
-  });
-  // Objects lost at the horizon in Schwarzschild coordinates are regenerated
-  // from their last state there, where those coordinates are ill-conditioned,
-  // so their regenerated past is less accurate.
-  if (!(maxError < 1e-6)) errors.push(`regenerated rows off the old worldlines by ${maxError.toExponential(1)}`);
-  if (!(maxErrorDead < 1e-3)) errors.push(`regenerated rows of lost objects off by ${maxErrorDead.toExponential(1)}`);
-  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
-    `regenerated rows on the old worldlines to ${maxError.toExponential(1)} ` +
-    `(objects lost at the horizon: ${maxErrorDead.toExponential(1)})`};
 }
 
 // The shader's object lookup (pixel time -> row, Newton steps to rest-frame
@@ -1036,9 +973,7 @@ async function main() {
       results.push({name, ok: false, message: String(err.message ?? err)});
     }
   };
-  await run('coordinate transformation (JS)', async () => checkCoordinateTransformJs());
   await run('scenarios (JS)', async () => checkScenariosJs());
-  await run('object histories across a coordinate switch (JS)', async () => checkObjectCoordinateSwitchJs());
   for (const type of metricTypes) {
     metric = new type(rs);
     random = prng(42);

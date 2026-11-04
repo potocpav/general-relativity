@@ -88,7 +88,7 @@ export class Schwarzschild {
   static label = 'Schwarzschild';
   static glslId = 0;
 
-  static endMessage = "You have reached the event horizon: Schwarzschild coordinates can't follow you inside. Switch to Gullstrand–Painlevé to continue, or";
+  static endMessage = "You have reached the event horizon: Schwarzschild coordinates can't follow you inside;";
 
   constructor(rs) {
     this.rs = rs;
@@ -164,7 +164,8 @@ export class Schwarzschild {
 
 // Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates:
 //   ds^2 = -(1 - rs/r) dT^2 + 2 sqrt(rs/r) dT dr + dr^2 + r^2 dphi^2
-// with T = t + gpTimeShift(r), t being the Schwarzschild time. Unlike
+// with T = t + 2 sqrt(rs r) + rs ln|(sqrt(r) - sqrt(rs)) / (sqrt(r) + sqrt(rs))|,
+// t being the Schwarzschild time. Unlike
 // Schwarzschild coordinates, these are regular at the (future) horizon and
 // cover the black hole's interior. Space at constant T is flat.
 //
@@ -266,27 +267,3 @@ export class GullstrandPainleve {
 }
 
 export const metricTypes = [Schwarzschild, GullstrandPainleve];
-
-// Gullstrand–Painlevé time minus Schwarzschild time at radius r > rs, and its
-// derivative sqrt(rs/r) / (1 - rs/r).
-export function gpTimeShift(rs, r) {
-  return 2 * Math.sqrt(rs * r) + rs * Math.log(Math.abs((Math.sqrt(r) - Math.sqrt(rs)) / (Math.sqrt(r) + Math.sqrt(rs))));
-}
-
-function gpTimeShiftDerivative(rs, r) {
-  return Math.sqrt(rs / r) / (1 - rs / r);
-}
-
-// Convert a position `x` and a vector `u` at it from the coordinates of
-// metric `from` to those of `to`. Returns [x, u], or null if the point can't
-// be represented in the target coordinates (inside the horizon).
-export function convertState(from, to, x, u) {
-  if (from.constructor === to.constructor) return [x, u];
-  const rs = from.rs, r = x[1];
-  if (!(r > rs)) return null;
-  const sign = to instanceof GullstrandPainleve ? 1 : -1;
-  return [
-    [x[0] + sign * gpTimeShift(rs, r), r, x[2]],
-    [u[0] + sign * gpTimeShiftDerivative(rs, r) * u[1], u[1], u[2]],
-  ];
-}

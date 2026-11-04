@@ -12,12 +12,9 @@
 //
 // Objects are kept one row ahead of the ship's coordinate time, so that the
 // pixels around the ship have data. Rewinding trims the rows after the new
-// time; an object rewound past its first row is removed. Switching
-// coordinates converts each object's latest state and regenerates its
-// history by integrating backwards (exact for free fall).
+// time; an object rewound past its first row is removed.
 
 import * as math from './math.js';
-import { convertState } from './metric.js';
 import { objectRadius } from './object-info.js';
 
 export const maxObjects = 256;
@@ -61,10 +58,9 @@ const stateSize = 10, rowSize = 11;
 const ring = k => ((k % historyRows) + historyRows) % historyRows;
 
 class SimObject {
-  constructor(type, x, u, slot) {
+  constructor(type, slot) {
     this.type = type;
     this.slot = slot;
-    this.birth = x;          // spawn event, to limit regenerated histories
     this.state = null;       // [x, u, tau, h] at row lastRow
     this.angle = undefined;  // orientation angle of the last row written, for continuity
     this.firstRow = 0;
@@ -104,7 +100,7 @@ export class Objects {
   spawn(type, x, u) {
     const slot = this.slots.indexOf(null);
     if (slot < 0) return false;
-    const o = new SimObject(type, x, u, slot);
+    const o = new SimObject(type, slot);
     const first = Math.ceil(x[0] / this.dt);
     const up = this.metric.cartesianToLocal(x, [0, 1]);
     const h = math.matVec(math.restToCoord(this.metric, x, u), [0, ...up]);
@@ -167,38 +163,6 @@ export class Objects {
   remove(o) {
     this.objects.splice(this.objects.indexOf(o), 1);
     this.slots[o.slot] = null;
-  }
-
-  // Switch to the coordinates of `metric`; the ship is now at coordinate time
-  // T. Each object's latest state is converted, and its history regenerated
-  // by integrating backwards, down to its (converted) spawn time or the window
-  // start. Objects that can't be represented in the new coordinates are removed.
-  setMetric(metric, T) {
-    const old = this.metric, objects = this.objects;
-    this.reset(metric, T);
-    for (const o of objects) {
-      const state = convertState(old, metric, o.state.slice(0, 3), o.state.slice(3, 6));
-      const axis = convertState(old, metric, o.state.slice(0, 3), o.state.slice(7, 10));
-      const birth = convertState(old, metric, o.birth, [1, 0, 0]);
-      if (state === null) continue;
-      const n = new SimObject(o.type, birth ? birth[0] : state[0], null, o.slot);
-      // the latest row: now if alive, else the last row before it got lost
-      const last = o.dead ? Math.floor(state[0][0] / this.dt) : this.now;
-      let y = integrateToTime(metric, [...state[0], ...state[1], o.state[6], ...axis[1]], last * this.dt);
-      if (y === null) continue;
-      n.firstRow = n.lastRow = last;
-      n.dead = o.dead;
-      this.slots[n.slot] = n;
-      this.objects.push(n);
-      n.state = y = this.writeRow(n, last, y);
-      const first = Math.max(Math.ceil(n.birth[0] / this.dt), this.windowStart());
-      for (let k = last - 1; k >= first; k--) {
-        y = integrateToTime(metric, y, k * this.dt);
-        if (y === null) break;
-        n.firstRow = k;
-        y = this.writeRow(n, k, y);
-      }
-    }
   }
 
   historyIndex(slot, k) {

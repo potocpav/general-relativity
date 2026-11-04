@@ -37,21 +37,23 @@ against the analytic critical angles, including relativistic aberration.
 
 Observer and object trajectories are computed in JS.
 
-The simulation runs in one of two coordinate systems for the same Schwarzschild black hole,
-selectable in the top right (`js/metric.js`, `METRIC` in `glsl/physics.glsl`):
+The simulation runs in one of two coordinate systems for the Schwarzschild black hole,
+selectable in the top right (`js/metric.js`, `METRIC` in `glsl/physics.glsl`). Each has its own
+scenarios (`js/scenarios.js`); switching starts the other one's first scenario, as states are not
+carried over:
 
-- **Schwarzschild**: the textbook coordinates. They are singular at the event horizon,
+- **Schwarzschild** (Free play only): the textbook coordinates. They are singular at the event horizon,
   so the ship and objects stop there. The grid's redshift is computed for light emitted by static
   observers.
-- **Gullstrand–Painlevé** (default, and for all scenarios): regular across the horizon, so the ship and objects can fall in and are
+- **Gullstrand–Painlevé** (default, with all scenarios but Free play): regular across the horizon, so the ship and objects can fall in and are
   followed until close to the singularity, and the view from inside is rendered. The grid's
   redshift is computed for light emitted by "raindrop" observers, falling freely from rest at
   infinity, so its colors differ.
 
 In both, the grid lines are at constant r and φ, which are the same in both coordinate systems
-(only the time coordinate differs), so they don't move.
+(only the time coordinate differs).
 
-Switching converts the ship and objects between the coordinates. Light rays are traced with their
+Light rays are traced with their
 conserved energy and angular momentum, which keeps them regular at the horizon. Rays that end in
 the black hole's shadow are black (dark red with "BH interior" on); from inside, that includes light that would come from the
 white hole (in a real black hole, from the collapsed star). `test/` checks the inside view against

@@ -4,21 +4,19 @@
 // The black hole's Schwarzschild radius, unless a scenario sets its own `rs`.
 export const defaultRs = 0.3;
 
-// Scenarios start in Gullstrand–Painlevé coordinates, which can follow
-// everything across the horizon (the user can switch afterwards).
-export const scenarioMetric = GullstrandPainleve;
-
-// Each scenario has a `setup(metric)` returning the initial state in the
-// coordinates of `metric` (a scenarioMetric):
+// Each scenario belongs to one metric (`metric`, a class from metricTypes);
+// switching the metric starts its first scenario. Its `setup(metric)`, given
+// an instance of that class, returns the initial state:
 //   {ship: {x, u, heading}, objects: [{type, x, u}], viewportSize,
 //    timeScale (negative runs backwards), paused}
-// Scenarios without `setup` are placeholders, shown disabled.
+// Scenarios without `setup` are placeholders, shown disabled. Ids are unique
+// across all metrics (they are used in links, ?scenario=<id>).
 
 import * as math from './math.js';
-import { Schwarzschild, GullstrandPainleve, velocity3, localVelocity3, convertState } from './metric.js';
+import { Schwarzschild, GullstrandPainleve, velocity3, localVelocity3 } from './metric.js';
 import { asteroidId, photonClockId } from './object-info.js';
 
-// --- helpers; positions are (r, phi), velocities in Schwarzschild coordinates
+// --- helpers; positions are (r, phi); they work in any of the metrics
 
 // effective potential: E^2 at the turning points of a timelike geodesic
 const potential = (rs, r, L) => (1 - rs / r) * (1 + L * L / (r * r));
@@ -32,12 +30,17 @@ function bisect(g, a, b) {
   return (a + b) / 2;
 }
 
-// Geodesic with energy E and angular momentum L at radius r, moving towards
-// +phi and inwards (or outwards), as [x, u] in Schwarzschild coordinates.
-function orbitState(rs, r, phi, E, L, inwards = true) {
-  const vr2 = E * E - potential(rs, r, L);
-  const ur = (inwards ? -1 : 1) * Math.sqrt(Math.max(0, vr2));
-  return [[0, r, phi], [E / (1 - rs / r), ur, L / (r * r)]];
+// Geodesic with energy E = -u_t and angular momentum L = u_phi at radius r,
+// moving towards +phi and inwards (or outwards), as [x, u]. Relative to the
+// static observer there, its Lorentz factor is gamma = E / sqrt(1 - rs/r),
+// and its velocity v_phi = L / (gamma r) and v_r^2 = 1 - 1/gamma^2 - v_phi^2.
+function orbitState(metric, r, phi, E, L, inwards = true) {
+  const rs = metric.rs, x = [0, r, phi];
+  const gamma = E / Math.sqrt(1 - rs / r), vphi = L / (gamma * r);
+  const vr = (inwards ? -1 : 1) * Math.sqrt(Math.max(0, 1 - 1 / (gamma * gamma) - vphi * vphi));
+  // (r-hat, phi-hat) components to the screen-aligned ones that localVelocity3 takes
+  const c = Math.cos(phi), s = Math.sin(phi);
+  return [x, localVelocity3(metric, x, [c * vr - s * vphi, s * vr + c * vphi])];
 }
 
 // E and L of a bound orbit between periapsis rp and apoapsis ra
@@ -67,9 +70,6 @@ const raindrop = (metric, r, phi) => {
   return [x, localVelocity3(metric, x, [-v * Math.cos(phi), -v * Math.sin(phi)])];
 };
 
-// convert a Schwarzschild-coordinates state to `metric`'s coordinates
-const fromSchwarzschild = (metric, [x, u]) => convertState(new Schwarzschild(metric.rs), metric, x, u);
-
 // free-fall state `tau` proper time before (x, u): geodesics are
 // time-reversible, so integrate forward with the velocity reversed
 function backwards(metric, [x, u], tau) {
@@ -84,23 +84,26 @@ const defaults = {viewportSize: 20, timeScale: 1, paused: false};
 
 // --- scenarios
 
-export const scenarios = [
-  {
-    id: 'free',
-    name: 'Free play',
-    description: 'A circular orbit at 10 rs, with a photon clock falling past. ' +
-      'Boost with the mouse or the arrow keys, spawn objects, and explore.',
-    setup: metric => {
-      const rs = metric.rs;
-      const clock = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
-      return {
-        ...defaults,
-        ship: ship(circularOrbit(metric, 10 * rs, 0)),
-        // started in the past, so that the clock is visible right away
-        objects: [object(photonClockId, backwards(metric, clock, 40))],
-      };
-    },
+// A circular orbit at 10 rs, with a photon clock falling past.
+const freePlay = {
+  name: 'Free play',
+  description: 'A circular orbit at 10 rs, with a photon clock falling past. ' +
+    'Boost with the mouse or the arrow keys, spawn objects, and explore.',
+  setup: metric => {
+    const rs = metric.rs;
+    const clock = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
+    return {
+      ...defaults,
+      ship: ship(circularOrbit(metric, 10 * rs, 0)),
+      // started in the past, so that the clock is visible right away
+      objects: [object(photonClockId, backwards(metric, clock, 40))],
+    };
   },
+};
+
+// Gullstrand–Painlevé coordinates follow everything across the horizon.
+const gpScenarios = [
+  {id: 'free', ...freePlay},
   {
     id: 'precession',
     name: 'Perihelion precession',
@@ -114,7 +117,7 @@ export const scenarios = [
       return {
         ...defaults,
         viewportSize: 11, timeScale: 4,
-        ship: ship(fromSchwarzschild(metric, orbitState(rs, ra, 0, E, L))),
+        ship: ship(orbitState(metric, ra, 0, E, L)),
         objects: [],
       };
     },
@@ -149,7 +152,7 @@ export const scenarios = [
       return {
         ...defaults,
         viewportSize: 12, timeScale: 2,
-        ship: ship(fromSchwarzschild(metric, orbitState(rs, 10 * rs, 0, E, L))),
+        ship: ship(orbitState(metric, 10 * rs, 0, E, L)),
         objects: [],
       };
     },
@@ -234,3 +237,16 @@ export const scenarios = [
     description: 'Holding position at 1.1 rs, under a blueshifted, compressed sky.',
   },
 ];
+
+// Schwarzschild coordinates stop at the horizon.
+const schwarzschildScenarios = [
+  {id: 'schwarzschild-free', ...freePlay},
+];
+
+export const scenarios = [
+  ...gpScenarios.map(sc => ({...sc, metric: GullstrandPainleve})),
+  ...schwarzschildScenarios.map(sc => ({...sc, metric: Schwarzschild})),
+];
+
+// The scenarios of metric class `type`.
+export const scenariosOf = type => scenarios.filter(sc => sc.metric === type);
