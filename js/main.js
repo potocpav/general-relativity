@@ -539,26 +539,26 @@ class App extends Component {
           <div>
             <button
               class=${this.state.showPhotonSphere ? "clicked" : ""}
-              title="Circular light orbits at 1.5 rs (P)"
-              onClick=${this.togglePhotonSphere}>Photon sphere</button>
+              title="Circular light orbits at 1.5 rs"
+              onClick=${this.togglePhotonSphere}>Photon sphere (P)</button>
           </div>
           <div>
             <button
               class=${this.state.showEventHorizon ? "clicked" : ""}
-              title="The event horizon at rs, visible from inside the black hole (H)"
-              onClick=${this.toggleEventHorizon}>Event horizon</button>
+              title="The event horizon at rs, visible from inside the black hole"
+              onClick=${this.toggleEventHorizon}>Event horizon (H)</button>
           </div>
           <div>
             <button
               class=${this.state.showInterior ? "clicked" : ""}
-              title="Tint the black hole's shadow instead of showing it black (I)"
-              onClick=${this.toggleInterior}>BH interior</button>
+              title="Tint the black hole's shadow instead of showing it black"
+              onClick=${this.toggleInterior}>BH interior (I)</button>
           </div>
           <div>
             <button
               class=${this.state.showRedshift ? "clicked" : ""}
-              title="Gravitational and Doppler redshift of colors and brightness (S)"
-              onClick=${this.toggleRedshift}>Redshift</button>
+              title="Gravitational and Doppler redshift of colors and brightness"
+              onClick=${this.toggleRedshift}>Redshift (S)</button>
           </div>
           <div>
             <span class="label">${this.state.fps + " FPS"}</span>
@@ -585,8 +585,8 @@ class App extends Component {
         ${this.state.error && html`<div><button>${this.state.error}</button></div>`}
         ${this.state.message && html`<div><button onClick=${() => this.setState({message: null})}>${this.state.message} ✕</button></div>`}
         <div>
-          <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost</button>
-          <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn</button>
+          <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost (1)</button>
+          <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn (2)</button>
         </div>
         ${this.state.tool != 'spawn' ? '' : html`
         <div>
@@ -612,7 +612,7 @@ class App extends Component {
 
       <div id="bottom_left">
         <div>
-          <button onClick=${this.reset}>τ = ${printTime(this.state.tau)}</button>
+          <button onClick=${this.reset} title="Restart the scenario">τ = ${printTime(this.state.tau)} (R)</button>
           <button onClick=${this.onResetTimeSlider}>τ' = ${timeScaleOf(this.state).toFixed(2)}</button>
         </div>
         <div>
