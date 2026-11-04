@@ -108,15 +108,27 @@ export function integrate(metric, f, xu, duration, maxStep) {
 export const RAY_REACHED = 0;  // traced to the end
 export const RAY_HORIZON = 1;  // went where it can't be followed (the black hole's shadow)
 
+// How much the reference frame (|T(y1) T^-1(y) - 1|) and a ray's energy
+// measured in it may change over one step of traceRay. The same control as in
+// trace_ray in glsl/physics.glsl, but much finer: traceRay is the reference.
+const rayFrameStep = 0.02;
+const rayEnergyStep = 1.02;
+
+const frobenius = m => Math.sqrt(m.reduce((s, row) => s + dot(row, row), 0));
+const identity3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+
 // Trace a light ray, a past-directed null geodesic from x0 with momentum p0,
 // from affine parameter 0 to 1. Mirrors trace_ray in glsl/physics.glsl: the
 // ray is traced using its conserved energy E and angular momentum L, as
 // y = [t, r, phi, v = dr/dl] with
 //   dt/dl = metric.rayDtdl(r, v, E, L),  dr/dl = v,  dphi/dl = L / r^2,
 //   dv/dl = L^2 (r - 1.5 rs) / r^4,
-// which (except for t) is regular at the horizon. Steps are at most
-// `maxStep`, and short enough to move by a small fraction of r. The ray is
-// stopped where it can't be followed (metric.rayCanFollow).
+// which (except for t) is regular at the horizon. RK4 steps are at most
+// `maxStep`, and short enough that the reference frame and the ray's energy
+// measured in it change little (rayFrameStep, rayEnergyStep); longer ones,
+// and ones changing the energy's sign or giving non-finite values, are
+// retried shorter, so that no step jumps across where the coordinates break
+// down. The ray is stopped where it can't be followed (metric.rayCanFollow).
 // Returns {status, x, p}, with x and p at the end if it was reached.
 export function traceRay(metric, x0, p0, maxStep = 1e-3) {
   const rs = metric.rs;
@@ -126,15 +138,28 @@ export function traceRay(metric, x0, p0, maxStep = 1e-3) {
     return [metric.rayDtdl(r, y[3], E, L), y[3], L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r)];
   };
   const momentum = y => [metric.rayDtdl(y[1], y[3], E, L), y[3], L / (y[1] * y[1])];
-  const e0 = matVec(metric.T(x0), p0)[0];
+  const frameEnergy = y => matVec(metric.T(y.slice(0, 3)), momentum(y))[0];
+  const e0 = frameEnergy([...x0, p0[1]]);
   const canFollow = y => metric.rayCanFollow(y.slice(0, 3), momentum(y), e0);
-  var y = [...x0, p0[1]], l = 0;
+  // whether a step from y to y1 (with frame energies e, e1) is short enough
+  const smallStep = (y, e, y1, e1) => {
+    const frameChange = frobenius(matMul(metric.T(y1.slice(0, 3)), metric.Tinv(y.slice(0, 3)))
+      .map((row, a) => row.map((v, b) => v - identity3[a][b])));
+    const change = e1 / e;
+    return frameChange <= rayFrameStep && change >= 1 / rayEnergyStep && change <= rayEnergyStep;
+  };
+  var y = [...x0, p0[1]], e = e0, l = 0, h = maxStep;
   for (var i = 0; 1 - l > 1e-12; i++) {
     if (!canFollow(y) || i > 1e6) return {status: RAY_HORIZON};
-    const speed = Math.abs(y[3]) + Math.abs(L) / y[1];
-    const h = Math.min(maxStep, 1 - l, 0.02 * y[1] / (speed + 1e-12));
-    y = rk4(f, y, h);
-    l += h;
+    h = Math.min(maxStep, 1 - l, h);
+    const y1 = rk4(f, y, h), e1 = frameEnergy(y1);
+    if (smallStep(y, e, y1, e1)) {
+      y = y1; e = e1; l += h;
+      h *= 2;
+    } else {
+      h /= 4;
+      if (!(h > 1e-15)) return {status: RAY_HORIZON};
+    }
   }
   if (!canFollow(y)) return {status: RAY_HORIZON};
   return {status: RAY_REACHED, x: y.slice(0, 3), p: momentum(y)};
