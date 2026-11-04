@@ -169,8 +169,18 @@ vec3 grid_tint(float l) {
 	return rgb / dot(rgb, vec3(0.2126, 0.7152, 0.0722));
 }
 
+const vec3 projectile_color = vec3(1.0, 0.9, 0.2);
+
 // `deltax` is the pixel's offset from the object, as components in the object's frame.
 vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
+	if (sprite_i == PROJECTILE_ID) {
+		// a dot, round in its rest frame, antialiased over about a pixel
+		// (the world size of a pixel near the observer)
+		float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
+		float d = length(deltax.yz) - 0.5 * objSize[sprite_i].y;
+		float a = clamp(0.5 - d / pixel_size, 0.0, 1.0);
+		return vec4(redshift(rshift, projectile_color, vec3(1.0)), a);
+	}
 	vec2 obj_texcoord2 = rot(orientation) * deltax.yz / objSize[sprite_i].yz;
 	if (max(abs(obj_texcoord2.x), abs(obj_texcoord2.y)) < 0.5) {
 		vec3 lo = objTexMin[sprite_i], hi = objTexMax[sprite_i];

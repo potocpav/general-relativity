@@ -6,7 +6,7 @@ import htm from 'https://esm.sh/htm@3.1.1';
 import * as renderer from './renderer.js';
 import * as math from './math.js';
 import { World } from './world.js';
-import { ObjectInfo, asteroidId, photonClockId } from './object-info.js';
+import { ObjectInfo, asteroidId, photonClockId, projectileId } from './object-info.js';
 import { Objects } from './objects.js';
 import { scenarios, defaultRs, scenarioMetric } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, convertState, metricTypes } from './metric.js';
@@ -56,6 +56,11 @@ const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
 // switchable, see selectMetric; its black hole size is set by scenarios
 var metric = new scenarioMetric(defaultRs);
+
+// projectiles fired with Space: speed in the ship's rest frame, and how many
+// are kept (the oldest are dropped)
+const projectileSpeed = 0.5;
+const maxProjectiles = 64;
 
 const objectIds = {
   'asteroid': asteroidId,
@@ -321,19 +326,24 @@ class App extends Component {
           this.setState({spawnObject: nextObjectId(this.state.spawnObject)});
         }
     }
+    if (ev.key == " " || ev.key == "Enter") {
+      // Don't let Space or Enter also activate a focused button (e.g. the pause button).
+      ev.preventDefault();
+      if (document.activeElement && document.activeElement !== document.body) {
+        document.activeElement.blur();
+      }
+      if (!ev.repeat) {
+        if (ev.key == " ") this.shoot();
+        else this.onPlayPause();
+      }
+      return;
+    }
     switch (ev.key) {
       case "r": this.reset();
       break; case "p": this.togglePhotonSphere();
       break; case "h": this.toggleEventHorizon();
       break; case "i": this.toggleInterior();
       break; case "s": this.toggleRedshift();
-      break; case " ":
-        // Don't let Space also activate a focused button (e.g. the pause button).
-        ev.preventDefault();
-        if (document.activeElement && document.activeElement !== document.body) {
-          document.activeElement.blur();
-        }
-        if (!ev.repeat) this.onPlayPause();
     }
   }
 
@@ -370,6 +380,18 @@ class App extends Component {
   }
 
   toggleDisplayOptions = _ => this.setState({showDisplayOptions: !this.state.showDisplayOptions});
+
+  // Fire a projectile forwards from the ship, at projectileSpeed in its rest frame.
+  shoot = _ => {
+    if (!world || world.crashed) return;
+    const [hr, hphi] = world.obsvO, gamma = 1 / Math.sqrt(1 - projectileSpeed ** 2);
+    const u = math.matVec(math.restToCoord(metric, world.obsvX, world.obsvU),
+      [gamma, gamma * projectileSpeed * hr, gamma * projectileSpeed * hphi]);
+    // keep at most maxProjectiles, dropping the oldest
+    const projectiles = objects.objects.filter(o => o.type == projectileId);
+    for (const o of projectiles.slice(0, Math.max(0, projectiles.length - maxProjectiles + 1))) objects.remove(o);
+    objects.spawn(projectileId, world.obsvX, u);
+  }
 
   onPlayPause = _ => {
     this.setState({pause: !this.state.pause});
@@ -609,7 +631,7 @@ class App extends Component {
           <button onClick=${this.onResetTimeSlider}>τ' = ${timeScaleOf(this.state).toFixed(2)}</button>
         </div>
         <div>
-          <button onClick=${this.onPlayPause} style="width: 4em; height: 3em;">${this.state.pause ? '▶' : '⏸'}</button>
+          <button onClick=${this.onPlayPause} title="Play / pause (Enter)" style="width: 4em; height: 3em;">${this.state.pause ? '▶' : '⏸'}</button>
           <input type="range" min="-3" max="3" value="${this.state.timeSlider}" id="time_slider" step="0.05" list="values" onInput=${this.onTimeSlider}
             title="Time scale: backwards (left) or forwards (right), ticks at ±10, ±1, ±0.1 and 0" />
           <datalist id="values">

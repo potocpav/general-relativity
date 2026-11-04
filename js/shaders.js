@@ -1,6 +1,6 @@
 // Shader source loading and assembly.
 
-import { nSprites } from './object-info.js';
+import { nSprites, projectileId } from './object-info.js';
 import { horizonMargin } from './metric.js';
 
 export async function fetchText(url) {
@@ -16,6 +16,7 @@ export async function fetchText(url) {
 export function shaderDefines(metric) {
   return {
     N_SPRITES: nSprites,
+    PROJECTILE_ID: projectileId,
     HORIZON_MARGIN: horizonMargin.toFixed(6),
     METRIC: metric.constructor.glslId,
   };

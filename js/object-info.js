@@ -7,7 +7,8 @@ export const
   shipId = 0,
   shipThrustingId = 1,
   asteroidId = 2,
-  photonClockId = 3;
+  photonClockId = 3,
+  projectileId = 4; // drawn as a dot by the shader, not from the sprite image
 
 // Sprite extents in world coordinates, including time coordinate.
 const objSize = new Float32Array([
@@ -15,6 +16,7 @@ const objSize = new Float32Array([
   2, 0.5, 0.5, -1,   // thrusting rocket
   5, 0.3, 0.3, -1, // asteroid
   1, 64/38/2, 64/38/2, -1,   // photon clock
+  1, 0.125, 0.125, -1,       // projectile: the dot's diameter, 1/4 of the rocket's width
   ]);
 
 // Minimum pixel coordinates of sprites in the combined sprite image (inclusive)
@@ -23,6 +25,7 @@ const objTexMin = new Float32Array([
   0, 0, 30, -1,
   64, 0, 0, -1,
   128, 0, 0, -1,
+  0, 0, 0, -1,     // projectile: unused
   ]);
 
 // Maximum pixel coordinates of sprites in the combined sprite image (inclusive)
@@ -31,6 +34,7 @@ const objTexMax = new Float32Array([
   63, 63, 59, -1,
   127, 63, 59, -1,
   191, 63, 59, -1,
+  0, 0, 0, -1,     // projectile: unused
   ]);
 
 const uniformBlockBinding = 0;
