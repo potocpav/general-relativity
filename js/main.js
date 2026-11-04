@@ -530,11 +530,6 @@ class App extends Component {
         ${this.state.showDisplayOptions && html`
         <div class="popup">
           <div>
-            <select onChange=${this.selectMetric} title="Coordinates of the simulation">
-            ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric}>${t.label}</option>`)}
-            </select>
-          </div>
-          <div>
             <select onChange=${this.selectQuality} title="Quality: device pixels per rendered pixel">
             ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
             </select>
@@ -572,6 +567,11 @@ class App extends Component {
         `}
       </div>
       <div id="top_left">
+        <div>
+          <select onChange=${this.selectMetric} title="Coordinates of the simulation">
+          ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric}>${t.label}</option>`)}
+          </select>
+        </div>
         <div>
           <select onChange=${this.selectScenario} title="Scenario (R restarts it)">
           ${scenariosOf(metric.constructor).map(sc => html`<option disabled=${!sc.setup} selected=${sc.id == this.state.scenario}>${sc.name}${sc.setup ? '' : ' (coming later)'}</option>`)}
