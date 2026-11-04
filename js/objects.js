@@ -4,7 +4,7 @@
 // Rendering only needs the past: each pixel shows an event on the ship's past
 // light cone. So objects are advanced together with the ship, and their
 // states are recorded at regular steps of coordinate time: row k holds the
-// state at time k * dt, dt = rs / rowsPerRs. The last `historyRows` rows are
+// state at time k * historyDt. The last `historyRows` rows are
 // kept, as a ring buffer (row k is stored at k mod historyRows), both in JS
 // (float64, the source of truth, used when rewinding) and on the GPU
 // (float32 textures, one column per object), where glsl/objects.glsl looks
@@ -19,9 +19,8 @@ import { objectRadius } from './object-info.js';
 
 export const maxObjects = 256;
 export const historyRows = 1024;
-export const rowsPerRs = 6;    // history rows per rs of coordinate time
+export const historyDt = 0.05; // coordinate time between history rows
 const chunkRows = 64;          // rows per chunk of bounding boxes
-const stepsPerRs = 15;         // integration steps per rs of proper time, at least
 
 // Integrate y = [x, u, tau] or [x, u, tau, h] of a free-falling body (or
 // accelerated, with `accel_rest` in its rest frame) to coordinate time T1,
@@ -38,10 +37,9 @@ export function integrateToTime(metric, y, T1, accel_rest) {
     const dT = d.map(v => v / ut);
     return withAxis ? [...dT.slice(0, 6), 1 / ut, ...dT.slice(6, 9)] : [...dT.slice(0, 6), 1 / ut];
   };
-  const maxStepTau = metric.rs / stepsPerRs;
   for (let i = 0; Math.abs(T1 - y[0]) > 1e-12 * Math.max(1, Math.abs(T1)); i++) {
     if (i > 100000) return null;
-    const hTau = Math.min(maxStepTau, metric.stepLimit(y));
+    const hTau = Math.min(math.maxProperStep, metric.stepLimit(y));
     const h = Math.min(Math.abs(T1 - y[0]), hTau * Math.abs(y[3]));
     const next = math.rk4(g, y, Math.sign(T1 - y[0]) * h);
     if (!metric.canFollow(next)) return null;
@@ -82,7 +80,7 @@ export class Objects {
   }
 
   get dt() {
-    return this.metric.rs / rowsPerRs;
+    return historyDt;
   }
 
   // Remove all objects; the ship is at coordinate time T.

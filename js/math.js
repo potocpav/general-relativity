@@ -85,6 +85,10 @@ export const rk4 = (f, y, h) => {
   return y.map((v, i) => v + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]));
 }
 
+// Max. proper-time RK4 step for the ship and objects (also limited by
+// metric.stepLimit).
+export const maxProperStep = 0.02;
+
 // Integrate the geodesic ODE `f` (see geo_f) over the parameter interval
 // `duration` (backwards if negative) with RK4 steps of at most `maxStep`.
 // Steps are shortened where the coordinates break down (metric.stepLimit),

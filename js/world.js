@@ -5,7 +5,6 @@ var gl;
 
 const thrust = 0.5;      // rocket acceleration in its rest frame
 const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
-const maxStep = 0.02;    // max. proper-time RK4 step for the observer
 
 export class World {
   constructor(gl_, metric) {
@@ -112,7 +111,7 @@ export class World {
     const f = math.geo_fw_f(this.metric, accel3_rest);
     // where it can't be followed, it stops exactly at the threshold
     const {xu: xuh, done, ended} = math.integrateToEdge(
-      this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], this.dt, maxStep);
+      this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], this.dt, math.maxProperStep);
     if (ended) this.crashed = true;
     this.time += done;
     this.obsvX = xuh.slice(0, 3);
