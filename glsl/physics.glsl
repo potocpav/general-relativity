@@ -97,8 +97,7 @@ float ray_dtdl(float r, float v, float E, float L) {
 // Where the coordinates break down, from local quantities only (the same for
 // all metrics, see maxFrameCondition in js/metric.js): the reference frame
 // becomes degenerate, or a light ray's energy measured by the reference
-// observer changes sign or by more than MAX_RAY_ENERGY_RATIO. Non-finite
-// values fail the comparisons too.
+// observer changes sign. Non-finite values fail the comparisons too.
 float frobenius(mat3 m) {
 	return sqrt(dot(m[0], m[0]) + dot(m[1], m[1]) + dot(m[2], m[2]));
 }
@@ -115,9 +114,7 @@ float frame_energy(vec3 x, vec3 p) {
 // Whether a ray at x with momentum p, which started with reference frame
 // energy e0, can't be followed further.
 bool ray_terminated(vec3 x, vec3 p, float e0) {
-	float ratio = frame_energy(x, p) / e0;
-	return !(frame_condition(x) < MAX_FRAME_CONDITION
-		&& ratio > 1.0 / MAX_RAY_ENERGY_RATIO && ratio < MAX_RAY_ENERGY_RATIO);
+	return !(frame_condition(x) < MAX_FRAME_CONDITION && frame_energy(x, p) * e0 > 0.0);
 }
 
 // normalize duplicate coordinate points
@@ -223,7 +220,6 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 	float L = x0.y * x0.y * u0.z;
 	float e0 = frame_energy(x0, u0);
 	vec4 y = vec4(x0, u0.y);
-	float e = e0; // frame energy at y
 	vec4 k1 = ray_f(y, E, L);
 	float l = 0.0;
 	float h = INITIAL_H;
@@ -250,17 +246,12 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 		float error = length(ray_velocity(z1, L) - w1) / scale;
 		// Don't step across where the coordinates break down: the step size is
 		// also controlled by how much the reference frame changes over the step,
-		// |T(y1) T^-1(y) - 1| <= FRAME_STEP, and the ray's frame energy, by at
-		// most a factor of ENERGY_STEP (each as an error of 1, scaling like the
-		// RK23 error); a change of sign, or non-finite values, reject the step.
-		// This also covers rays without an error estimate (radial ones).
+		// |T(y1) T^-1(y) - 1| <= FRAME_STEP (as an error of 1, scaling like the
+		// RK23 error); non-finite values reject the step. This also covers rays
+		// without an error estimate (radial ones).
 		const float FRAME_STEP = 0.5;
-		const float ENERGY_STEP = 2.0;
 		float frame_change = frobenius(T(y1.xyz) * T_inv(y.xyz) - mat3(1.0)) / FRAME_STEP;
-		float e1 = frame_energy(y1.xyz, ray_momentum(y1, E, L));
-		float change = e1 / e;
-		float energy_change = change > 0.0 ? abs(log(change)) / log(ENERGY_STEP) : 1e3;
-		float breakdown_error = pow(max(frame_change, energy_change), 3.0);
+		float breakdown_error = pow(frame_change, 3.0);
 		error = max(error, breakdown_error < 1e3 ? breakdown_error : 1e3);
 
 		float factor;
@@ -285,7 +276,6 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 			l = l1;
 			y = y1;
 			k1 = k4;
-			e = e1;
 		}
 	}
 	if (status == RAY_OUT_OF_STEPS) { // the last step may have finished it

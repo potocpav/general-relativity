@@ -1,7 +1,7 @@
 // Shader source loading and assembly.
 
 import { nSprites, projectileId } from './object-info.js';
-import { maxFrameCondition, maxRayEnergyRatio } from './metric.js';
+import { maxFrameCondition } from './metric.js';
 
 export async function fetchText(url) {
   const response = await fetch(url);
@@ -18,7 +18,6 @@ export function shaderDefines(metric) {
     N_SPRITES: nSprites,
     PROJECTILE_ID: projectileId,
     MAX_FRAME_CONDITION: maxFrameCondition.toExponential(),
-    MAX_RAY_ENERGY_RATIO: maxRayEnergyRatio.toExponential(),
     METRIC: metric.constructor.glslId,
   };
 }

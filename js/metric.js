@@ -1,19 +1,16 @@
 import { matVec, dot, scale, norm } from './math.js';
 
 // Where the coordinates break down, detected from local quantities only (the
-// same for every metric; light rays use the first and last, see glsl/physics.glsl):
+// same for every metric, also in glsl/physics.glsl):
 // - the reference frame becomes degenerate: the condition number of T,
 //   estimated as |T| |T^-1| (Frobenius norms), exceeds maxFrameCondition
 //   (e.g. Schwarzschild coordinates at the horizon, or near the singularity);
-// - a body moves faster than this Lorentz factor relative to the reference
-//   observer (e.g. falling into the horizon in Schwarzschild coordinates);
-// - a light ray's energy measured by the reference observer changes sign, or
-//   by more than this factor from where it started (e.g. a ray heading into
-//   the past horizon, which Gullstrand–Painlevé coordinates don't cover).
+// - a light ray's energy measured by the reference observer changes sign: it
+//   would no longer be past-directed (e.g. a ray heading into the past
+//   horizon, which Gullstrand–Painlevé coordinates don't cover: there the
+//   energy diverges, and has the other sign beyond).
 // Non-finite values count as a breakdown too.
 export const maxFrameCondition = 1e6;
-export const maxGamma = 1e3;
-export const maxRayEnergyRatio = 1e3;
 
 // Integration steps are limited so that a body's velocity changes by at most
 // this fraction per step (measured in the reference frame), which makes them
@@ -26,10 +23,8 @@ export const frameCondition = (metric, x) => frobenius(metric.T(x)) * frobenius(
 // Whether a light ray at x with momentum p, which started with reference
 // frame energy e0, can be followed further.
 export function rayCanFollow(metric, x, p, e0) {
-  if (![...x, ...p].every(Number.isFinite)) return false;
-  if (!(frameCondition(metric, x) < maxFrameCondition)) return false;
-  const ratio = matVec(metric.T(x), p)[0] / e0;
-  return ratio > 1 / maxRayEnergyRatio && ratio < maxRayEnergyRatio;
+  return [...x, ...p].every(Number.isFinite) && frameCondition(metric, x) < maxFrameCondition
+    && matVec(metric.T(x), p)[0] * e0 > 0;
 }
 
 // 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
@@ -79,13 +74,6 @@ function radialChristoffel(metric, x, u, v) {
   return scale(matVec(metric.gInv(x), w), 0.5);
 }
 
-// rotate a screen-space cartesian 2-vector into the local orthonormal
-// (r-hat, phi-hat) basis at `x0`
-function cartesianToLocal(x0, v) {
-  const c = Math.cos(x0[2]), s = Math.sin(x0[2]);
-  return [c * v[0] + s * v[1], -s * v[0] + c * v[1]];
-}
-
 // Metrics are in (time, r, phi) coordinates and depend only on r.
 //
 // Each metric defines a reference frame: an orthonormal frame at every point.
@@ -94,22 +82,37 @@ function cartesianToLocal(x0, v) {
 // observers, or null where there are none (inside the horizon).
 // `glslId` selects the metric in glsl/physics.glsl (METRIC).
 //
-// canFollow(xu) and stepLimit(xu) are the same for all metrics (see Metric).
+// dgdr(x) is d g / d r, from which Metric computes the Christoffel symbols.
+// canFollow(xu), stepLimit(xu) and the rest are the same for all metrics.
 //
 // Light rays are traced with their conserved energy E = -p_t and angular
 // momentum L = p_phi (see traceRay in js/math.js and glsl/physics.glsl):
 // rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dt/dl, with v = dr/dl.
 
 class Metric {
+  // Gamma^mu_ab u^a v^b, and the same with v = u
+  gammaUV(x, u, v) {
+    return radialChristoffel(this, x, u, v);
+  }
+
+  gammaUU(x, u) {
+    return radialChristoffel(this, x, u, u);
+  }
+
+  // rotate a screen-space cartesian 2-vector into the local orthonormal
+  // (r-hat, phi-hat) basis at `x0`
+  cartesianToLocal(x0, v) {
+    const c = Math.cos(x0[2]), s = Math.sin(x0[2]);
+    return [c * v[0] + s * v[1], -s * v[0] + c * v[1]];
+  }
+
   // How close a body at xu = [x, u, ...] is to where the coordinates break
   // down (see maxFrameCondition): it can be followed while this is below 1.
   // Continuous, so that the point where it reaches 1 can be found exactly
   // (integrateToEdge); infinite for non-finite values.
   breakdown(xu) {
-    const x = xu.slice(0, 3), u = xu.slice(3, 6);
-    if (![...x, ...u].every(Number.isFinite)) return Infinity;
-    const b = Math.max(frameCondition(this, x) / maxFrameCondition, matVec(this.T(x), u)[0] / maxGamma);
-    return Number.isFinite(b) ? b : Infinity;
+    const b = frameCondition(this, xu.slice(0, 3)) / maxFrameCondition;
+    return xu.slice(0, 6).every(Number.isFinite) && Number.isFinite(b) ? b : Infinity;
   }
 
   canFollow(xu) {
@@ -167,15 +170,6 @@ export class Schwarzschild extends Metric {
     return [[-rs / (r * r), 0, 0], [0, -rs / ((r - rs) * (r - rs)), 0], [0, 0, 2 * r]];
   }
 
-  // Gamma^mu_ab u^a v^b, and the same with v = u
-  gammaUV(x, u, v) {
-    return radialChristoffel(this, x, u, v);
-  }
-
-  gammaUU(x, u) {
-    return radialChristoffel(this, x, u, u);
-  }
-
   T(x) {
     const r = x[1], s = Math.sqrt(1 - this.rs / r);
     return [[s, 0, 0], [0, 1 / s, 0], [0, 0, r]];
@@ -192,10 +186,6 @@ export class Schwarzschild extends Metric {
 
   staticTinv(x) {
     return x[1] > this.rs ? this.Tinv(x) : null;
-  }
-
-  cartesianToLocal(x0, v) {
-    return cartesianToLocal(x0, v);
   }
 }
 
@@ -228,8 +218,9 @@ export class GullstrandPainleve extends Metric {
   // (E + s v) / (1 - rs/r), rewritten using the null condition to be finite
   // at the horizon, except for rays heading into the past horizon (white
   // hole), which these coordinates don't cover: there dT/dl diverges, and
-  // the ray's energy measured by the raindrop observer with it, so the ray
-  // is stopped (see rayCanFollow). Rays are traced backwards in time: those
+  // the ray's energy measured by the raindrop observer with it, changing
+  // sign beyond, so the ray is stopped (see rayCanFollow). Rays are traced
+  // backwards in time: those
   // crossing the horizon inwards came out of the white hole, and inside, rays
   // with E > 0 head there too; in a real black hole they would come from the
   // collapsed star.
@@ -251,15 +242,6 @@ export class GullstrandPainleve extends Metric {
   dgdr(x) {
     const r = x[1], s = Math.sqrt(this.rs / r);
     return [[-this.rs / (r * r), -s / (2 * r), 0], [-s / (2 * r), 0, 0], [0, 0, 2 * r]];
-  }
-
-  // Gamma^mu_ab u^a v^b, and the same with v = u
-  gammaUV(x, u, v) {
-    return radialChristoffel(this, x, u, v);
-  }
-
-  gammaUU(x, u) {
-    return radialChristoffel(this, x, u, u);
   }
 
   // raindrop frame: e_0 = (1, -s, 0), e_r = (0, 1, 0), e_phi = (0, 0, 1/r), s = sqrt(rs/r)
@@ -287,10 +269,6 @@ export class GullstrandPainleve extends Metric {
     if (!(q > 0)) return null;
     const sq = Math.sqrt(q);
     return [[1 / sq, s / sq, 0], [0, sq, 0], [0, 0, 1 / r]];
-  }
-
-  cartesianToLocal(x0, v) {
-    return cartesianToLocal(x0, v);
   }
 }
 
