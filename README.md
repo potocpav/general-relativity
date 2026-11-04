@@ -105,10 +105,8 @@ Test objects, interaction:
 - [x] Interactive spaceship control
 - [x] Interactive object spawning
 - [x] Time controls
-- [ ] Control effects (redshift, beaming, etc.)
-- [ ] Scenario presets
-- [ ] Automatically generate floaters
-- [ ] Spatial indexing of object trajectories to improve performance of multiple objects
+- [x] Control effects (redshift, beaming, etc.)
+- [x] Scenario presets
 
 Scenario ideas:
 
