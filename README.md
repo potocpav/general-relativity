@@ -1,5 +1,7 @@
 # General Relativity Playground
 
+[by Pavel Potoček](https://potocpav.github.io/)
+
 You can play with general relativity [here](https://potocpav.github.io/general-relativity/).
 
 ## Run
