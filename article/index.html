@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flying Through Spacetime</title>
+  <script>
+    // Apply a theme chosen earlier with the theme switch before the page is first drawn, so it does not flash.
+    try {
+      const t = localStorage.getItem('flying-through-spacetime-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) { }
+  </script>
+  <meta name="description"
+    content="What special and general relativity look like from a spaceship, simulated by tracing light rays.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕓</text></svg>">
+  <style>
+    /* Look and feel of ../rope-twist (https://potocpav.github.io/rope-twist/). */
+    :root {
+      --bg: #ffffff;
+      --text: #1f1e1c;
+      --muted: #3f3e3a;
+      --line: #d6d4cc;
+      --outline: #444444;
+      --panel: #f3f2ee;
+      --accent: #b8501f;
+      color-scheme: light;
+    }
+
+    /* Dark theme: from the system preference until the script sets data-theme (from the system or the theme
+       switch). */
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #141412;
+        --text: #ecebe6;
+        --muted: #a9a8a2;
+        --line: #45443f;
+        --outline: #444444;
+        --panel: #2a2927;
+        --accent: #e8875a;
+        color-scheme: dark;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #141412;
+      --text: #ecebe6;
+      --muted: #a9a8a2;
+      --line: #45443f;
+      --outline: #444444;
+      --panel: #2a2927;
+      --accent: #e8875a;
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 48px 16px 80px;
+    }
+
+    header {
+      margin-bottom: 40px;
+    }
+
+    h1,
+    h2 {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.2;
+      font-weight: 650;
+    }
+
+    h1 {
+      font-size: clamp(30px, 6vw, 42px);
+      margin: 0 0 12px;
+      letter-spacing: -0.01em;
+    }
+
+    h2 {
+      font-size: 26px;
+      margin: 50px 0 20px;
+    }
+
+    .byline {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .lede {
+      font-size: 19px;
+      color: var(--muted);
+      margin: 0 0 16px;
+    }
+
+    p {
+      margin: 0 0 20px;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    /* Math in one installed math font that has every symbol it uses, so its letters and spacing match:
+       macOS has STIX Two Math, Windows Cambria Math, and many Linux systems Latin Modern or DejaVu Math. */
+    math {
+      font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", "DejaVu Math TeX Gyre", math;
+    }
+
+    figure {
+      margin: 30px 0 20px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+
+    figcaption {
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+
+    figcaption b {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Readouts above a figure's view. */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+
+    .stat div:first-child {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .stat div:last-child {
+      font-size: 22px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* The simulation's view: always dark (it shows space), in both themes. */
+    .view {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      border: 1px solid var(--outline);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .view canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .view .placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a9a8a2;
+      font-size: 15px;
+    }
+
+    /* Sliders and other controls below a figure's view. */
+    .controls {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) 72px;
+      align-items: center;
+      gap: 6px 10px;
+      margin: 14px 0;
+    }
+
+    .controls label {
+      white-space: nowrap;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .controls output {
+      font-size: 14px;
+      font-weight: 500;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 20px;
+      background: transparent;
+      margin: 0;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--line);
+    }
+
+    input[type=range]::-moz-range-track {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--line);
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: -7px;
+      border: none;
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+    }
+
+    input:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Light / dark switch in the top right corner. */
+    .theme-switch {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+    }
+
+    .theme-switch button {
+      border: 0;
+      padding: 5px 10px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .theme-switch button+button {
+      border-left: 1px solid var(--line);
+    }
+
+    .theme-switch button:hover {
+      background: var(--panel);
+    }
+
+    .theme-switch button[aria-pressed="true"] {
+      background: var(--panel);
+      color: var(--text);
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="theme-switch" role="group" aria-label="Color theme">
+    <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+    <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+  </div>
+  <main>
+    <header>
+      <h1>Flying Through Spacetime</h1>
+      <p class="lede">What special and general relativity look like from a spaceship, simulated by tracing light rays.
+      </p>
+      <p class="byline"><a href="https://potocpav.github.io/">by Pavel Potoček</a> · <a href="../">open the
+          simulation</a></p>
+    </header>
+
+    <p>
+      You have probably heard that moving clocks run slow and moving rulers shrink. This article shows what that would
+      actually <i>look like</i>. The figures are a live simulation: for every pixel, a ray of light is traced backwards
+      through spacetime, from the ship to wherever it came from.
+    </p>
+    <p>
+      To keep things simple, the simulated universe is flat in one more sense: space has only two dimensions. The ship
+      moves in a plane, and so does light. We look down on that plane with the ship in the centre. Each point around
+      it shows where the light arriving at the ship <i>right now</i> came from. Its direction is the direction the
+      light came from, and its distance from the ship is how far the light travelled, which is also how long ago it
+      left. A grid is painted on space so you can see how it moves and distorts.
+    </p>
+
+    <h2 id="flat-space">Moving through flat space</h2>
+    <p>
+      Start without gravity, in the flat spacetime of special relativity. The speed of light is the same for everyone,
+      and nothing goes faster.
+    </p>
+    <p>
+      <b>Lengths contract.</b> An object moving past you at speed <math><mi>v</mi></math> is shorter along its
+      direction of motion, by the Lorentz factor
+      <math><mi>γ</mi><mo>=</mo><mfrac><mn>1</mn><msqrt><mn>1</mn><mo>−</mo><msup><mi>v</mi><mn>2</mn></msup><mo>/</mo><msup><mi>c</mi><mn>2</mn></msup></msqrt></mfrac></math>.
+      At 90% of the speed of light, <math><mi>γ</mi><mo>≈</mo><mn>2.3</mn></math>. This is not an optical illusion.
+      Measuring a length means marking both ends <i>at the same moment</i>, and observers moving relative to each
+      other disagree on which moments are simultaneous. Seen from a moving ship, the grid really is shorter along the
+      direction of motion.
+    </p>
+    <p>
+      <b>But that's not what you see.</b> Your eyes, or your camera, catch light that left different parts of an object
+      at different times. The grid ahead of you is rushing towards you, so light from its far parts set out earlier,
+      when they were even farther away. That stretches the view ahead. Behind you it's the other way round, and the
+      view is squeezed. Together with the contraction, things straight ahead look longer by a factor
+      <math><msqrt><mfrac><mrow><mn>1</mn><mo>+</mo><mi>β</mi></mrow><mrow><mn>1</mn><mo>−</mo><mi>β</mi></mrow></mfrac></msqrt></math>,
+      where <math><mi>β</mi><mo>=</mo><mi>v</mi><mo>/</mo><mi>c</mi></math>, and things straight behind look shorter
+      by the same factor. At 90% of light speed, that's a factor of about 4.4 either way.
+    </p>
+    <p>
+      <b>Light piles up ahead.</b> Light from the sides appears to come from further ahead, like rain hitting the
+      windscreen of a moving car. This is called aberration. The view of the world around you crowds into a cone in
+      front of you, and behind you it thins out. The light ahead is also Doppler-shifted to higher energies: you run
+      into the waves faster. Both effects make the view ahead much brighter and bluer, and the view behind dimmer and
+      redder. This is called relativistic beaming. In the simulation, the grid glows like a warm white light source.
+      Its colour and brightness follow the shift: bluish ahead, orange behind.
+    </p>
+
+    <figure id="fig-1">
+      <div class="stats">
+        <div class="stat">
+          <div>Velocity, <math><mi>v</mi></math></div>
+          <div id="fig-1-v">0%</div>
+        </div>
+        <div class="stat">
+          <div>Lorentz factor, <math><mi>γ</mi></math></div>
+          <div id="fig-1-gamma">1.00</div>
+        </div>
+      </div>
+      <div class="view">
+        <div class="placeholder">Interactive figure coming soon</div>
+      </div>
+      <div class="controls">
+        <label for="fig-1-target">Target velocity</label>
+        <input type="range" id="fig-1-target" min="-0.9" max="0.9" step="0.01" value="0" disabled>
+        <output for="fig-1-target" id="fig-1-target-out">0%</output>
+      </div>
+      <figcaption>
+        <b>Figure 1.</b> A spaceship in flat spacetime, at rest relative to the grid. Set a target velocity with the
+        slider: the ship turns and fires its engine until it reaches it. The slider's marker shows the ship's actual
+        velocity.
+      </figcaption>
+    </figure>
+
+    <h2 id="black-hole">Black hole</h2>
+    <p>
+      Two months after Einstein published general relativity in 1915, Karl Schwarzschild found the first exact
+      solution of its equations: <a href="https://en.wikipedia.org/wiki/Schwarzschild_metric">the spacetime around a
+        single, non-rotating mass</a>. If that mass is squeezed within the Schwarzschild radius
+      <math><msub><mi>r</mi><mi>s</mi></msub><mo>=</mo><mn>2</mn><mi>G</mi><mi>M</mi><mo>/</mo><msup><mi>c</mi><mn>2</mn></msup></math>,
+      it becomes a black hole. The sphere at <math><msub><mi>r</mi><mi>s</mi></msub></math> is its event horizon, and
+      nothing that crosses it can ever get out. In the figure below, the ship falls in from rest far away. Nothing
+      special happens locally as it crosses the horizon, yet from there it reaches the singularity at the centre in a
+      finite time of its own. The simulation uses
+      <a href="https://en.wikipedia.org/wiki/Gullstrand%E2%80%93Painlev%C3%A9_coordinates">Gullstrand–Painlevé
+        coordinates</a>. In them, space can be pictured as flowing into the black hole like a river, faster and faster,
+      reaching the speed of light at the horizon, and the falling ship is carried along with it.
+    </p>
+
+    <figure id="fig-2">
+      <div class="view">
+        <div class="placeholder">Interactive figure coming soon</div>
+      </div>
+      <figcaption>
+        <b>Figure 2.</b> A spaceship falling into a black hole from rest far away. Drag the slider to move along its
+        journey, from 3 <math><msub><mi>r</mi><mi>s</mi></msub></math> to 0.1
+        <math><msub><mi>r</mi><mi>s</mi></msub></math>.
+      </figcaption>
+    </figure>
+  </main>
+
+  <script>
+    // Color theme: set with the theme switch, which is remembered in this browser (where storage is allowed), or
+    // else from the system preference (and again whenever it changes).
+    (function () {
+      const mq = matchMedia('(prefers-color-scheme: dark)');
+      const buttons = [...document.querySelectorAll('[data-theme-choice]')];
+      const KEY = 'flying-through-spacetime-theme';
+      let chosen = null;
+      try { const t = localStorage.getItem(KEY); if (t === 'light' || t === 'dark') chosen = t; } catch (e) { }
+      const setTheme = t => {
+        document.documentElement.dataset.theme = t;
+        buttons.forEach(b => b.setAttribute('aria-pressed', b.dataset.themeChoice === t));
+      };
+      setTheme(chosen || (mq.matches ? 'dark' : 'light'));
+      mq.addEventListener('change', () => { if (!chosen) setTheme(mq.matches ? 'dark' : 'light'); });
+      buttons.forEach(b => b.addEventListener('click', () => {
+        chosen = b.dataset.themeChoice;
+        try { localStorage.setItem(KEY, chosen); } catch (e) { }
+        setTheme(chosen);
+      }));
+    })();
+  </script>
+</body>
+
+</html>
