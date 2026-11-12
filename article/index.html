@@ -5,45 +5,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Flying Through Spacetime</title>
-  <script>
-    // Apply a theme chosen earlier with the theme switch before the page is first drawn, so it does not flash.
-    try {
-      const t = localStorage.getItem('flying-through-spacetime-theme');
-      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-    } catch (e) { }
-  </script>
   <meta name="description"
     content="What special and general relativity look like from a spaceship, simulated by tracing light rays.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕓</text></svg>">
   <style>
-    /* Look and feel of ../rope-twist (https://potocpav.github.io/rope-twist/). */
+    /* Look and feel of ../rope-twist (https://potocpav.github.io/rope-twist/), in its dark theme only: it
+       suits pictures of space. */
     :root {
-      --bg: #ffffff;
-      --text: #1f1e1c;
-      --muted: #3f3e3a;
-      --line: #d6d4cc;
-      --outline: #444444;
-      --panel: #f3f2ee;
-      --accent: #b8501f;
-      color-scheme: light;
-    }
-
-    /* Dark theme: from the system preference until the script sets data-theme (from the system or the theme
-       switch). */
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) {
-        --bg: #141412;
-        --text: #ecebe6;
-        --muted: #a9a8a2;
-        --line: #45443f;
-        --outline: #444444;
-        --panel: #2a2927;
-        --accent: #e8875a;
-        color-scheme: dark;
-      }
-    }
-
-    :root[data-theme="dark"] {
       --bg: #141412;
       --text: #ecebe6;
       --muted: #a9a8a2;
@@ -168,7 +136,7 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* The simulation's view: always dark (it shows space), in both themes. */
+    /* The simulation's view. */
     .view {
       position: relative;
       aspect-ratio: 4 / 3;
@@ -285,49 +253,10 @@
       outline-offset: 2px;
     }
 
-    /* Light / dark switch in the top right corner. */
-    .theme-switch {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      display: inline-flex;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      overflow: hidden;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      font-size: 13px;
-    }
-
-    .theme-switch button {
-      border: 0;
-      padding: 5px 10px;
-      background: transparent;
-      color: var(--muted);
-      font: inherit;
-      cursor: pointer;
-    }
-
-    .theme-switch button+button {
-      border-left: 1px solid var(--line);
-    }
-
-    .theme-switch button:hover {
-      background: var(--panel);
-    }
-
-    .theme-switch button[aria-pressed="true"] {
-      background: var(--panel);
-      color: var(--text);
-      font-weight: 600;
-    }
   </style>
 </head>
 
 <body>
-  <div class="theme-switch" role="group" aria-label="Color theme">
-    <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
-    <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
-  </div>
   <main>
     <header>
       <h1>Flying Through Spacetime</h1>
@@ -463,28 +392,6 @@
       document.getElementById('fig-1-actual').style.setProperty('--at', (vNow + 0.9) / 1.8);
     });
     if (!sim) document.getElementById('fig-1-note').hidden = false;
-  </script>
-  <script>
-    // Color theme: set with the theme switch, which is remembered in this browser (where storage is allowed), or
-    // else from the system preference (and again whenever it changes).
-    (function () {
-      const mq = matchMedia('(prefers-color-scheme: dark)');
-      const buttons = [...document.querySelectorAll('[data-theme-choice]')];
-      const KEY = 'flying-through-spacetime-theme';
-      let chosen = null;
-      try { const t = localStorage.getItem(KEY); if (t === 'light' || t === 'dark') chosen = t; } catch (e) { }
-      const setTheme = t => {
-        document.documentElement.dataset.theme = t;
-        buttons.forEach(b => b.setAttribute('aria-pressed', b.dataset.themeChoice === t));
-      };
-      setTheme(chosen || (mq.matches ? 'dark' : 'light'));
-      mq.addEventListener('change', () => { if (!chosen) setTheme(mq.matches ? 'dark' : 'light'); });
-      buttons.forEach(b => b.addEventListener('click', () => {
-        chosen = b.dataset.themeChoice;
-        try { localStorage.setItem(KEY, chosen); } catch (e) { }
-        setTheme(chosen);
-      }));
-    })();
   </script>
 </body>
 
