@@ -2,9 +2,9 @@
 
 [by Pavel Potoček](https://potocpav.github.io/)
 
-You can play with general relativity [here](https://potocpav.github.io/general-relativity/), and read an article
-explaining what you see, with the simulation in its figures:
-[Flying Through Spacetime](https://potocpav.github.io/general-relativity/article/) (`article/`).
+- Play with general relativity in the [simulation](https://potocpav.github.io/general-relativity/).
+- Read the article explaining what you see, with the simulation in its figures:
+  [Flying Through Spacetime](https://potocpav.github.io/general-relativity/article/) (`article/`).
 
 ## Run
 
