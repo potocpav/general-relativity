@@ -509,6 +509,9 @@ class App extends Component {
           <button class=${"icon" + (this.state.showDisplayOptions ? " clicked" : "")} title="Display options" onClick=${this.toggleDisplayOptions}>
             <img src="img/eye.svg" alt="Display options" />
           </button>
+          <a class="icon" href="article/" title="Read the article: Flying Through Spacetime">
+            <img src="img/article.svg" alt="Article" />
+          </a>
           <a class="icon" href="https://github.com/potocpav/general-relativity" target="_blank" rel="noopener" title="Go to GitHub Repository">
             <img src="img/github-mark-white.svg" alt="GitHub" />
           </a>
