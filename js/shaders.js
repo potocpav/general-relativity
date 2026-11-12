@@ -3,12 +3,17 @@
 import { nSprites, projectileId } from './object-info.js';
 import { maxFrameCondition } from './metric.js';
 
-export async function fetchText(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
-  }
-  return response.text();
+// Fetches a text file, once per page (shaders are shared by all simulations).
+const texts = new Map(); // url -> Promise<string>
+export function fetchText(url) {
+  if (!texts.has(url)) texts.set(url, (async () => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    }
+    return response.text();
+  })());
+  return texts.get(url);
 }
 
 // Constants shared between JS and GLSL, defined once on the JS side.

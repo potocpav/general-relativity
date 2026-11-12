@@ -1,5 +1,4 @@
 
-var gl;
 
 const spritesFile = "models/sprites.webp";
 const spritesShape = [64*3, 64, 60]; // x, y, d
@@ -48,49 +47,60 @@ export const nSprites = objSize.length / 4;
 console.assert(objTexMin.length == nSprites * 4 && objTexMax.length == nSprites * 4);
 
 
+// The sprite image's pixels (RGBA), loaded once per page and shared by all
+// simulations on it. They are uploaded from an array, not from the image:
+// Chrome rejects images taller than MAX_3D_TEXTURE_SIZE (2048 on some GPUs,
+// and in SwiftShader) as a 3D texture source, although the texture fits.
+const spritePixels = new Map(); // root -> Promise<Uint8Array>
+function loadSprites(root) {
+  if (!spritePixels.has(root)) spritePixels.set(root, (async () => {
+    const url = root + spritesFile;
+    const img = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.addEventListener('load', () => resolve(img));
+      img.addEventListener('error', () => reject(new Error(`Failed to load ${url}`)));
+      img.src = url;
+    });
+    const [width, height, depth] = spritesShape;
+    if (img.width != width || img.height != height * depth) {
+      throw new Error(`${url} has unexpected size ${img.width}x${img.height}, expected ${width}x${height * depth}`);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    return new Uint8Array(ctx.getImageData(0, 0, img.width, img.height).data.buffer);
+  })());
+  return spritePixels.get(root);
+}
+
 // Information about where objects are in the combined sprite map,
 // and what are their extents in world coordinates.
 export class ObjectInfo {
   // All obj* input objects must be `Float32Array`s padded to
   // four elements per object.
   constructor(gl_) {
-    gl = gl_;
+    this.gl = gl_;
   }
 
-  // needs to be awaited before using the object!
-  // creates a 3D texture info from a hard-coded URL.
-  async initialize() {
-    const img = await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.addEventListener('load', () => resolve(img));
-      img.addEventListener('error', () => reject(new Error(`Failed to load ${spritesFile}`)));
-      img.src = spritesFile;
-    });
-
+  // Needs to be awaited before using the object: loads the sprite image, from
+  // `root` (the URL of the repository root, relative to the page).
+  async initialize(root = '') {
     [this.width, this.height, this.depth] = spritesShape;
-    if (img.width != this.width || img.height != this.height * this.depth) {
-      throw new Error(`${spritesFile} has unexpected size ${img.width}x${img.height}, ` +
-        `expected ${this.width}x${this.height * this.depth}`);
-    }
-    // The pixels are uploaded from an array, not from the image: Chrome rejects
-    // images taller than MAX_3D_TEXTURE_SIZE (2048 on some GPUs, and in
-    // SwiftShader) as a 3D texture source, although the texture itself fits.
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    this.pixels = new Uint8Array(ctx.getImageData(0, 0, img.width, img.height).data.buffer);
+    this.pixels = await loadSprites(root);
   }
 
   // Set up for a (new) shader program. GPU resources are created only once.
   compile(program) {
+    const gl = this.gl;
     if (!this.spriteTexture) this.createResources(program);
     this.spriteUniformLocation = gl.getUniformLocation(program, 'sprites');
     gl.uniformBlockBinding(program, gl.getUniformBlockIndex(program, "objectInfo"), uniformBlockBinding);
   }
 
   createResources(program) {
+    const gl = this.gl;
     this.spriteTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.spriteTexture);
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, this.width, this.height, this.depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels);
@@ -122,6 +132,7 @@ export class ObjectInfo {
   }
 
   render() {
+    const gl = this.gl;
     gl.uniform1i(this.spriteUniformLocation, 2);
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_3D, this.spriteTexture);

@@ -3,11 +3,9 @@
 import { h, Component, render } from 'https://esm.sh/preact@11.1.1';
 import htm from 'https://esm.sh/htm@3.1.1';
 
-import * as renderer from './renderer.js';
 import * as math from './math.js';
-import { World } from './world.js';
-import { ObjectInfo, asteroidId, photonClockId, projectileId } from './object-info.js';
-import { Objects } from './objects.js';
+import { Simulation } from './simulation.js';
+import { asteroidId, photonClockId, projectileId } from './object-info.js';
 import { scenarios, scenariosOf } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
 
@@ -73,10 +71,9 @@ const nextObjectId = id => {
 
 var canvas;
 var overlay;
-var gl;
-var world;
-var objectInfo;
-var objects;
+var sim;     // the Simulation
+var world;   // sim.world
+var objects; // sim.objects
 
 var params = {
   mousePos: null, // [x, y] in CSS pixels, y pointing up; null until the pointer moves
@@ -155,18 +152,19 @@ class App extends Component {
   componentDidMount () {
     canvas = document.getElementById("canvas")
     overlay = document.getElementById("overlay")
-    gl = renderer.initGl(canvas);
-    if (!gl) {
-      this.setState({error: "WebGL 2 is not supported by this browser."});
-      return;
-    }
 
     document.body.onkeydown = this.onKeyDown;
     document.body.onkeyup = this.onKeyUp;
     // keyup is not delivered when the window loses focus
     window.addEventListener('blur', () => arrowKeys.clear());
 
-    startup().then(() => {
+    Simulation.create(canvas, metric).then(created => {
+      if (!created) throw new Error("WebGL 2 is not supported by this browser.");
+      sim = created;
+      world = sim.world;
+      objects = sim.objects;
+      refreshWindow();
+      window.addEventListener('resize', refreshWindow, false);
       world.showPhotonSphere = this.state.showPhotonSphere;
       world.showEventHorizon = this.state.showEventHorizon;
       world.showInterior = this.state.showInterior;
@@ -184,9 +182,8 @@ class App extends Component {
   animate = t => {
     requestAnimationFrame(this.animate);
     world.timeScale = timeScaleOf(this.state);
-    world.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim, shipControls());
-    objects.advance(world.obsvX[0]);
-    renderer.render();
+    sim.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim, shipControls());
+    sim.render();
     this.renderOverlay();
 
     if (t - this.lastUiUpdate >= uiUpdateInterval) {
@@ -426,18 +423,11 @@ class App extends Component {
     const type = scenario.metric;
     if (type !== metric.constructor || !metric.sameParams(scenario.params)) {
       const next = new type(scenario.params);
-      // compile first (if the coordinates change), then switch everything at once
-      if (type !== metric.constructor) await renderer.setMetric(next);
+      await sim.setMetric(next);
       metric = next;
-      world.metric = next;
     }
     const state = scenario.setup(metric);
-    world.viewportSize = state.viewportSize;
-    world.reset(state.ship.x, state.ship.u, state.ship.heading);
-    objects.reset(metric, world.obsvX[0]);
-    for (const o of state.objects) {
-      objects.spawn(o.type, o.x, o.u);
-    }
+    sim.reset(state);
     saveSettings({scenario: scenario.id});
     this.setState({
       scenario: scenario.id,
@@ -632,28 +622,12 @@ class App extends Component {
 
 render(html`<${App} />`, document.body);
 
-async function startup() {
-  world = new World(gl, metric);
-
-  objectInfo = new ObjectInfo(gl);
-  await objectInfo.initialize();
-
-  objects = new Objects(gl, metric);
-
-  await renderer.init(gl, world, objectInfo, objects, metric);
-
-  refreshWindow();
-  window.addEventListener('resize', refreshWindow, false);
-}
-
 function refreshWindow() {
   const dpr = devicePixelRatio();
   const w = viewWidth(), h = viewHeight();
-  canvas.width = Math.max(1, Math.round(w * dpr / quality));
-  canvas.height = Math.max(1, Math.round(h * dpr / quality));
+  sim.resize(Math.max(1, Math.round(w * dpr / quality)), Math.max(1, Math.round(h * dpr / quality)));
   overlay.width = Math.max(1, Math.round(w * dpr));
   overlay.height = Math.max(1, Math.round(h * dpr));
-  renderer.initializeWindow(canvas.width, canvas.height);
   params.screenDim = [w, h];
 }
 

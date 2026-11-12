@@ -1,14 +1,12 @@
 
 import * as math from './math.js';
 
-var gl;
-
 const thrust = 0.5;      // rocket acceleration in its rest frame
 const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
 
 export class World {
   constructor(gl_, metric) {
-    gl = gl_;
+    this.gl = gl_;
 
     this.lastRealTime = undefined;
     this.time = 0;
@@ -53,6 +51,7 @@ export class World {
   }
 
   compile(program) {
+    const gl = this.gl;
     this.time_loc = gl.getUniformLocation(program, 'time');
     this.obsv_x_loc = gl.getUniformLocation(program, 'obsv_x');
     this.obsv_u_loc = gl.getUniformLocation(program, 'obsv_u');
@@ -132,6 +131,7 @@ export class World {
   }
 
   render() {
+    const gl = this.gl;
     gl.uniform1f(this.time_loc, this.time);
     gl.uniform3f(this.obsv_x_loc, ...this.obsvX);
     gl.uniform3f(this.obsv_u_loc, ...this.obsvU);
