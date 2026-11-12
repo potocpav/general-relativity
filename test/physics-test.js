@@ -12,6 +12,8 @@ import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
 import { scenarios, velocity3 } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
+import { World } from '../js/world.js';
+import { matchVelocity, velocityX } from '../article/pilots.js';
 import { asteroidId, photonClockId, objectRadius } from '../js/object-info.js';
 
 const root = '../';
@@ -173,6 +175,43 @@ function checkSpecialRelativityJs() {
   if (!(maxAberration < 1e-8 && maxDoppler < 1e-8)) errors.push(`aberration off by ${maxAberration.toExponential(1)}, Doppler by ${maxDoppler.toExponential(1)}`);
   return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
     `straight lines to ${maxError.toExponential(1)}; aberration and Doppler factor match`};
+}
+
+// The article's figure 1 pilot (in flat spacetime): flown to a target
+// velocity, the ship ends exactly at it, never overshooting, moving only
+// along x; it turns before thrusting, and coasts afterwards; and it follows a
+// target changed mid-way, turning around to brake.
+function checkMatchVelocityPilotJs() {
+  const errors = [];
+  const world = new World(null, new Minkowski());
+  world.reset([0, 0, 0], [1, 0, 0], Math.PI / 2);
+  const fly = (target, seconds, dt = 1 / 60) => {
+    let maxBeyond = 0, thrustedBeforeAligned = false;
+    const start = velocityX(world), dir = Math.sign(target - start);
+    for (let t = 0; t < seconds; t += dt) {
+      const c = matchVelocity(world, target, dt);
+      if (c.accel && Math.abs(c.heading[1]) > 1e-12) thrustedBeforeAligned = true;
+      world.step(dt, c);
+      maxBeyond = Math.max(maxBeyond, dir * (velocityX(world) - target));
+    }
+    return {maxBeyond, thrustedBeforeAligned};
+  };
+  for (const [target, seconds] of [[0.8, 5], [-0.5, 8], [0.9, 6], [0.9, 1]]) {
+    const r = fly(target, seconds);
+    const v = velocityX(world);
+    if (Math.abs(v - target) > 1e-9) errors.push(`target ${target}: v = ${v.toFixed(6)}`);
+    if (r.maxBeyond > 1e-9) errors.push(`target ${target}: overshot by ${r.maxBeyond.toExponential(1)}`);
+    if (r.thrustedBeforeAligned) errors.push(`target ${target}: thrusted before turning`);
+    if (Math.abs(world.obsvU[2]) > 1e-12) errors.push(`target ${target}: velocity along y`);
+  }
+  // a target changed mid-way: from 0.9 towards 0.8 after only 1 s, then to 0.8
+  world.reset([0, 0, 0], [1, 0, 0], Math.PI / 2);
+  fly(0.9, 1);
+  const r = fly(0.8, 6);
+  if (Math.abs(velocityX(world) - 0.8) > 1e-9) errors.push(`retargeted: v = ${velocityX(world).toFixed(6)}`);
+  // coasting: no thrust once there
+  if (matchVelocity(world, 0.8, 1 / 60).accel) errors.push('thrusting after reaching the target');
+  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') : 'reaches targets exactly, without overshooting, turning first'};
 }
 
 // The reference and static frames are orthonormal, and T, Tinv are inverses.
@@ -1071,6 +1110,7 @@ async function main() {
   };
   await run('metric parameters (JS)', async () => checkMetricParamsJs());
   await run('scenarios (JS)', async () => checkScenariosJs());
+  await run("article: figure 1's pilot (JS)", async () => checkMatchVelocityPilotJs());
   for (const type of metricTypes) {
     metric = new type({rs});
     random = prng(42);

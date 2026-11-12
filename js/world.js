@@ -1,8 +1,8 @@
 
 import * as math from './math.js';
 
-const thrust = 0.5;      // rocket acceleration in its rest frame
-const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
+export const thrust = 0.5;      // rocket acceleration in its rest frame
+export const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
 
 export class World {
   constructor(gl_, metric) {
@@ -98,25 +98,33 @@ export class World {
         thrusting = true;
       }
     }
-    this.setHeading(heading);
+    this.step(this.dt, {heading, accel: thrusting ? thrust : 0});
+  }
 
-    // rocket motor, in the ship's rest frame
-    var accel3_rest = undefined;
-    if (thrusting) {
-      accel3_rest = [0, thrust * this.obsvO[0], thrust * this.obsvO[1]];
-      this.obsvSprite = 1;
+  // Advance the ship by proper time `dt` (backwards if negative): point it
+  // along `heading` (rest frame components; by default, keep it), and fire
+  // the engine, with proper acceleration `accel` along the heading, for the
+  // first `thrustTime` of it (by default, all of it). Where it can't be
+  // followed, it stops exactly at the threshold (and `crashed` is set).
+  step(dt, {heading = null, accel = 0, thrustTime = Math.abs(dt)} = {}) {
+    this.obsvSprite = 0;
+    if (heading) this.setHeading(heading);
+    const sign = Math.sign(dt), burn = accel > 0 ? Math.min(Math.abs(dt), thrustTime) : 0;
+    for (const [duration, a] of [[burn, accel], [Math.abs(dt) - burn, 0]]) {
+      if (!(duration > 0) || this.crashed) continue;
+      // rocket motor, in the ship's rest frame
+      const accel3_rest = a > 0 ? [0, a * this.obsvO[0], a * this.obsvO[1]] : undefined;
+      if (a > 0) this.obsvSprite = 1;
+      const f = math.geo_fw_f(this.metric, accel3_rest);
+      const {xu: xuh, done, ended} = math.integrate(
+        this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], sign * duration, math.maxProperStep);
+      if (ended) this.crashed = true;
+      this.time += done;
+      this.obsvX = xuh.slice(0, 3);
+      this.obsvU = xuh.slice(3, 6);
+      this.obsvH = xuh.slice(6, 9);
+      this.setHeading(this.restHeading());
     }
-
-    const f = math.geo_fw_f(this.metric, accel3_rest);
-    // where it can't be followed, it stops exactly at the threshold
-    const {xu: xuh, done, ended} = math.integrate(
-      this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], this.dt, math.maxProperStep);
-    if (ended) this.crashed = true;
-    this.time += done;
-    this.obsvX = xuh.slice(0, 3);
-    this.obsvU = xuh.slice(3, 6);
-    this.obsvH = xuh.slice(6, 9);
-    this.setHeading(this.restHeading());
   }
 
   // get world coordinates under the screen coordinates,

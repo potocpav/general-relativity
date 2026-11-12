@@ -67,6 +67,13 @@ export class Simulation {
     this.objects.advance(this.world.obsvX[0]);
   }
 
+  // Advance the ship by proper time `dt` under `control` (heading, engine;
+  // see World.step), e.g. from an article's pilot; the objects follow.
+  step(dt, control) {
+    this.world.step(dt, control);
+    this.objects.advance(this.world.obsvX[0]);
+  }
+
   render() {
     this.renderer.render();
   }

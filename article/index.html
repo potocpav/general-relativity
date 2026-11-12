@@ -255,6 +255,30 @@
       border: none;
     }
 
+    /* A slider with a second marker (e.g. an actual value following the slider's target). The marker is
+       positioned along the track by --at (0 to 1), aligned with the thumb's centre. */
+    .slider {
+      position: relative;
+    }
+
+    .slider .marker {
+      position: absolute;
+      top: 50%;
+      left: calc(9px + (100% - 18px) * var(--at, 0.5));
+      width: 4px;
+      height: 16px;
+      border-radius: 2px;
+      background: var(--text);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .note {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 10px 0 0;
+    }
+
     input:focus-visible,
     button:focus-visible {
       outline: 2px solid var(--accent);
@@ -370,13 +394,17 @@
         </div>
       </div>
       <div class="view">
-        <div class="placeholder">Interactive figure coming soon</div>
+        <canvas id="fig-1-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
       </div>
       <div class="controls">
         <label for="fig-1-target">Target velocity</label>
-        <input type="range" id="fig-1-target" min="-0.9" max="0.9" step="0.01" value="0" disabled>
+        <div class="slider">
+          <input type="range" id="fig-1-target" min="-0.9" max="0.9" step="0.01" value="0">
+          <div class="marker" id="fig-1-actual" title="Actual velocity"></div>
+        </div>
         <output for="fig-1-target" id="fig-1-target-out">0%</output>
       </div>
+      <p class="note" id="fig-1-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>
         <b>Figure 1.</b> A spaceship in flat spacetime, at rest relative to the grid. Set a target velocity with the
         slider: the ship turns and fires its engine until it reaches it. The slider's marker shows the ship's actual
@@ -411,6 +439,31 @@
     </figure>
   </main>
 
+  <script type="module">
+    // Figure 1: a ship in flat spacetime, flown to the slider's target velocity along x (see matchVelocity).
+    import { runFigure } from '../js/figure.js';
+    import { scenarios } from '../js/scenarios.js';
+    import { matchVelocity, velocityX } from './pilots.js';
+
+    const percent = v => `${v > 0.0049 ? '+' : v < -0.0049 ? '−' : ''}${Math.abs(Math.round(v * 100))}%`;
+    const slider = document.getElementById('fig-1-target');
+    const show = (id, text) => { document.getElementById(id).textContent = text; };
+    const showTarget = () => show('fig-1-target-out', percent(+slider.value));
+    slider.addEventListener('input', showTarget);
+    showTarget();
+
+    const scenario = scenarios.find(sc => sc.id == 'flat');
+    const metric = new scenario.metric(scenario.params);
+    const state = {...scenario.setup(metric), viewportSize: 12};
+    const sim = await runFigure(document.getElementById('fig-1-canvas'), metric, state, (sim, dt) => {
+      sim.step(dt, matchVelocity(sim.world, +slider.value, dt));
+      const vNow = velocityX(sim.world);
+      show('fig-1-v', percent(vNow));
+      show('fig-1-gamma', sim.world.obsvU[0].toFixed(2));
+      document.getElementById('fig-1-actual').style.setProperty('--at', (vNow + 0.9) / 1.8);
+    });
+    if (!sim) document.getElementById('fig-1-note').hidden = false;
+  </script>
   <script>
     // Color theme: set with the theme switch, which is remembered in this browser (where storage is allowed), or
     // else from the system preference (and again whenever it changes).
