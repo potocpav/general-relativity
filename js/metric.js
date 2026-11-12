@@ -75,8 +75,10 @@ function radialChristoffel(metric, x, u, v) {
 //   spatial reference frame components (screen_to_frame in its GLSL file);
 // - toPlane(x): x in a flat plane, for culling boxes (chart_plane);
 // - traceRay(x0, p0, maxStep): light rays, see js/math.js (trace_ray);
-// - static id, label, endMessage, params (below), `features` of the spacetime
-//   ({blackHole} so far) and `glslFile`, its file in glsl/metrics/.
+// - static id, label (of the spacetime), coordinates (their name),
+//   coordinateNames, referenceObserver (who the reference frame belongs to),
+//   endMessage, params (below), `features` of the spacetime ({blackHole} so
+//   far) and `glslFile`, its file in glsl/metrics/.
 // canFollow(xu), stepLimit(xu) and the rest are the same for all metrics.
 //
 // Metrics have parameters, declared as `static params = {name: {label,
@@ -146,7 +148,10 @@ const identity3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 // rest at infinity, u = (1, -sqrt(rs/r), 0); they exist everywhere.
 export class GullstrandPainleve extends Metric {
   static id = 'gp';
-  static label = 'Gullstrand–Painlevé';
+  static label = 'Black hole';
+  static coordinates = 'Gullstrand–Painlevé';
+  static coordinateNames = ['T', 'r', 'φ'];
+  static referenceObserver = 'free fall';
 
   static endMessage = "You have hit the singularity:";
   static params = {rs: {label: 'Schwarzschild radius', default: 0.3}};

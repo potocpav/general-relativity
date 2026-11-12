@@ -535,6 +535,7 @@ class App extends Component {
             <button onClick=${this.zoomIn} title="Zoom in">+</button>
             <button onClick=${this.zoomOut} title="Zoom out">−</button>
           </div>
+          ${metric.constructor.features.blackHole && html`
           <div>
             <button
               class=${this.state.showPhotonSphere ? "clicked" : ""}
@@ -553,6 +554,7 @@ class App extends Component {
               title="Tint the black hole's shadow instead of showing it black"
               onClick=${this.toggleInterior}>BH interior (I)</button>
           </div>
+          `}
           <div>
             <button
               class=${this.state.showRedshift ? "clicked" : ""}
@@ -567,8 +569,8 @@ class App extends Component {
       </div>
       <div id="top_left">
         <div>
-          <select onChange=${this.selectMetric} title="Coordinates of the simulation">
-          ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric}>${t.label}</option>`)}
+          <select onChange=${this.selectMetric} title=${`Spacetime (simulated in ${metric.constructor.coordinates} coordinates)`}>
+          ${metricTypes.map(t => html`<option selected=${t.id == this.state.metric} title=${`${t.coordinates} coordinates`}>${t.label}</option>`)}
           </select>
         </div>
         <div>
@@ -602,7 +604,7 @@ class App extends Component {
 
       <div id="bottom_right">
         <div>
-          <span class="label" title="The ship's coordinates (time, r, φ)">${print3Vec(this.state.obsvX)}</span>
+          <span class="label" title=${`The ship's coordinates (${metric.constructor.coordinateNames.join(', ')})`}>${print3Vec(this.state.obsvX)}</span>
         </div>
         <div>
           <span class="label" title="The ship's speed">${printVelocity(this.state.obsvX, this.state.obsvU)}</span>
@@ -670,12 +672,12 @@ function printVelocity(x, u) {
   if (u === null) {
     return "n/a"
   } else {
-    // relative to a static observer; inside the horizon, where there are
-    // none, to the metric's reference observer
+    // relative to a static observer; where there are none (inside the
+    // horizon), to the metric's reference observer
     const lambda = staticGamma(metric, x, u);
     const speed = gamma => Math.floor(Math.sqrt(Math.max(0, 1 - Math.pow(gamma, -2))) * 100) + " %";
     if (lambda !== null) return "v = " + speed(lambda);
-    return "v = " + speed(referenceGamma(metric, x, u)) + " (vs. free fall)";
+    return "v = " + speed(referenceGamma(metric, x, u)) + ` (vs. ${metric.constructor.referenceObserver})`;
   }
 }
 
