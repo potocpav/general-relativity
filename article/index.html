@@ -259,19 +259,7 @@
        positioned along the track by --at (0 to 1), aligned with the thumb's centre. */
     .slider {
       position: relative;
-      margin: 16px 0 9px; /* room for the marker and ticks */
-    }
-
-    /* A tick line below the track, at --at. */
-    .slider .tick {
-      position: absolute;
-      top: calc(100% + 2px);
-      left: calc(9px + (100% - 18px) * var(--at, 0.5));
-      width: 2px;
-      height: 7px;
-      background: var(--muted);
-      transform: translateX(-50%);
-      pointer-events: none;
+      margin-top: 16px; /* room for the marker */
     }
 
     /* A small triangle above the track, pointing down at the value. */
@@ -372,14 +360,13 @@
       <div class="view">
         <canvas id="fig-1-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
         <div class="overlay">
-          <button type="button" id="fig-1-reset" aria-label="Back to rest" title="Back to rest (target velocity 0)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+          <button type="button" id="fig-1-reset" aria-label="Reset" title="Reset"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
       </div>
       <div class="controls">
         <label for="fig-1-target">Target velocity</label>
         <div class="slider">
           <input type="range" id="fig-1-target" min="-0.9" max="0.9" step="0.01" value="0">
-          <div class="tick" style="--at: 0.5" title="At rest"></div>
           <div class="marker" id="fig-1-actual" title="Actual velocity"></div>
         </div>
         <output for="fig-1-target" id="fig-1-target-out">0.00&#x202F;c</output>
@@ -435,12 +422,7 @@
     const showTarget = () => show('fig-1-target-out', speed(+slider.value));
     slider.addEventListener('input', showTarget);
     slider.addEventListener('change', () => { target = +slider.value; });
-    // the reset button sets the target velocity to zero: the ship turns and brakes to rest
-    document.getElementById('fig-1-reset').addEventListener('click', () => {
-      slider.value = 0;
-      target = 0;
-      showTarget();
-    });
+
     showTarget();
 
     const scenario = scenarios.find(sc => sc.id == 'flat');
@@ -454,6 +436,13 @@
       document.getElementById('fig-1-actual').style.setProperty('--at', (vNow + 0.9) / 1.8);
     });
     if (!sim) document.getElementById('fig-1-note').hidden = false;
+    // the reset button puts the ship back to its initial state, at rest, at once
+    document.getElementById('fig-1-reset').addEventListener('click', () => {
+      slider.value = 0;
+      target = 0;
+      showTarget();
+      if (sim) sim.reset(state);
+    });
   </script>
 </body>
 
