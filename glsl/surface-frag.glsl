@@ -8,7 +8,7 @@ uniform float time;
 uniform vec2 resolution;
 uniform vec3 obsv_x;
 uniform vec3 obsv_u;
-uniform vec2 obsv_o; // orientation vector in the local orthonormal (r, phi) frame
+uniform vec2 obsv_o; // heading, as spatial components in the ship's rest frame (see screen_to_frame)
 uniform int obsv_sprite;
 
 uniform float viewport_size;
@@ -260,8 +260,11 @@ void main( void ) {
 		objects_color = mix(objects_color, obj_color, obj_color.a);
 	}
 
+	// The ship as seen by itself: in its rest frame, whose axes are the
+	// screen's, where the viewport vector is the pixel's offset from it (light
+	// travel across the ship is negligible), so it is never contracted.
 	vec4 obsv_color = render_obj(
-		obsv_sprite, 1.0, time, T_pix_x * vec3(0.0, coord_delta(obsv_x, pix_x).yz), obsv_o);
+		obsv_sprite, 1.0, time, vec3(0.0, -screen_to_frame(obsv_x, pix_cartesian)), obsv_o);
 
 	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
 
