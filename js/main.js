@@ -674,9 +674,9 @@ function printVelocity(x, u) {
   } else {
     // relative to a static observer; where there are none (inside the
     // horizon), to the metric's reference observer
-    const lambda = staticGamma(metric, x, u);
+    const gamma = staticGamma(metric, x, u);
     const speed = gamma => Math.floor(Math.sqrt(Math.max(0, 1 - Math.pow(gamma, -2))) * 100) + " %";
-    if (lambda !== null) return "v = " + speed(lambda);
+    if (gamma !== null) return "v = " + speed(gamma);
     return "v = " + speed(referenceGamma(metric, x, u)) + ` (vs. ${metric.constructor.referenceObserver})`;
   }
 }
