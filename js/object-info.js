@@ -60,7 +60,7 @@ export class ObjectInfo {
   // needs to be awaited before using the object!
   // creates a 3D texture info from a hard-coded URL.
   async initialize() {
-    this.img = await new Promise((resolve, reject) => {
+    const img = await new Promise((resolve, reject) => {
       const img = new Image();
       img.addEventListener('load', () => resolve(img));
       img.addEventListener('error', () => reject(new Error(`Failed to load ${spritesFile}`)));
@@ -68,10 +68,19 @@ export class ObjectInfo {
     });
 
     [this.width, this.height, this.depth] = spritesShape;
-    if (this.img.width != this.width || this.img.height != this.height * this.depth) {
-      throw new Error(`${spritesFile} has unexpected size ${this.img.width}x${this.img.height}, ` +
+    if (img.width != this.width || img.height != this.height * this.depth) {
+      throw new Error(`${spritesFile} has unexpected size ${img.width}x${img.height}, ` +
         `expected ${this.width}x${this.height * this.depth}`);
     }
+    // The pixels are uploaded from an array, not from the image: Chrome rejects
+    // images taller than MAX_3D_TEXTURE_SIZE (2048 on some GPUs, and in
+    // SwiftShader) as a 3D texture source, although the texture itself fits.
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    this.pixels = new Uint8Array(ctx.getImageData(0, 0, img.width, img.height).data.buffer);
   }
 
   // Set up for a (new) shader program. GPU resources are created only once.
@@ -84,7 +93,7 @@ export class ObjectInfo {
   createResources(program) {
     this.spriteTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_3D, this.spriteTexture);
-    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, this.width, this.height, this.depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.img);
+    gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, this.width, this.height, this.depth, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.pixels);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
