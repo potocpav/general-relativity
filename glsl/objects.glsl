@@ -62,7 +62,7 @@ bool object_event(int i, vec3 pix_x, out vec3 obj_x, out vec3 obj_u, out float o
 	}
 	// The simultaneous event must be within the stored history, and the Newton
 	// steps must have converged: where they don't (objects falling towards the
-	// horizon, mostly in Schwarzschild coordinates), the last sample may be far
+	// horizon), the last sample may be far
 	// from simultaneous yet have a small spatial offset, drawing a ghost copy.
 	return k >= info.x - 0.01 && k <= info.y + 0.01 && abs(obj_deltax.x) < OBJECT_TIME_TOLERANCE;
 }

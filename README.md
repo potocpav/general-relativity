@@ -39,21 +39,12 @@ against the analytic critical angles, including relativistic aberration.
 
 Observer and object trajectories are computed in JS.
 
-The simulation runs in one of two coordinate systems for the Schwarzschild black hole,
-selectable in the top right (`js/metric.js`, `METRIC` in `glsl/physics.glsl`). Each has its own
-scenarios (`js/scenarios.js`); switching starts the other one's first scenario, as states are not
-carried over:
-
-- **Schwarzschild** (Free play only): the textbook coordinates. They are singular at the event horizon,
-  so the ship and objects stop there. The grid's redshift is computed for light emitted by static
-  observers.
-- **Gullstrand–Painlevé** (default, with all scenarios but Free play): regular across the horizon, so the ship and objects can fall in and are
-  followed until close to the singularity, and the view from inside is rendered. The grid's
-  redshift is computed for light emitted by "raindrop" observers, falling freely from rest at
-  infinity, so its colors differ.
-
-In both, the grid lines are at constant r and φ, which are the same in both coordinate systems
-(only the time coordinate differs).
+The Schwarzschild black hole is simulated in Gullstrand–Painlevé coordinates (`js/metric.js`,
+`glsl/physics.glsl`), which are regular across the horizon: the ship and objects can fall in and
+are followed until close to the singularity, and the view from inside is rendered. The grid lines
+are at constant r and φ, and its redshift is computed for light emitted by "raindrop" observers,
+falling freely from rest at infinity. Where coordinates break down, bodies and light rays are
+stopped by checks based on local quantities only (`maxFrameCondition` in `js/metric.js`).
 
 Light rays are traced with their
 conserved energy and angular momentum, which keeps them regular at the horizon. Rays that end in

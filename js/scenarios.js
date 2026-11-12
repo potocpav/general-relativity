@@ -13,10 +13,10 @@ export const defaultRs = 0.3;
 // across all metrics (they are used in links, ?scenario=<id>).
 
 import * as math from './math.js';
-import { Schwarzschild, GullstrandPainleve, velocity3, localVelocity3 } from './metric.js';
+import { GullstrandPainleve, velocity3, localVelocity3 } from './metric.js';
 import { asteroidId, photonClockId } from './object-info.js';
 
-// --- helpers; positions are (r, phi); they work in any of the metrics
+// --- helpers; positions are (r, phi)
 
 // effective potential: E^2 at the turning points of a timelike geodesic
 const potential = (rs, r, L) => (1 - rs / r) * (1 + L * L / (r * r));
@@ -84,26 +84,24 @@ const defaults = {viewportSize: 20, timeScale: 1, paused: false};
 
 // --- scenarios
 
-// A circular orbit at 10 rs, with a photon clock falling past.
-const freePlay = {
-  name: 'Free play',
-  description: 'A circular orbit at 10 rs, with a photon clock falling past. ' +
-    'Boost with the mouse or the arrow keys, spawn objects, and explore.',
-  setup: metric => {
-    const rs = metric.rs;
-    const clock = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
-    return {
-      ...defaults,
-      ship: ship(circularOrbit(metric, 10 * rs, 0)),
-      // started in the past, so that the clock is visible right away
-      objects: [object(photonClockId, backwards(metric, clock, 40))],
-    };
-  },
-};
-
 // Gullstrand–Painlevé coordinates follow everything across the horizon.
 const gpScenarios = [
-  {id: 'free', ...freePlay},
+  {
+    id: 'free',
+    name: 'Free play',
+    description: 'A circular orbit at 10 rs, with a photon clock falling past. ' +
+      'Boost with the mouse or the arrow keys, spawn objects, and explore.',
+    setup: metric => {
+      const rs = metric.rs;
+      const clock = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
+      return {
+        ...defaults,
+        ship: ship(circularOrbit(metric, 10 * rs, 0)),
+        // started in the past, so that the clock is visible right away
+        objects: [object(photonClockId, backwards(metric, clock, 40))],
+      };
+    },
+  },
   {
     id: 'precession',
     name: 'Perihelion precession',
@@ -238,14 +236,8 @@ const gpScenarios = [
   },
 ];
 
-// Schwarzschild coordinates stop at the horizon.
-const schwarzschildScenarios = [
-  {id: 'schwarzschild-free', ...freePlay},
-];
-
 export const scenarios = [
   ...gpScenarios.map(sc => ({...sc, metric: GullstrandPainleve})),
-  ...schwarzschildScenarios.map(sc => ({...sc, metric: Schwarzschild})),
 ];
 
 // The scenarios of metric class `type`.

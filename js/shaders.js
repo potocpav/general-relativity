@@ -18,7 +18,6 @@ export function shaderDefines(metric) {
     N_SPRITES: nSprites,
     PROJECTILE_ID: projectileId,
     MAX_FRAME_CONDITION: maxFrameCondition.toExponential(),
-    METRIC: metric.constructor.glslId,
   };
 }
 

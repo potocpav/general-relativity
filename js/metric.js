@@ -4,7 +4,7 @@ import { matVec, dot, scale, norm } from './math.js';
 // same for every metric, also in glsl/physics.glsl):
 // - the reference frame becomes degenerate: the condition number of T,
 //   estimated as |T| |T^-1| (Frobenius norms), exceeds maxFrameCondition
-//   (e.g. Schwarzschild coordinates at the horizon, or near the singularity);
+//   (e.g. near the singularity);
 // - a light ray's energy measured by the reference observer changes sign: it
 //   would no longer be past-directed (e.g. a ray heading into the past
 //   horizon, which Gullstrand–Painlevé coordinates don't cover: there the
@@ -80,7 +80,6 @@ function radialChristoffel(metric, x, u, v) {
 // T(x) takes coordinate components of a vector at x to reference frame
 // components, Tinv(x) back. staticT / staticTinv are the frame of static
 // observers, or null where there are none (inside the horizon).
-// `glslId` selects the metric in glsl/physics.glsl (METRIC).
 //
 // dgdr(x) is d g / d r, from which Metric computes the Christoffel symbols.
 // canFollow(xu), stepLimit(xu) and the rest are the same for all metrics.
@@ -131,77 +130,18 @@ class Metric {
   }
 }
 
-// Schwarzschild metric in Schwarzschild (t, r, phi) coordinates.
-// The reference frame is that of static observers. The coordinates are
-// singular at the horizon, so nothing can be followed across it.
-export class Schwarzschild extends Metric {
-  static id = 'schwarzschild';
-  static label = 'Schwarzschild';
-  static glslId = 0;
-
-  static endMessage = "You have reached the event horizon: Schwarzschild coordinates can't follow you inside;";
-
-  constructor(rs) {
-    super();
-    this.rs = rs;
-  }
-
-  rayEnergy(x, p) {
-    return (1 - this.rs / x[1]) * p[0];
-  }
-
-  rayDtdl(r, v, E, L) {
-    return E / (1 - this.rs / r);
-  }
-
-  g(x) {
-    const r = x[1], a = 1 - this.rs / r;
-    return [[-a, 0, 0], [0, 1 / a, 0], [0, 0, r * r]];
-  }
-
-  gInv(x) {
-    const r = x[1], a = 1 - this.rs / r;
-    return [[-1 / a, 0, 0], [0, a, 0], [0, 0, 1 / (r * r)]];
-  }
-
-  // d g / d r
-  dgdr(x) {
-    const r = x[1], rs = this.rs;
-    return [[-rs / (r * r), 0, 0], [0, -rs / ((r - rs) * (r - rs)), 0], [0, 0, 2 * r]];
-  }
-
-  T(x) {
-    const r = x[1], s = Math.sqrt(1 - this.rs / r);
-    return [[s, 0, 0], [0, 1 / s, 0], [0, 0, r]];
-  }
-
-  Tinv(x) {
-    const r = x[1], s = Math.sqrt(1 - this.rs / r);
-    return [[1 / s, 0, 0], [0, s, 0], [0, 0, 1 / r]];
-  }
-
-  staticT(x) {
-    return x[1] > this.rs ? this.T(x) : null;
-  }
-
-  staticTinv(x) {
-    return x[1] > this.rs ? this.Tinv(x) : null;
-  }
-}
-
 // Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates:
 //   ds^2 = -(1 - rs/r) dT^2 + 2 sqrt(rs/r) dT dr + dr^2 + r^2 dphi^2
 // with T = t + 2 sqrt(rs r) + rs ln|(sqrt(r) - sqrt(rs)) / (sqrt(r) + sqrt(rs))|,
-// t being the Schwarzschild time. Unlike
-// Schwarzschild coordinates, these are regular at the (future) horizon and
-// cover the black hole's interior. Space at constant T is flat.
+// t being the Schwarzschild time. Unlike Schwarzschild coordinates, these are
+// regular at the (future) horizon and cover the black hole's interior. Space
+// at constant T is flat.
 //
 // The reference frame is that of "raindrop" observers, falling freely from
 // rest at infinity, u = (1, -sqrt(rs/r), 0); they exist everywhere.
 export class GullstrandPainleve extends Metric {
   static id = 'gp';
   static label = 'Gullstrand–Painlevé';
-  static glslId = 1;
 
   static endMessage = "You have hit the singularity:";
 
@@ -272,4 +212,4 @@ export class GullstrandPainleve extends Metric {
   }
 }
 
-export const metricTypes = [Schwarzschild, GullstrandPainleve];
+export const metricTypes = [GullstrandPainleve];

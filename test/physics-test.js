@@ -6,7 +6,7 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { Schwarzschild, GullstrandPainleve, metricTypes, localVelocity3, velocity3 } from '../js/metric.js';
+import { GullstrandPainleve, metricTypes, localVelocity3, velocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
@@ -180,11 +180,9 @@ function checkFreeFallJs() {
 }
 
 // Bodies are stopped where the coordinates break down (frame condition
-// number, Lorentz factor relative to the reference observer): a raindrop
-// falling from 10 rs is followed until just in front of the horizon in
-// Schwarzschild coordinates, and close to the singularity in
-// Gullstrand–Painlevé coordinates. Light rays falling in are stopped at the
-// horizon (Schwarzschild) or the past horizon (Gullstrand–Painlevé).
+// number): a raindrop falling from 10 rs is followed until close to the
+// singularity, exactly at the threshold, however the integration is split.
+// Light rays falling in are stopped at the past horizon.
 function checkBreakdownJs() {
   const x0 = [0, 10 * rs, 0.3];
   const u0 = localVelocity3(metric, x0, [-Math.sqrt(0.1) * Math.cos(0.3), -Math.sqrt(0.1) * Math.sin(0.3)]);
@@ -212,10 +210,7 @@ function checkBreakdownJs() {
   const atEdge = endB.every(b => b > 1 - 1e-6 && b < 1);
   // a radial light ray, inwards (traced back in time)
   const ray = math.traceRay(metric, x0, math.matVec(math.restToCoord(metric, x0, u0), [-20, -20, 0]));
-  const ok = metric instanceof Schwarzschild
-    ? rStop > 1 && rStop < 1 + 1e-3
-    : rStop < 1e-3;
-  return {ok: ok && ray.status == math.RAY_HORIZON && atEdge && spread < 1e-6,
+  return {ok: rStop < 1e-3 && ray.status == math.RAY_HORIZON && atEdge && spread < 1e-6,
     message: `raindrop stopped at ${rStop.toPrecision(6)} rs, after tau = ${lo.toFixed(4)}; ` +
       `in chunks, at breakdown ${endB.map(b => b && b.toPrecision(8)).join(', ')}, r spread ${spread.toExponential(1)}; ` +
       `radial ray ` + (ray.status == math.RAY_HORIZON ? 'stopped' : 'not stopped')};
