@@ -58,7 +58,7 @@ export class World {
     this.obsv_u_loc = gl.getUniformLocation(program, 'obsv_u');
     this.obsv_o_loc = gl.getUniformLocation(program, 'obsv_o');
     this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
-    this.rs_loc = gl.getUniformLocation(program, 'rs');
+    this.metric_params_loc = gl.getUniformLocation(program, 'metric_params');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
     this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
     this.show_event_horizon_loc = gl.getUniformLocation(program, 'show_event_horizon');
@@ -137,7 +137,7 @@ export class World {
     gl.uniform3f(this.obsv_u_loc, ...this.obsvU);
     gl.uniform2f(this.obsv_o_loc, ...this.obsvO);
     gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
-    gl.uniform1f(this.rs_loc, this.metric.rs);
+    gl.uniform4fv(this.metric_params_loc, this.metric.glslParams());
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
     gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);
     gl.uniform1i(this.show_event_horizon_loc, this.showEventHorizon ? 1 : 0);

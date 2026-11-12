@@ -5,7 +5,7 @@
 
 precision highp float;
 
-uniform float rs;
+uniform vec4 metric_params; // the metric's parameters, see glslParams in js/metric.js
 
 #define pi 3.141592653589793
 #define epsilon 1e-5
@@ -18,6 +18,7 @@ vec2 s2v(vec2 screen, vec2 res, float size) {
 }
 
 // Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates.
+#define rs metric_params.x
 //
 // The metric defines a reference frame, an orthonormal frame at every point.
 // T(x) takes coordinate components of a vector at x to reference frame

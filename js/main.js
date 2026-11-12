@@ -8,7 +8,7 @@ import * as math from './math.js';
 import { World } from './world.js';
 import { ObjectInfo, asteroidId, photonClockId, projectileId } from './object-info.js';
 import { Objects } from './objects.js';
-import { scenarios, scenariosOf, defaultRs } from './scenarios.js';
+import { scenarios, scenariosOf } from './scenarios.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
 
 const html = htm.bind(h);
@@ -54,8 +54,8 @@ const initialScenario = findScenario(new URLSearchParams(location.search).get('s
 
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
-// set by the scenario (its metric class and black hole size), see loadScenario
-var metric = new initialScenario.metric(initialScenario.rs ?? defaultRs);
+// set by the scenario (its metric class and parameters), see loadScenario
+var metric = new initialScenario.metric(initialScenario.params);
 
 // projectiles fired with Space: speed in the ship's rest frame, and how many
 // are kept (the oldest are dropped)
@@ -424,9 +424,8 @@ class App extends Component {
   // Reset the world to the initial state of `scenario`, in its metric.
   async loadScenario(scenario) {
     const type = scenario.metric;
-    const rs = scenario.rs ?? defaultRs;
-    if (type !== metric.constructor || rs !== metric.rs) {
-      const next = new type(rs);
+    if (type !== metric.constructor || !metric.sameParams(scenario.params)) {
+      const next = new type(scenario.params);
       // compile first (if the coordinates change), then switch everything at once
       if (type !== metric.constructor) await renderer.setMetric(next);
       metric = next;

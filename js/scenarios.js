@@ -1,12 +1,10 @@
 // Scenarios: preset initial states showing interesting features of general
 // relativity and the Schwarzschild black hole.
 //
-// The black hole's Schwarzschild radius, unless a scenario sets its own `rs`.
-export const defaultRs = 0.3;
-
 // Each scenario belongs to one metric (`metric`, a class from metricTypes);
-// switching the metric starts its first scenario. Its `setup(metric)`, given
-// an instance of that class, returns the initial state:
+// switching the metric starts its first scenario. It may set the metric's
+// parameters (`params`, the others take their defaults). Its `setup(metric)`,
+// given an instance of that class, returns the initial state:
 //   {ship: {x, u, heading}, objects: [{type, x, u}], viewportSize,
 //    timeScale (negative runs backwards), paused}
 // Scenarios without `setup` are placeholders, shown disabled. Ids are unique
@@ -165,7 +163,7 @@ const gpScenarios = [
       'the inward direction.',
     // Free fall from infinity takes (2/3) rs of proper time from the horizon
     // to the singularity: 5 s at this size.
-    rs: 7.5,
+    params: {rs: 7.5},
     setup: metric => {
       const rs = metric.rs;
       return {

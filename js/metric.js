@@ -84,11 +84,32 @@ function radialChristoffel(metric, x, u, v) {
 // dgdr(x) is d g / d r, from which Metric computes the Christoffel symbols.
 // canFollow(xu), stepLimit(xu) and the rest are the same for all metrics.
 //
+// Metrics have parameters, declared as `static params = {name: {label,
+// default}}` and given to the constructor as {name: value} (missing ones take
+// their defaults), available as `params`. The shader gets them, in declaration
+// order, as the components of `metric_params` (see glslParams).
+//
 // Light rays are traced with their conserved energy E = -p_t and angular
 // momentum L = p_phi (see traceRay in js/math.js and glsl/physics.glsl):
 // rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dt/dl, with v = dr/dl.
 
 class Metric {
+  constructor(params = {}) {
+    const declared = this.constructor.params;
+    this.params = Object.fromEntries(Object.entries(declared).map(([name, p]) => [name, params[name] ?? p.default]));
+  }
+
+  // whether `params` ({name: value}, missing ones at their defaults) are the same as this metric's
+  sameParams(params = {}) {
+    return Object.entries(this.constructor.params).every(([name, p]) => (params[name] ?? p.default) === this.params[name]);
+  }
+
+  // the parameters as the shader's `metric_params` (vec4)
+  glslParams() {
+    const values = Object.keys(this.constructor.params).map(name => this.params[name]);
+    return [...values, 0, 0, 0, 0].slice(0, 4);
+  }
+
   // Gamma^mu_ab u^a v^b, and the same with v = u
   gammaUV(x, u, v) {
     return radialChristoffel(this, x, u, v);
@@ -144,10 +165,10 @@ export class GullstrandPainleve extends Metric {
   static label = 'Gullstrand–Painlevé';
 
   static endMessage = "You have hit the singularity:";
+  static params = {rs: {label: 'Schwarzschild radius', default: 0.3}};
 
-  constructor(rs) {
-    super();
-    this.rs = rs;
+  get rs() {
+    return this.params.rs;
   }
 
   rayEnergy(x, p) {

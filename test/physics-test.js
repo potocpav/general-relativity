@@ -122,6 +122,25 @@ function checkGeodesicsJs() {
   return {ok: maxError < 1e-8, message: `max drift of E, L, u.u: ${maxError.toExponential(2)}`};
 }
 
+// Metric parameters take their defaults where not given, are compared with
+// defaults filled in, and are passed to the shader in declaration order.
+function checkMetricParamsJs() {
+  const errors = [];
+  for (const type of metricTypes) {
+    const declared = Object.entries(type.params);
+    const defaults = new type();
+    const custom = Object.fromEntries(declared.map(([name, p], i) => [name, p.default * 2 + i]));
+    const m = new type(custom);
+    declared.forEach(([name, p], i) => {
+      if (defaults.params[name] !== p.default) errors.push(`${type.id}: default ${name}`);
+      if (m.params[name] !== custom[name] || m.glslParams()[i] !== custom[name]) errors.push(`${type.id}: ${name}`);
+    });
+    if (m.glslParams().length != 4) errors.push(`${type.id}: glslParams length`);
+    if (!defaults.sameParams({}) || !defaults.sameParams(undefined) || !m.sameParams(custom) || m.sameParams({})) errors.push(`${type.id}: sameParams`);
+  }
+  return {ok: errors.length == 0, message: errors.length ? errors.join(', ') : `${metricTypes.length} metric(s)`};
+}
+
 // The reference and static frames are orthonormal, and T, Tinv are inverses.
 function checkFramesJs() {
   const transpose = m => m[0].map((_, j) => m.map(row => row[j]));
@@ -455,7 +474,7 @@ async function runOnGpu(gl, vertexSource, test, samples, nRows) {
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, inputTex);
   gl.uniform1i(gl.getUniformLocation(program, 'inputs'), 0);
-  gl.uniform1f(gl.getUniformLocation(program, 'rs'), rs);
+  gl.uniform4fv(gl.getUniformLocation(program, 'metric_params'), metric.glslParams());
 
   const position = gl.getAttribLocation(program, 'position');
   gl.enableVertexAttribArray(position);
@@ -682,7 +701,7 @@ function checkScenariosJs() {
     return {fell: false, rMin, rMax, periapsisPhis, xu};
   };
   for (const sc of scenarios.filter(sc => sc.setup)) {
-    const m = new sc.metric(sc.rs ?? rs);
+    const m = new sc.metric(sc.params);
     const st = sc.setup(m);
     for (const body of [st.ship, ...st.objects]) {
       const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
@@ -1013,9 +1032,10 @@ async function main() {
       results.push({name, ok: false, message: String(err.message ?? err)});
     }
   };
+  await run('metric parameters (JS)', async () => checkMetricParamsJs());
   await run('scenarios (JS)', async () => checkScenariosJs());
   for (const type of metricTypes) {
-    metric = new type(rs);
+    metric = new type({rs});
     random = prng(42);
     const prefix = `[${type.label}] `;
     await run(prefix + 'surface shader', () => checkSurfaceShader(gl, vertexSource));
