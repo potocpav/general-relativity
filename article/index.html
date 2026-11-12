@@ -146,6 +146,38 @@
       background: #000;
     }
 
+    /* Buttons overlaid on the view's lower left corner (as in ../rope-twist, but dark, over space). */
+    .view .overlay {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .view .overlay button {
+      width: 40px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(20, 20, 18, 0.8);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .view .overlay button:hover {
+      background: var(--panel);
+    }
+
+    .view .overlay svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
     .view canvas {
       display: block;
       width: 100%;
@@ -339,6 +371,9 @@
       </div>
       <div class="view">
         <canvas id="fig-1-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-1-reset" aria-label="Back to rest" title="Back to rest (target velocity 0)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
       </div>
       <div class="controls">
         <label for="fig-1-target">Target velocity</label>
@@ -400,6 +435,12 @@
     const showTarget = () => show('fig-1-target-out', speed(+slider.value));
     slider.addEventListener('input', showTarget);
     slider.addEventListener('change', () => { target = +slider.value; });
+    // the reset button sets the target velocity to zero: the ship turns and brakes to rest
+    document.getElementById('fig-1-reset').addEventListener('click', () => {
+      slider.value = 0;
+      target = 0;
+      showTarget();
+    });
     showTarget();
 
     const scenario = scenarios.find(sc => sc.id == 'flat');
