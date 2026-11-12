@@ -336,7 +336,7 @@
       <p class="note" id="fig-1-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>
         <b>Figure 1.</b> A spaceship in flat spacetime, at rest relative to the grid. Set a target velocity with the
-        slider: the ship turns and fires its engine until it reaches it. The slider's marker shows the ship's actual
+        slider: when you let go, the ship turns and fires its engine until it reaches it. The slider's marker shows the ship's actual
         velocity.
       </figcaption>
     </figure>
@@ -377,15 +377,19 @@
     const percent = v => `${v > 0.0049 ? '+' : v < -0.0049 ? '−' : ''}${Math.abs(Math.round(v * 100))}%`;
     const slider = document.getElementById('fig-1-target');
     const show = (id, text) => { document.getElementById(id).textContent = text; };
+    // The ship steers for the target once the slider is released ('change'; with the keyboard, each step); while
+    // dragging, only the shown value follows ('input').
+    let target = +slider.value;
     const showTarget = () => show('fig-1-target-out', percent(+slider.value));
     slider.addEventListener('input', showTarget);
+    slider.addEventListener('change', () => { target = +slider.value; });
     showTarget();
 
     const scenario = scenarios.find(sc => sc.id == 'flat');
     const metric = new scenario.metric(scenario.params);
     const state = {...scenario.setup(metric), viewportSize: 12};
     const sim = await runFigure(document.getElementById('fig-1-canvas'), metric, state, (sim, dt) => {
-      sim.step(dt, matchVelocity(sim.world, +slider.value, dt));
+      sim.step(dt, matchVelocity(sim.world, target, dt));
       const vNow = velocityX(sim.world);
       show('fig-1-v', percent(vNow));
       show('fig-1-gamma', sim.world.obsvU[0].toFixed(2));
