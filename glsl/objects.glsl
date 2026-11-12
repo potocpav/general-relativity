@@ -47,7 +47,7 @@ bool object_event(int i, vec3 pix_x, out vec3 obj_x, out vec3 obj_u, out float o
 	if (info.w == 0.0) return false;
 	// cull: the pixel is outside the box around the object's stored history
 	vec4 box = texelFetch(obj_info, ivec2(i, 1), 0);
-	vec2 p = pix_x.y * vec2(cos(pix_x.z), sin(pix_x.z));
+	vec2 p = chart_plane(pix_x);
 	if (any(lessThan(p, box.xy)) || any(greaterThan(p, box.zw))) return false;
 
 	float k = pix_x.x / history_dt;
@@ -57,7 +57,7 @@ bool object_event(int i, vec3 pix_x, out vec3 obj_x, out vec3 obj_u, out float o
 		float kc = clamp(k, info.x, info.y);
 		object_sample(i, kc, obj_x, obj_u, obj_tau, obj_angle);
 		obj_rest = coord_to_rest(pix_x, obj_u);
-		obj_deltax = obj_rest * cyclic(obj_x - pix_x);
+		obj_deltax = obj_rest * coord_delta(obj_x, pix_x);
 		k = kc - obj_deltax.x * obj_u.x / history_dt;
 	}
 	// The simultaneous event must be within the stored history, and the Newton

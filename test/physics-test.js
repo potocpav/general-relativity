@@ -1,4 +1,4 @@
-// Checks that the GLSL physics (glsl/physics.glsl) agrees with its JS
+// Checks that the GLSL physics (glsl/common.glsl, glsl/metrics/) agrees with its JS
 // counterparts. Each test evaluates a GLSL expression on the GPU for a set of
 // random inputs and compares the results with the JS implementation.
 //
@@ -6,11 +6,11 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { GullstrandPainleve, metricTypes, localVelocity3, velocity3 } from '../js/metric.js';
+import { GullstrandPainleve, metricTypes, localVelocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
-import { scenarios } from '../js/scenarios.js';
+import { scenarios, velocity3 } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { asteroidId, photonClockId, objectRadius } from '../js/object-info.js';
 
@@ -167,7 +167,7 @@ function checkTraceRayJs() {
     const x0 = randomPoint(2, 10);
     const p0 = screenRay(metric, x0, randomVelocity(x0), randomVector2(10));
     if (Math.abs(impactParameter(x0, p0) / bCrit - 1) < 0.1) continue;
-    const ray = math.traceRay(metric, x0, p0, 1e-4);
+    const ray = metric.traceRay(x0, p0, 1e-4);
     const {xu, ended} = math.integrate(metric, math.geo_f(metric), [...x0, ...p0], 1, 1e-4);
     if (ray.status != math.RAY_REACHED || ended) continue;
     compared++;
@@ -228,7 +228,7 @@ function checkBreakdownJs() {
   const spread = Math.max(...endR) / Math.min(...endR) - 1;
   const atEdge = endB.every(b => b > 1 - 1e-6 && b < 1);
   // a radial light ray, inwards (traced back in time)
-  const ray = math.traceRay(metric, x0, math.matVec(math.restToCoord(metric, x0, u0), [-20, -20, 0]));
+  const ray = metric.traceRay(x0, math.matVec(math.restToCoord(metric, x0, u0), [-20, -20, 0]));
   return {ok: rStop < 1e-3 && ray.status == math.RAY_HORIZON && atEdge && spread < 1e-6,
     message: `raindrop stopped at ${rStop.toPrecision(6)} rs, after tau = ${lo.toFixed(4)}; ` +
       `in chunks, at breakdown ${endB.map(b => b && b.toPrecision(8)).join(', ')}, r spread ${spread.toExponential(1)}; ` +
@@ -282,7 +282,7 @@ function checkShadowJs() {
   const failures = [];
   for (const setup of shadowSetups) {
     for (const ray of shadowEdgeRays(setup, delta)) {
-      const fallsIn = math.traceRay(metric, ray.x0, ray.u0, 2e-4).status == math.RAY_HORIZON;
+      const fallsIn = metric.traceRay(ray.x0, ray.u0, 2e-4).status == math.RAY_HORIZON;
       if (fallsIn != ray.fallsIn) failures.push(`${setup.name}: ${ray.label}`);
     }
   }
@@ -400,7 +400,7 @@ const tests = [
 
 // traceRay's result in the rows of the raytrace tests, or null if not reached
 function expectedRay(x0, u0) {
-  const ray = math.traceRay(metric, x0, u0, 1e-3);
+  const ray = metric.traceRay(x0, u0, 1e-3);
   return ray.status == math.RAY_REACHED ? [[...ray.x, 1], [...ray.p, 0]] : null;
 }
 
@@ -552,7 +552,7 @@ async function checkShadowGpu(gl, vertexSource, deg) {
 // and report a slightly longer ray as fallen in.
 async function checkNearHorizonGpu(gl, vertexSource) {
   const endRadius = (x0, u0) => {
-    const ray = math.traceRay(metric, x0, u0, 1e-3);
+    const ray = metric.traceRay(x0, u0, 1e-3);
     return ray.status == math.RAY_REACHED ? ray.x[1] : 0;
   };
   const cases = [];
@@ -617,7 +617,7 @@ async function checkSkyGpu(gl, vertexSource, rMin, rMax) {
     const angle = uniform(0, 2 * Math.PI);
     const p0 = screenRay(metric, x0, randomVelocity(x0), [30 * Math.cos(angle), 30 * Math.sin(angle)]);
     if (Math.abs(impactParameter(x0, p0) / bCrit - 1) < 0.03) continue;
-    const ray = math.traceRay(metric, x0, p0, 1e-3);
+    const ray = metric.traceRay(x0, p0, 1e-3);
     if (ray.status == math.RAY_REACHED && ray.x[1] < 1.1 * rs) continue;
     cases.push({x0, p0, sky: reachesSky(x0, p0), js: ray.status == math.RAY_REACHED});
   }
@@ -1001,15 +1001,19 @@ async function checkObjectNoGhostsGpu(gl, vertexSource) {
 
 // The full raytracing shader compiles and its uniform block matches the JS sprite tables.
 async function checkSurfaceShader(gl, vertexSource) {
-  const program = compileProgram(gl, vertexSource,
-    await physicsFragmentShader(await fetchText(root + 'glsl/surface-frag.glsl'), metric, root));
+  const source = await fetchText(root + 'glsl/surface-frag.glsl');
+  const program = compileProgram(gl, vertexSource, await physicsFragmentShader(source, metric, root));
   const block = gl.getUniformBlockIndex(program, 'objectInfo');
   const size = gl.getActiveUniformBlockParameter(program, block, gl.UNIFORM_BLOCK_DATA_SIZE);
   const expectedSize = 3 * nSprites * 16; // 3 arrays of std140 vec3
   gl.deleteProgram(program);
+  // it also compiles with the features toggled (e.g. without the black hole's overlays)
+  const toggled = Object.fromEntries(['blackHole'].map(f => [f, !metric.constructor.features[f]]));
+  const variant = Object.create(metric, {constructor: {value: class extends metric.constructor { static features = toggled; }}});
+  gl.deleteProgram(compileProgram(gl, vertexSource, await physicsFragmentShader(source, variant, root)));
   return {
     ok: size == expectedSize,
-    message: `objectInfo block size ${size}, expected ${expectedSize}`,
+    message: `objectInfo block size ${size}, expected ${expectedSize}; compiles with features toggled`,
   };
 }
 

@@ -1,7 +1,7 @@
-import { matVec, dot, scale, norm } from './math.js';
+import { matVec, matMul, dot, scale, norm, rk4, RAY_REACHED, RAY_HORIZON } from './math.js';
 
 // Where the coordinates break down, detected from local quantities only (the
-// same for every metric, also in glsl/physics.glsl):
+// same for every metric, also in glsl/common.glsl):
 // - the reference frame becomes degenerate: the condition number of T,
 //   estimated as |T| |T^-1| (Frobenius norms), exceeds maxFrameCondition
 //   (e.g. near the singularity);
@@ -25,17 +25,6 @@ export const frameCondition = (metric, x) => frobenius(metric.T(x)) * frobenius(
 export function rayCanFollow(metric, x, p, e0) {
   return [...x, ...p].every(Number.isFinite) && frameCondition(metric, x) < maxFrameCondition
     && matVec(metric.T(x), p)[0] * e0 > 0;
-}
-
-// 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
-// in screen-aligned cartesian components, i.e. flat-space polar (dr/dt, r dphi/dt).
-// Returns null if the velocity is not timelike.
-export const velocity3 = (metric, x, u2_cart) => {
-  const [vr, vphi] = metric.cartesianToLocal(x, u2_cart);
-  const V = [1, vr, vphi / x[1]];
-  const norm = -dot(V, matVec(metric.g(x), V));
-  if (!(norm > 0)) return null;
-  return scale(V, 1 / Math.sqrt(norm));
 }
 
 // 3-velocity from a physical 2-velocity measured by a static observer at x,
@@ -62,7 +51,7 @@ export const staticGamma = (metric, x, u) => {
 export const referenceGamma = (metric, x, u) => matVec(metric.T(x), u)[0];
 
 // Christoffel symbols contracted with vectors u and v, Gamma^mu_ab u^a v^b,
-// for a metric depending only on r:
+// for a metric in (t, r, phi) depending only on r:
 //   Gamma^mu_ab = 1/2 g^mu nu (d_a g_nu b + d_b g_nu a - d_nu g_ab)
 // where only d_r is non-zero, so
 //   Gamma^mu_ab u^a v^b = 1/2 g^mu nu (u^r (g' v)_nu + v^r (g' u)_nu - delta^r_nu u.g'.v)
@@ -74,26 +63,30 @@ function radialChristoffel(metric, x, u, v) {
   return scale(matVec(metric.gInv(x), w), 0.5);
 }
 
-// Metrics are in (time, r, phi) coordinates and depend only on r.
-//
-// Each metric defines a reference frame: an orthonormal frame at every point.
-// T(x) takes coordinate components of a vector at x to reference frame
-// components, Tinv(x) back. staticT / staticTinv are the frame of static
-// observers, or null where there are none (inside the horizon).
-//
-// dgdr(x) is d g / d r, from which Metric computes the Christoffel symbols.
+// Metrics are in coordinates (time, x1, x2), where the time coordinate is a
+// global time function. Each metric class provides:
+// - g(x), gInv(x): the metric and its inverse;
+// - gammaUV(x, u, v), gammaUU(x, u): Christoffel symbols, Gamma^mu_ab u^a v^b;
+// - T(x), Tinv(x): the reference frame, an orthonormal frame at every point:
+//   T takes coordinate components of a vector at x to reference frame
+//   components, Tinv back; staticT / staticTinv: the frame of static
+//   observers, or null where there are none;
+// - cartesianToLocal(x, v): a screen-aligned (cartesian) 2-vector at x as
+//   spatial reference frame components (screen_to_frame in its GLSL file);
+// - toPlane(x): x in a flat plane, for culling boxes (chart_plane);
+// - traceRay(x0, p0, maxStep): light rays, see js/math.js (trace_ray);
+// - static id, label, endMessage, params (below), `features` of the spacetime
+//   ({blackHole} so far) and `glslFile`, its file in glsl/metrics/.
 // canFollow(xu), stepLimit(xu) and the rest are the same for all metrics.
 //
 // Metrics have parameters, declared as `static params = {name: {label,
 // default}}` and given to the constructor as {name: value} (missing ones take
 // their defaults), available as `params`. The shader gets them, in declaration
 // order, as the components of `metric_params` (see glslParams).
-//
-// Light rays are traced with their conserved energy E = -p_t and angular
-// momentum L = p_phi (see traceRay in js/math.js and glsl/physics.glsl):
-// rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dt/dl, with v = dr/dl.
 
 class Metric {
+  static features = {};
+
   constructor(params = {}) {
     const declared = this.constructor.params;
     this.params = Object.fromEntries(Object.entries(declared).map(([name, p]) => [name, params[name] ?? p.default]));
@@ -108,22 +101,6 @@ class Metric {
   glslParams() {
     const values = Object.keys(this.constructor.params).map(name => this.params[name]);
     return [...values, 0, 0, 0, 0].slice(0, 4);
-  }
-
-  // Gamma^mu_ab u^a v^b, and the same with v = u
-  gammaUV(x, u, v) {
-    return radialChristoffel(this, x, u, v);
-  }
-
-  gammaUU(x, u) {
-    return radialChristoffel(this, x, u, u);
-  }
-
-  // rotate a screen-space cartesian 2-vector into the local orthonormal
-  // (r-hat, phi-hat) basis at `x0`
-  cartesianToLocal(x0, v) {
-    const c = Math.cos(x0[2]), s = Math.sin(x0[2]);
-    return [c * v[0] + s * v[1], -s * v[0] + c * v[1]];
   }
 
   // How close a body at xu = [x, u, ...] is to where the coordinates break
@@ -151,6 +128,13 @@ class Metric {
   }
 }
 
+// How much the reference frame may change over one step of traceRay,
+// |T(y1) T^-1(y) - 1|. The same control as in trace_ray in glsl/metrics/gp.glsl,
+// but much finer: traceRay is the reference.
+const rayFrameStep = 0.02;
+
+const identity3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+
 // Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates:
 //   ds^2 = -(1 - rs/r) dT^2 + 2 sqrt(rs/r) dT dr + dr^2 + r^2 dphi^2
 // with T = t + 2 sqrt(rs r) + rs ln|(sqrt(r) - sqrt(rs)) / (sqrt(r) + sqrt(rs))|,
@@ -166,10 +150,36 @@ export class GullstrandPainleve extends Metric {
 
   static endMessage = "You have hit the singularity:";
   static params = {rs: {label: 'Schwarzschild radius', default: 0.3}};
+  static features = {blackHole: true};
+  static glslFile = 'gp';
 
   get rs() {
     return this.params.rs;
   }
+
+  // Gamma^mu_ab u^a v^b, and the same with v = u
+  gammaUV(x, u, v) {
+    return radialChristoffel(this, x, u, v);
+  }
+
+  gammaUU(x, u) {
+    return radialChristoffel(this, x, u, u);
+  }
+
+  // rotate a screen-space cartesian 2-vector into the local orthonormal
+  // (r-hat, phi-hat) basis at `x0`
+  cartesianToLocal(x0, v) {
+    const c = Math.cos(x0[2]), s = Math.sin(x0[2]);
+    return [c * v[0] + s * v[1], -s * v[0] + c * v[1]];
+  }
+
+  toPlane(x) {
+    return [x[1] * Math.cos(x[2]), x[1] * Math.sin(x[2])];
+  }
+
+  // Light rays are traced with their conserved energy E = -p_t and angular
+  // momentum L = p_phi: rayEnergy(x, p) is E, rayDtdl(r, v, E, L) is dT/dl,
+  // with v = dr/dl.
 
   rayEnergy(x, p) {
     const a = this.rs / x[1];
@@ -187,6 +197,48 @@ export class GullstrandPainleve extends Metric {
   // collapsed star.
   rayDtdl(r, v, E, L) {
     return (E * E + this.rs * L * L / (r * r * r)) / (E - Math.sqrt(this.rs / r) * v);
+  }
+
+  // Trace a light ray, a past-directed null geodesic from x0 with momentum p0,
+  // from affine parameter 0 to 1. Mirrors trace_ray in glsl/metrics/gp.glsl: the
+  // ray is traced using its conserved energy E and angular momentum L, as
+  // y = [t, r, phi, v = dr/dl] with
+  //   dt/dl = this.rayDtdl(r, v, E, L),  dr/dl = v,  dphi/dl = L / r^2,
+  //   dv/dl = L^2 (r - 1.5 rs) / r^4,
+  // which (except for t) is regular at the horizon. RK4 steps are at most
+  // `maxStep`, and short enough that the reference frame changes little
+  // (rayFrameStep); longer ones, and ones giving non-finite values, are retried
+  // shorter, so that no step jumps across where the coordinates break down.
+  // The ray is stopped where it can't be followed (this.rayCanFollow).
+  // Returns {status, x, p}, with x and p at the end if it was reached.
+  traceRay(x0, p0, maxStep = 1e-3) {
+    const rs = this.rs;
+    const E = this.rayEnergy(x0, p0), L = x0[1] * x0[1] * p0[2];
+    const f = y => {
+      const r = y[1];
+      return [this.rayDtdl(r, y[3], E, L), y[3], L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r)];
+    };
+    const momentum = y => [this.rayDtdl(y[1], y[3], E, L), y[3], L / (y[1] * y[1])];
+    const e0 = matVec(this.T(x0), p0)[0];
+    const canFollow = y => this.rayCanFollow(y.slice(0, 3), momentum(y), e0);
+    // whether a step from y to y1 is short enough (false for non-finite values)
+    const smallStep = (y, y1) => frobenius(matMul(this.T(y1.slice(0, 3)), this.Tinv(y.slice(0, 3)))
+      .map((row, a) => row.map((v, b) => v - identity3[a][b]))) <= rayFrameStep;
+    var y = [...x0, p0[1]], l = 0, h = maxStep;
+    for (var i = 0; 1 - l > 1e-12; i++) {
+      if (!canFollow(y) || i > 1e6) return {status: RAY_HORIZON};
+      h = Math.min(maxStep, 1 - l, h);
+      const y1 = rk4(f, y, h);
+      if (smallStep(y, y1)) {
+        y = y1; l += h;
+        h *= 2;
+      } else {
+        h /= 4;
+        if (!(h > 1e-15)) return {status: RAY_HORIZON};
+      }
+    }
+    if (!canFollow(y)) return {status: RAY_HORIZON};
+    return {status: RAY_REACHED, x: y.slice(0, 3), p: momentum(y)};
   }
 
   g(x) {

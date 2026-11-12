@@ -49,8 +49,6 @@ export function integrateToTime(metric, y, T1, accel_rest) {
   return y;
 }
 
-const cartesian = y => [y[1] * Math.cos(y[2]), y[1] * Math.sin(y[2])];
-
 // state: [x, u, tau, h]; history rows add the orientation angle (see writeRow)
 const stateSize = 10, rowSize = 11;
 const ring = k => ((k % historyRows) + historyRows) % historyRows;
@@ -193,7 +191,7 @@ export class Objects {
   }
 
   extendBounds(o, k, y) {
-    const [px, py] = cartesian(y);
+    const [px, py] = this.metric.toPlane(y);
     const c = Math.floor(k / chunkRows);
     const b = o.chunks.get(c);
     if (b) {

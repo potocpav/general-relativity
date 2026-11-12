@@ -1,29 +1,10 @@
-// Spacetime physics shared by the surface shader and the physics tests.
-// Mirrors js/metric.js, js/math.js and js/world.js; test/ checks that they agree.
-// Light rays use a different (equivalent) formulation than js/math.js, see below.
-// Assembled by js/shaders.js, which prepends `#version` and the shared defines.
-
-precision highp float;
-
-uniform vec4 metric_params; // the metric's parameters, see glslParams in js/metric.js
-
-#define pi 3.141592653589793
-#define epsilon 1e-5
-
-// Screen-space [px] to viewport-space, scaled by the mean of screen dimensions
-// to look good on both vertical and horizontal devices
-vec2 s2v(vec2 screen, vec2 res, float size) {
-	float meanRes = (res.x + res.y) / 2.0;
-	return ((screen - res / 2.0) / meanRes) * size / 2.0;
-}
-
-// Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates.
+// Schwarzschild metric in Gullstrand–Painlevé (T, r, phi) coordinates
+// (GullstrandPainleve in js/metric.js). Implements the interface declared in
+// glsl/common.glsl.
 #define rs metric_params.x
-//
-// The metric defines a reference frame, an orthonormal frame at every point.
-// T(x) takes coordinate components of a vector at x to reference frame
-// components, T_inv(x) back. Here: raindrop observers, falling from rest at
-// infinity, e_0 = (1, -s, 0), e_r = (0, 1, 0), e_phi = (0, 0, 1/r), s = sqrt(rs/r).
+
+// Reference frame: raindrop observers, falling from rest at infinity,
+// e_0 = (1, -s, 0), e_r = (0, 1, 0), e_phi = (0, 0, 1/r), s = sqrt(rs/r).
 mat3 T(vec3 x) {
 	float s = sqrt(rs / x.y);
 	return mat3( // columns
@@ -40,6 +21,24 @@ mat3 T_inv(vec3 x) {
 		0.0, 0.0, 1.0 / x.y);
 }
 
+// rotated by phi, from screen-aligned to (r-hat, phi-hat)
+vec2 screen_to_frame(vec3 x, vec2 v) {
+	float c = cos(x.z), s = sin(x.z);
+	return vec2(c * v.x + s * v.y, -s * v.x + c * v.y);
+}
+
+// phi wrapped to (-pi, pi]
+vec3 coord_delta(vec3 a, vec3 b) {
+	vec3 d = a - b;
+	return vec3(d.x, d.y, mod(d.z + pi, pi*2.0) - pi);
+}
+
+vec2 chart_plane(vec3 x) {
+	return x.y * vec2(cos(x.z), sin(x.z));
+}
+
+// Light rays
+
 // conserved energy E = -p_T of a ray with momentum p at x
 float ray_energy(vec3 x, vec3 p) {
 	float a = rs / x.y;
@@ -55,73 +54,18 @@ float ray_dtdl(float r, float v, float E, float L) {
 	return (E * E + rs * L * L / (r * r * r)) / (E - sqrt(rs / r) * v);
 }
 
-// Where the coordinates break down, from local quantities only (the same for
-// all metrics, see maxFrameCondition in js/metric.js): the reference frame
-// becomes degenerate, or a light ray's energy measured by the reference
-// observer changes sign. Non-finite values fail the comparisons too.
-float frobenius(mat3 m) {
-	return sqrt(dot(m[0], m[0]) + dot(m[1], m[1]) + dot(m[2], m[2]));
-}
-
-float frame_condition(vec3 x) {
-	return frobenius(T(x)) * frobenius(T_inv(x));
-}
-
 // energy of a ray at x with momentum p, measured by the reference observer
 float frame_energy(vec3 x, vec3 p) {
 	return (T(x) * p).x;
 }
 
 // Whether a ray at x with momentum p, which started with reference frame
-// energy e0, can't be followed further.
+// energy e0, can't be followed further: where the coordinates break down
+// (see frame_condition), or where the ray's frame energy changes sign, which
+// it does beyond the past horizon (where it diverges).
 bool ray_terminated(vec3 x, vec3 p, float e0) {
 	return !(frame_condition(x) < MAX_FRAME_CONDITION && frame_energy(x, p) * e0 > 0.0);
 }
-
-// normalize duplicate coordinate points
-vec3 cyclic(vec3 x) {
-	return vec3(x.x, x.y, mod(x.z + pi, pi*2.0) - pi);
-}
-
-// Lorentz boost of orthonormal frame components. `w` is the unit timelike
-// 3-velocity of an observer in some frame; boost(w) takes components in that
-// frame to the observer's rest frame, boost(neg_spatial(w)) back.
-mat3 boost(vec3 w) {
-	float fac = (w.x - 1.0) / (dot(w.yz, w.yz) + epsilon);
-	return mat3(
-		w.x, -w.y, -w.z,
-		-w.y, 1.0 + fac * w.y*w.y, fac * w.y*w.z,
-		-w.z, fac * w.y*w.z, 1.0 + fac * w.z*w.z
-	);
-}
-
-vec3 neg_spatial(vec3 w) {
-	return vec3(w.x, -w.yz);
-}
-
-// The rest frame of an observer with 4-velocity `u` at `x` is the reference
-// frame boosted to the observer's velocity. rest_to_coord takes rest frame
-// components to coordinate components, coord_to_rest the other way.
-mat3 rest_to_coord(vec3 x, vec3 u) {
-	return T_inv(x) * boost(neg_spatial(T(x) * u));
-}
-
-mat3 coord_to_rest(vec3 x, vec3 u) {
-	mat3 Tx = T(x);
-	return boost(Tx * u) * Tx;
-}
-
-// The light ray (past-directed null vector, coordinate components) that the
-// observer at `x` with 4-velocity `u` sees at viewport vector `v`. The screen
-// axes are the observer's rest frame axes, rotated to screen-aligned
-// (cartesian) directions. The photon energy measured by the observer is |v|.
-vec3 screen_ray(vec3 x, vec3 u, vec2 v) {
-	float c = cos(x.z), s = sin(x.z);
-	vec2 local = vec2(c * v.x + s * v.y, -s * v.x + c * v.y); // (r-hat, phi-hat)
-	return rest_to_coord(x, u) * vec3(-length(local), local);
-}
-
-// Light rays
 
 // Light rays are traced using their conserved energy E = -p_t and angular
 // momentum L = p_phi, as y = (t, r, phi, v = dr/dl):
@@ -158,14 +102,7 @@ void rk23(vec4 y, vec4 k1, float h, float E, float L, out vec4 y1, out vec4 k4, 
 	z1 = y + h * (7.0/24.0 * k1 + 0.25 * k2 + 1.0/3.0 * k3 + 0.125 * k4);
 }
 
-#define RAY_REACHED 0       // traced to the end
-#define RAY_HORIZON 1       // went where it can't be followed (the black hole's shadow)
-#define RAY_OUT_OF_STEPS 2  // ran out of solver steps
-
-// Trace a light ray (x0, u0 null) from affine parameter 0 to 1 with an adaptive
-// RK23 solver. Returns one of the RAY_* statuses; x, u and l_end are the ray's
-// position, momentum and affine parameter where it ended, and `steps` is the
-// number of solver iterations used.
+// Trace a light ray (see glsl/common.glsl) with an adaptive RK23 solver.
 int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int steps) {
 	const float SAFETY = 0.9;
 	const float INITIAL_H = 0.1;
@@ -245,12 +182,4 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 	u = ray_momentum(y, E, L);
 	l_end = l;
 	return status;
-}
-
-// Trace a light ray from affine parameter 0 to 1.
-// Returns false if it didn't get there (fell in, or ran out of solver steps).
-bool raytrace(vec3 x0, vec3 u0, out vec3 x, out vec3 u) {
-	float l_end;
-	int steps;
-	return trace_ray(x0, u0, x, u, l_end, steps) == RAY_REACHED;
 }

@@ -122,54 +122,9 @@ export function integrate(metric, f, xu, duration, maxStep) {
 }
 
 export const RAY_REACHED = 0;  // traced to the end
-export const RAY_HORIZON = 1;  // went where it can't be followed (the black hole's shadow)
+export const RAY_HORIZON = 1;  // went where it can't be followed (e.g. the black hole's shadow)
 
-// How much the reference frame may change over one step of traceRay,
-// |T(y1) T^-1(y) - 1|. The same control as in trace_ray in glsl/physics.glsl,
-// but much finer: traceRay is the reference.
-const rayFrameStep = 0.02;
-
-const frobenius = m => Math.sqrt(m.reduce((s, row) => s + dot(row, row), 0));
-const identity3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-
-// Trace a light ray, a past-directed null geodesic from x0 with momentum p0,
-// from affine parameter 0 to 1. Mirrors trace_ray in glsl/physics.glsl: the
-// ray is traced using its conserved energy E and angular momentum L, as
-// y = [t, r, phi, v = dr/dl] with
-//   dt/dl = metric.rayDtdl(r, v, E, L),  dr/dl = v,  dphi/dl = L / r^2,
-//   dv/dl = L^2 (r - 1.5 rs) / r^4,
-// which (except for t) is regular at the horizon. RK4 steps are at most
-// `maxStep`, and short enough that the reference frame changes little
-// (rayFrameStep); longer ones, and ones giving non-finite values, are retried
-// shorter, so that no step jumps across where the coordinates break down.
-// The ray is stopped where it can't be followed (metric.rayCanFollow).
-// Returns {status, x, p}, with x and p at the end if it was reached.
-export function traceRay(metric, x0, p0, maxStep = 1e-3) {
-  const rs = metric.rs;
-  const E = metric.rayEnergy(x0, p0), L = x0[1] * x0[1] * p0[2];
-  const f = y => {
-    const r = y[1];
-    return [metric.rayDtdl(r, y[3], E, L), y[3], L / (r * r), L * L * (r - 1.5 * rs) / (r * r * r * r)];
-  };
-  const momentum = y => [metric.rayDtdl(y[1], y[3], E, L), y[3], L / (y[1] * y[1])];
-  const e0 = matVec(metric.T(x0), p0)[0];
-  const canFollow = y => metric.rayCanFollow(y.slice(0, 3), momentum(y), e0);
-  // whether a step from y to y1 is short enough (false for non-finite values)
-  const smallStep = (y, y1) => frobenius(matMul(metric.T(y1.slice(0, 3)), metric.Tinv(y.slice(0, 3)))
-    .map((row, a) => row.map((v, b) => v - identity3[a][b]))) <= rayFrameStep;
-  var y = [...x0, p0[1]], l = 0, h = maxStep;
-  for (var i = 0; 1 - l > 1e-12; i++) {
-    if (!canFollow(y) || i > 1e6) return {status: RAY_HORIZON};
-    h = Math.min(maxStep, 1 - l, h);
-    const y1 = rk4(f, y, h);
-    if (smallStep(y, y1)) {
-      y = y1; l += h;
-      h *= 2;
-    } else {
-      h /= 4;
-      if (!(h > 1e-15)) return {status: RAY_HORIZON};
-    }
-  }
-  if (!canFollow(y)) return {status: RAY_HORIZON};
-  return {status: RAY_REACHED, x: y.slice(0, 3), p: momentum(y)};
-}
+// Light rays are traced by the metric's traceRay(x0, p0, maxStep): a
+// past-directed null geodesic from x0 with momentum p0, from affine parameter
+// 0 to 1, returning {status, x, p}, with x and p at the end if it was reached.
+// Mirrors trace_ray in the metric's file in glsl/metrics/.

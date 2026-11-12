@@ -11,10 +11,21 @@
 // across all metrics (they are used in links, ?scenario=<id>).
 
 import * as math from './math.js';
-import { GullstrandPainleve, velocity3, localVelocity3 } from './metric.js';
+import { GullstrandPainleve, localVelocity3 } from './metric.js';
 import { asteroidId, photonClockId } from './object-info.js';
 
 // --- helpers; positions are (r, phi)
+
+// 3-velocity from a 2-velocity given as coordinate velocity (dx/dt, dy/dt)
+// in screen-aligned cartesian components, i.e. flat-space polar (dr/dt, r dphi/dt).
+// Returns null if the velocity is not timelike.
+export const velocity3 = (metric, x, u2_cart) => {
+  const [vr, vphi] = metric.cartesianToLocal(x, u2_cart);
+  const V = [1, vr, vphi / x[1]];
+  const norm = -math.dot(V, math.matVec(metric.g(x), V));
+  if (!(norm > 0)) return null;
+  return math.scale(V, 1 / Math.sqrt(norm));
+}
 
 // effective potential: E^2 at the turning points of a timelike geodesic
 const potential = (rs, r, L) => (1 - rs / r) * (1 + L * L / (r * r));

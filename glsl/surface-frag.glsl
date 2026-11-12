@@ -1,4 +1,4 @@
-// Raytracing fragment shader. Appended to glsl/physics.glsl and
+// Raytracing fragment shader. Appended to glsl/common.glsl, the metric's file and
 // glsl/objects.glsl by js/shaders.js, which also defines N_SPRITES.
 
 precision mediump sampler3D;
@@ -90,6 +90,9 @@ vec3 grid_color(vec3 pos) {
 	return vec3(pow(min(line_linear * max(grid, grid2), 1.0), 1.0 / 2.2));
 }
 
+#ifdef BLACK_HOLE
+// Overlays of the black hole.
+
 // Coverage of an antialiased line where the per-pixel radius `r` equals
 // `radius`, of a fixed width in rendered pixels; `fwidth` is the change of r
 // across one pixel. `continuous` must be false where neighbouring pixels' `r`
@@ -110,6 +113,7 @@ float radius_line(float r, float radius, bool continuous) {
 const vec3 shadow_color = vec3(0.1, 0.0, 0.0);
 const vec3 photon_sphere_color = vec3(1.0, 0.85, 0.2);
 const vec3 event_horizon_color = vec3(1.0, 0.15, 0.1);
+#endif
 
  // a must be a heading vector, not necessarily normalized
 mat2 rot(vec2 a) {
@@ -220,8 +224,10 @@ void main( void ) {
 
 	// compute output colors; rays that didn't arrive show the black hole's shadow
 	float grid_l = show_redshift ? rshift : 1.0;
-	vec3 world_color = reached ? redshift(grid_l, grid_color(pix_x), grid_tint(grid_l))
-		: show_interior ? shadow_color : vec3(0.0);
+	vec3 world_color = reached ? redshift(grid_l, grid_color(pix_x), grid_tint(grid_l)) : vec3(0.0);
+
+#ifdef BLACK_HOLE
+	if (!reached && show_interior) world_color = shadow_color;
 
 	// annotations, not redshifted
 	float photon_sphere = radius_line(pix_x.y, 1.5 * rs, fwidth(float(reached)) == 0.0 && reached);
@@ -234,6 +240,7 @@ void main( void ) {
 	float event_horizon = radius_line(pix_x.y, rs,
 		fwidth(float(on_future_horizon)) == 0.0 && on_future_horizon);
 	world_color = mix(world_color, event_horizon_color, show_event_horizon ? event_horizon : 0.0);
+#endif
 
 	// show objects
 	vec4 objects_color = vec4(0.0);
@@ -254,7 +261,7 @@ void main( void ) {
 	}
 
 	vec4 obsv_color = render_obj(
-		obsv_sprite, 1.0, time, T_pix_x * vec3(0.0, cyclic(obsv_x - pix_x).yz), obsv_o);
+		obsv_sprite, 1.0, time, T_pix_x * vec3(0.0, coord_delta(obsv_x, pix_x).yz), obsv_o);
 
 	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
 

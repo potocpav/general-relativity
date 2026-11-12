@@ -20,7 +20,8 @@ Runs `test/index.html` in headless Chromium (set `$CHROME` if it isn't found aut
 The page can also be opened directly in a browser via the dev server.
 
 The physics is implemented twice: in JS (`js/metric.js`, `js/math.js`, `js/world.js`) for the
-observer and object trajectories, and in GLSL (`glsl/physics.glsl`) for raytracing.
+observer and object trajectories, and in GLSL (`glsl/common.glsl`, and per metric in `glsl/metrics/`)
+for raytracing.
 The tests evaluate both on random inputs and check that they agree, so a change to one side
 must be mirrored in the other. Constants shared with the shaders (e.g. `N_SPRITES`) are defined
 in JS and injected by `js/shaders.js`.
@@ -30,7 +31,8 @@ in JS and injected by `js/shaders.js`.
 - [ ] Describe the architecture
 
 Raytracing along geodesics is done inside the GLSL fragment shader
-(`glsl/physics.glsl` + `glsl/surface-frag.glsl`, assembled by `js/shaders.js`).
+(`glsl/common.glsl`, the metric's file in `glsl/metrics/` and `glsl/surface-frag.glsl`, assembled by
+`js/shaders.js`).
 Each pixel traces a light ray backwards from the observer. The screen axes are the observer's
 local orthonormal frame, so angles and short distances around the observer are the ones the
 observer would measure. The black hole therefore appears as a shadow wedge behind it rather than
@@ -40,7 +42,7 @@ against the analytic critical angles, including relativistic aberration.
 Observer and object trajectories are computed in JS.
 
 The Schwarzschild black hole is simulated in Gullstrand–Painlevé coordinates (`js/metric.js`,
-`glsl/physics.glsl`), which are regular across the horizon: the ship and objects can fall in and
+`glsl/metrics/gp.glsl`), which are regular across the horizon: the ship and objects can fall in and
 are followed until close to the singularity, and the view from inside is rendered. The grid lines
 are at constant r and φ, and its redshift is computed for light emitted by "raindrop" observers,
 falling freely from rest at infinity. Where coordinates break down, bodies and light rays are

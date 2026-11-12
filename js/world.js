@@ -127,7 +127,7 @@ export class World {
     const u0 = screenRay(this.metric, this.obsvX, this.obsvU, viewport);
 
     // raytracing along null geodesics, affine parameter from 0 to 1
-    const ray = math.traceRay(this.metric, this.obsvX, u0);
+    const ray = this.metric.traceRay(this.obsvX, u0);
     return ray.status == math.RAY_REACHED ? ray.x : null;
   }
 

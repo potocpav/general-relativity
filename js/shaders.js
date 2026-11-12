@@ -12,12 +12,14 @@ export async function fetchText(url) {
 }
 
 // Constants shared between JS and GLSL, defined once on the JS side.
-// `metric` selects the metric in glsl/physics.glsl.
+// `metric` selects the metric's file and features, see physicsFragmentShader.
 export function shaderDefines(metric) {
   return {
     N_SPRITES: nSprites,
     PROJECTILE_ID: projectileId,
     MAX_FRAME_CONDITION: maxFrameCondition.toExponential(),
+    // features of the metric's spacetime, see `features` in js/metric.js
+    ...(metric.constructor.features.blackHole ? {BLACK_HOLE: 1} : {}),
   };
 }
 
@@ -32,10 +34,11 @@ export function assembleShader(defines, parts) {
   return [header.join('\n'), ...parts.map((part, i) => `#line 1 ${i + 1}\n${part}`)].join('\n');
 }
 
-// Fragment shader made of glsl/physics.glsl for `metric` and glsl/objects.glsl,
-// followed by `mainSource`. `root` is the URL of the repository root,
-// relative to the page.
+// Fragment shader made of glsl/common.glsl, the metric's file in
+// glsl/metrics/ (its `glslFile`) and glsl/objects.glsl, followed by
+// `mainSource`. `root` is the URL of the repository root, relative to the page.
 export async function physicsFragmentShader(mainSource, metric, root = '') {
-  const [physics, objects] = await Promise.all(['glsl/physics.glsl', 'glsl/objects.glsl'].map(f => fetchText(root + f)));
-  return assembleShader(shaderDefines(metric), [physics, objects, mainSource]);
+  const files = ['glsl/common.glsl', `glsl/metrics/${metric.constructor.glslFile}.glsl`, 'glsl/objects.glsl'];
+  const parts = await Promise.all(files.map(f => fetchText(root + f)));
+  return assembleShader(shaderDefines(metric), [...parts, mainSource]);
 }
