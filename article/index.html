@@ -168,6 +168,10 @@
       justify-content: center;
     }
 
+    .view .overlay button[hidden] {
+      display: none;
+    }
+
     .view .overlay button:hover {
       background: var(--panel);
     }
@@ -360,7 +364,7 @@
       <div class="view">
         <canvas id="fig-1-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
         <div class="overlay">
-          <button type="button" id="fig-1-reset" aria-label="Reset" title="Reset"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+          <button type="button" id="fig-1-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
       </div>
       <div class="controls">
@@ -434,6 +438,7 @@
       show('fig-1-v', speed(vNow));
       show('fig-1-gamma', sim.world.obsvU[0].toFixed(2));
       document.getElementById('fig-1-actual').style.setProperty('--at', (vNow + 0.9) / 1.8);
+      document.getElementById('fig-1-reset').hidden = Math.abs(vNow) < 1e-9; // only while moving
     });
     if (!sim) document.getElementById('fig-1-note').hidden = false;
     // the reset button puts the ship back to its initial state, at rest, at once
