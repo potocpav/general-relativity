@@ -227,7 +227,19 @@
        positioned along the track by --at (0 to 1), aligned with the thumb's centre. */
     .slider {
       position: relative;
-      margin-top: 16px; /* room for the marker */
+      margin: 16px 0 9px; /* room for the marker and ticks */
+    }
+
+    /* A tick line below the track, at --at. */
+    .slider .tick {
+      position: absolute;
+      top: calc(100% + 2px);
+      left: calc(9px + (100% - 18px) * var(--at, 0.5));
+      width: 2px;
+      height: 7px;
+      background: var(--muted);
+      transform: translateX(-50%);
+      pointer-events: none;
     }
 
     /* A small triangle above the track, pointing down at the value. */
@@ -332,6 +344,7 @@
         <label for="fig-1-target">Target velocity</label>
         <div class="slider">
           <input type="range" id="fig-1-target" min="-0.9" max="0.9" step="0.01" value="0">
+          <div class="tick" style="--at: 0.5" title="At rest"></div>
           <div class="marker" id="fig-1-actual" title="Actual velocity"></div>
         </div>
         <output for="fig-1-target" id="fig-1-target-out">0.00&#x202F;c</output>
