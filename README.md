@@ -41,6 +41,14 @@ against the analytic critical angles, including relativistic aberration.
 
 Observer and object trajectories are computed in JS.
 
+Each spacetime is simulated in one metric (`js/metric.js`, with its shader code in
+`glsl/metrics/`), selectable in the top left, and has its own scenarios (`js/scenarios.js`):
+
+- **Black hole**: the Schwarzschild black hole, see below.
+- **Flat spacetime**: Minkowski spacetime in Cartesian coordinates, without gravity: only special
+  relativity (aberration, Doppler shift and beaming, length contraction). Light rays are traced
+  exactly, in one step.
+
 The Schwarzschild black hole is simulated in Gullstrand–Painlevé coordinates (`js/metric.js`,
 `glsl/metrics/gp.glsl`), which are regular across the horizon: the ship and objects can fall in and
 are followed until close to the singularity, and the view from inside is rendered. The grid lines

@@ -290,4 +290,65 @@ export class GullstrandPainleve extends Metric {
   }
 }
 
-export const metricTypes = [GullstrandPainleve];
+const identity3x3 = () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+
+// Flat spacetime in Cartesian (t, x, y) coordinates:
+//   ds^2 = -dt^2 + dx^2 + dy^2
+// The reference frame is that of observers at rest; light rays are straight.
+export class Minkowski extends Metric {
+  static id = 'minkowski';
+  static label = 'Flat spacetime';
+  static coordinates = 'Cartesian';
+  static coordinateNames = ['t', 'x', 'y'];
+  static referenceObserver = 'rest';
+  static endMessage = "The coordinates broke down:";
+  static params = {};
+  static glslFile = 'minkowski';
+
+  g(x) {
+    return [[-1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  }
+
+  gInv(x) {
+    return this.g(x);
+  }
+
+  gammaUV(x, u, v) {
+    return [0, 0, 0];
+  }
+
+  gammaUU(x, u) {
+    return [0, 0, 0];
+  }
+
+  T(x) {
+    return identity3x3();
+  }
+
+  Tinv(x) {
+    return identity3x3();
+  }
+
+  staticT(x) {
+    return identity3x3();
+  }
+
+  staticTinv(x) {
+    return identity3x3();
+  }
+
+  cartesianToLocal(x0, v) {
+    return [...v];
+  }
+
+  toPlane(x) {
+    return [x[1], x[2]];
+  }
+
+  // a straight line: exact, in one step
+  traceRay(x0, p0) {
+    return {status: RAY_REACHED, x: x0.map((v, i) => v + p0[i]), p: [...p0]};
+  }
+}
+
+export const metricTypes = [GullstrandPainleve, Minkowski];

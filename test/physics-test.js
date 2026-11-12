@@ -6,7 +6,7 @@
 // for test/run.mjs.
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
-import { GullstrandPainleve, metricTypes, localVelocity3 } from '../js/metric.js';
+import { GullstrandPainleve, Minkowski, metricTypes, localVelocity3 } from '../js/metric.js';
 import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
@@ -136,9 +136,43 @@ function checkMetricParamsJs() {
       if (m.params[name] !== custom[name] || m.glslParams()[i] !== custom[name]) errors.push(`${type.id}: ${name}`);
     });
     if (m.glslParams().length != 4) errors.push(`${type.id}: glslParams length`);
-    if (!defaults.sameParams({}) || !defaults.sameParams(undefined) || !m.sameParams(custom) || m.sameParams({})) errors.push(`${type.id}: sameParams`);
+    if (!defaults.sameParams({}) || !defaults.sameParams(undefined) || !m.sameParams(custom) || (declared.length > 0 && m.sameParams({}))) errors.push(`${type.id}: sameParams`);
   }
   return {ok: errors.length == 0, message: errors.length ? errors.join(', ') : `${metricTypes.length} metric(s)`};
+}
+
+// Flat spacetime: free fall is a straight line, light rays are straight
+// lines ending at x0 + p0, and a moving observer sees the aberration and
+// Doppler shift of special relativity. Moving at beta along x, a ray seen in
+// rest frame direction n comes from static frame direction
+// n_x' = (n_x - beta) / (1 - beta n_x), with photon energy (static / seen)
+// gamma (1 - beta n_x).
+function checkSpecialRelativityJs() {
+  const errors = [];
+  let maxError = 0;
+  for (let i = 0; i < 20; i++) {
+    const x = randomPoint(), u = randomVelocity(x), tau = uniform(0.1, 5);
+    const {xu} = math.integrate(metric, math.geo_f(metric), [...x, ...u], tau, 0.02);
+    for (let k = 0; k < 3; k++) maxError = Math.max(maxError, Math.abs(xu[k] - (x[k] + u[k] * tau)), Math.abs(xu[3 + k] - u[k]));
+    const p = screenRay(metric, x, u, randomVector2(10)), ray = metric.traceRay(x, p);
+    for (let k = 0; k < 3; k++) maxError = Math.max(maxError, Math.abs(ray.x[k] - (x[k] + p[k])), Math.abs(ray.p[k] - p[k]));
+  }
+  if (!(maxError < 1e-12)) errors.push(`free fall or rays off straight lines by ${maxError.toExponential(1)}`);
+  let maxAberration = 0, maxDoppler = 0;
+  for (const beta of [0.3, 0.9]) {
+    const gamma = 1 / Math.sqrt(1 - beta * beta), x0 = [0, 0, 0], u = [gamma, gamma * beta, 0];
+    for (let k = 0; k < 16; k++) {
+      const psi = 2 * Math.PI * k / 16, n = [Math.cos(psi), Math.sin(psi)];
+      const p = screenRay(metric, x0, u, math.scale(n, 2)); // past-directed, observed energy 2
+      const ns = [p[1] / -p[0], p[2] / -p[0]];
+      maxAberration = Math.max(maxAberration, Math.abs(ns[0] - (n[0] - beta) / (1 - beta * n[0])));
+      maxDoppler = Math.max(maxDoppler, Math.abs(-p[0] / 2 - gamma * (1 - beta * n[0])));
+    }
+  }
+  // (math.boost adds 1e-10 to a denominator, against division by zero)
+  if (!(maxAberration < 1e-8 && maxDoppler < 1e-8)) errors.push(`aberration off by ${maxAberration.toExponential(1)}, Doppler by ${maxDoppler.toExponential(1)}`);
+  return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
+    `straight lines to ${maxError.toExponential(1)}; aberration and Doppler factor match`};
 }
 
 // The reference and static frames are orthonormal, and T, Tinv are inverses.
@@ -821,7 +855,7 @@ function checkObjectHistoryJs() {
   for (const o of objs.objects) {
     const b = objs.bounds(o);
     for (const [, y] of rowsOf(objs, o)) {
-      const px = y[1] * Math.cos(y[2]), py = y[1] * Math.sin(y[2]), pad = objectRadius(o.type) - 1e-9;
+      const [px, py] = metric.toPlane(y), pad = objectRadius(o.type) - 1e-9;
       if (px < b[0] + pad || py < b[1] + pad || px > b[2] - pad || py > b[3] - pad) {
         errors.push('a stored position is outside the culling box');
         break;
@@ -1007,13 +1041,12 @@ async function checkSurfaceShader(gl, vertexSource) {
   const size = gl.getActiveUniformBlockParameter(program, block, gl.UNIFORM_BLOCK_DATA_SIZE);
   const expectedSize = 3 * nSprites * 16; // 3 arrays of std140 vec3
   gl.deleteProgram(program);
-  // it also compiles with the features toggled (e.g. without the black hole's overlays)
-  const toggled = Object.fromEntries(['blackHole'].map(f => [f, !metric.constructor.features[f]]));
-  const variant = Object.create(metric, {constructor: {value: class extends metric.constructor { static features = toggled; }}});
+  // it also compiles without the metric's features (e.g. the black hole's overlays)
+  const variant = Object.create(metric, {constructor: {value: class extends metric.constructor { static features = {}; }}});
   gl.deleteProgram(compileProgram(gl, vertexSource, await physicsFragmentShader(source, variant, root)));
   return {
     ok: size == expectedSize,
-    message: `objectInfo block size ${size}, expected ${expectedSize}; compiles with features toggled`,
+    message: `objectInfo block size ${size}, expected ${expectedSize}; compiles without the metric's features`,
   };
 }
 
@@ -1045,18 +1078,19 @@ async function main() {
     await run(prefix + 'surface shader', () => checkSurfaceShader(gl, vertexSource));
     await run(prefix + 'frames (JS)', async () => checkFramesJs());
     await run(prefix + 'geodesics (JS)', async () => checkGeodesicsJs());
-    await run(prefix + 'where the coordinates break down (JS)', async () => checkBreakdownJs());
-    await run(prefix + 'gyroscope (JS)', async () => checkGyroscopeJs());
     await run(prefix + 'object history (JS)', async () => checkObjectHistoryJs());
-    await run(prefix + 'object orientation (JS)', async () => checkObjectOrientationJs());
     await run(prefix + 'object lookup (GPU)', () => checkObjectLookupGpu(gl, vertexSource));
-    await run(prefix + 'no ghosts of infalling objects (GPU)', () => checkObjectNoGhostsGpu(gl, vertexSource));
+    await run(prefix + 'no ghosts of objects (GPU)', () => checkObjectNoGhostsGpu(gl, vertexSource));
     await run(prefix + 'ray tracer vs geodesic equation (JS)', async () => checkTraceRayJs());
-    if (type == GullstrandPainleve) await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());
-    await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());
-    await run(prefix + 'shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
-    await run(prefix + 'near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
-    if (type == GullstrandPainleve) {
+    if (type == Minkowski) await run(prefix + 'special relativity (JS)', async () => checkSpecialRelativityJs());
+    if (type.features.blackHole) {
+      await run(prefix + 'where the coordinates break down (JS)', async () => checkBreakdownJs());
+      await run(prefix + 'gyroscope (JS)', async () => checkGyroscopeJs());
+      await run(prefix + 'object orientation (JS)', async () => checkObjectOrientationJs());
+      await run(prefix + 'free fall to the singularity (JS)', async () => checkFreeFallJs());
+      await run(prefix + 'shadow edges (JS)', async () => checkShadowJs());
+      await run(prefix + 'shadow edges (GPU)', () => checkShadowGpu(gl, vertexSource, 0.3));
+      await run(prefix + 'near-horizon rays (GPU)', () => checkNearHorizonGpu(gl, vertexSource));
       await run(prefix + 'sky or shadow from inside the horizon, analytic (JS, GPU)', () => checkSkyGpu(gl, vertexSource, 0.2 * rs, 0.98 * rs));
       await run(prefix + 'sky or shadow from outside, analytic (JS, GPU)', () => checkSkyGpu(gl, vertexSource, 1.02 * rs, 4 * rs));
       await run(prefix + 'view while falling in, analytic (GPU)', () => checkInfallViewGpu(gl, vertexSource));

@@ -1,5 +1,5 @@
 // Scenarios: preset initial states showing interesting features of general
-// relativity and the Schwarzschild black hole.
+// relativity, in each spacetime.
 //
 // Each scenario belongs to one metric (`metric`, a class from metricTypes);
 // switching the metric starts its first scenario. It may set the metric's
@@ -11,7 +11,7 @@
 // across all metrics (they are used in links, ?scenario=<id>).
 
 import * as math from './math.js';
-import { GullstrandPainleve, localVelocity3 } from './metric.js';
+import { GullstrandPainleve, Minkowski, localVelocity3 } from './metric.js';
 import { asteroidId, photonClockId } from './object-info.js';
 
 // --- helpers; positions are (r, phi)
@@ -245,8 +245,24 @@ const gpScenarios = [
   },
 ];
 
+// Flat spacetime, in Cartesian coordinates: special relativity.
+const minkowskiScenarios = [
+  {
+    id: 'flat',
+    name: 'Free play',
+    description: 'A ship at rest in flat spacetime, without gravity: only special relativity. ' +
+      'Boost with the mouse or the arrow keys, spawn objects, and explore.',
+    setup: metric => ({
+      ...defaults,
+      ship: ship([[0, 0, 0], [1, 0, 0]]),
+      objects: [],
+    }),
+  },
+];
+
 export const scenarios = [
   ...gpScenarios.map(sc => ({...sc, metric: GullstrandPainleve})),
+  ...minkowskiScenarios.map(sc => ({...sc, metric: Minkowski})),
 ];
 
 // The scenarios of metric class `type`.
