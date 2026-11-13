@@ -314,6 +314,8 @@ class App extends Component {
       this.setState({showDisplayOptions: false});
       return;
     }
+    // browser shortcuts (Alt+arrows for history, Ctrl+R, ...) are the browser's
+    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
     if (isArrowControl(ev.key)) {
       // don't scroll, or move the focused time slider
       ev.preventDefault();
