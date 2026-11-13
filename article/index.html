@@ -31,7 +31,7 @@
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-classical-v">0.3&#x202F;c</div>
+          <div id="fig-classical-v">0.30&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Acceleration, <math><mi>a</mi></math></div>
@@ -45,14 +45,66 @@
         </div>
       </div>
       <p class="note" id="fig-classical-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
-      <figcaption>
-        <b>Figure 1.</b> A spaceship in a world without relativity, as if light travelled infinitely fast.
-        Touch or click and hold the view to fire the ship's engine away from that point.
-        The grid only slides past, undistorted. (Simulated as the same flight scaled down to a thousandth of the size
-        and speed, where the effects of relativity are far too small to see.)
-      </figcaption>
     </figure>
 
+    <p>
+    The ship accelerates absurdly fast - in just two seconds, it can reach the speed of light, <math><mi>c</mi></math>.
+    Because relativity is not taken into account yet, speed of light is not a limit.
+    </p>
+
+    <p>
+      These simulations take place in three-dimensional space-time - two spatial dimensions and one temporal dimension.
+      This allows us to see the overview of the universe from the outside.
+    </p>
+
+    <p>
+      As we know, in relativity, speed of light can not be exceeded. As we get closer to it, lengths contracts, and
+      acceleration, as seen from the stationary observer, slows down.
+    </p>
+
+    <figure id="fig-relativistic">
+      <div class="stats">
+        <div class="stat">
+          <div>Speed, <math><mi>v</mi></math></div>
+          <div id="fig-relativistic-v">0.30&#x202F;c</div>
+        </div>
+        <div class="stat">
+          <div>Lorentz factor, <math><mi>γ</mi></math></div>
+          <div id="fig-relativistic-gamma">1.05</div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="fig-relativistic-canvas" aria-label="What is around a spaceship in flat spacetime at the same moment, in its rest frame, looking down on a square grid painted on space; the ship is in the centre."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-relativistic-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
+      </div>
+      <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+    </figure>
+
+    <figure id="fig-light-cone">
+      <div class="stats">
+        <div class="stat">
+          <div>Speed, <math><mi>v</mi></math></div>
+          <div id="fig-light-cone-v">0.30&#x202F;c</div>
+        </div>
+        <div class="stat">
+          <div>Lorentz factor, <math><mi>γ</mi></math></div>
+          <div id="fig-light-cone-gamma">1.05</div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="fig-light-cone-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space; the ship is in the centre."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-light-cone-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
+      </div>
+      <p class="note" id="fig-light-cone-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+    </figure>
+
+    <p>
+      The amount of length contraction is given by the Lorentz factor, <math><mi>γ</mi></math>.
+  </p>
     <p>
       To keep things simple, the simulated universe is flat in one more sense: space has only two dimensions. The ship
       moves in a plane, and so does light. We look down on that plane with the ship in the centre. Each point around
@@ -98,38 +150,6 @@
       the ship sees everything around it as it is right now. Figure 2 shows the same flight in flat spacetime.
     </p>
 
-    <figure id="fig-relativistic">
-      <div class="stats">
-        <div class="stat">
-          <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-relativistic-v">0.3&#x202F;c</div>
-        </div>
-        <div class="stat">
-          <div>Lorentz factor, <math><mi>γ</mi></math></div>
-          <div id="fig-relativistic-gamma">1.05</div>
-        </div>
-      </div>
-      <div class="view">
-        <canvas id="fig-relativistic-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
-        <div class="overlay">
-          <button type="button" id="fig-relativistic-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
-        </div>
-      </div>
-      <div class="controls">
-        <div class="switch" role="group" aria-label="View" id="fig-relativistic-view">
-          <button type="button" data-view="0" aria-pressed="true" title="The light arriving at the ship now">What the ship sees</button>
-          <button type="button" data-view="1" aria-pressed="false" title="Everything at the same moment, in the ship's rest frame">What is there now</button>
-        </div>
-      </div>
-      <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
-      <figcaption>
-        <b>Figure 2.</b> A spaceship in flat spacetime, coasting across the grid at 0.3 c. Touch or click and hold the view
-        to fire the ship's engine away from that point. Switch the view to <i>what is there now</i> to see everything at the same moment, as
-        the ship would measure it rather than see it: then the grid is simply contracted by <math><mi>γ</mi></math>
-        along the direction of motion.
-      </figcaption>
-    </figure>
-
     <h2 id="black-hole">Black hole</h2>
     <p>
       Two months after Einstein published general relativity in 1915, Karl Schwarzschild found the first exact
@@ -150,7 +170,7 @@
         <div class="placeholder">Interactive figure coming soon</div>
       </div>
       <figcaption>
-        <b>Figure 3.</b> A spaceship falling into a black hole from rest far away. Drag the slider to move along its
+        <b>Figure 4.</b> A spaceship falling into a black hole from rest far away. Drag the slider to move along its
         journey, from 3 <math><msub><mi>r</mi><mi>s</mi></msub></math> to 0.1
         <math><msub><mi>r</mi><mi>s</mi></msub></math>.
       </figcaption>
@@ -164,17 +184,16 @@
     // acceleration, so it takes as long), where relativistic effects are too small to see.
     import { runFigure } from '../js/figure.js';
     import { scenarios } from '../js/scenarios.js';
-    import { thrust } from '../js/world.js';
+    import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
-    const speed = v => `${v.toFixed(1)}\u202fc`;
+    const speed = v => `${v.toFixed(2)}\u202fc`;
     const startSpeed = 0.3; // the ship's speed at the start, as a fraction of c
-    const rampTime = 0.5; // the time for the engine to go from off to full thrust, or back [s]
-    // the thrust, as a fraction of full, for the throttle at `t` (0 to 1): smooth at both ends
-    const smoothstep = t => t * t * (3 - 2 * t);
+    const rampTime = 0.25; // the time for the engine to go from off to full thrust, or back [s]
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
-    async function velocityFigure(prefix, scale) {
+    // `viewMode`: what the figure shows, what the ship sees or what is there now (see VIEW_SEEN)
+    async function velocityFigure(prefix, scale, viewMode = VIEW_SEEN) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
 
@@ -207,7 +226,7 @@
         // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
         const control = sim.world.control(dt, pointer, pointer != null, dim);
         throttle = Math.min(1, Math.max(0, throttle + (pointer ? dt : -dt) / rampTime));
-        accel = sim.world.thrust * smoothstep(throttle);
+        accel = sim.world.thrust * throttle;
         sim.step(dt, {heading: control.heading, accel});
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
         show(`${prefix}-v`, speed(v));
@@ -222,12 +241,7 @@
       }
       sim.world.shipScale = scale;
       sim.world.thrust = thrust * scale;
-      // the view switch, where the figure has one: what the ship sees, or what is there now (see VIEW_SEEN)
-      const views = el('view') ? [...el('view').querySelectorAll('button')] : [];
-      views.forEach(b => b.addEventListener('click', () => {
-        sim.world.viewMode = +b.dataset.view;
-        views.forEach(c => c.setAttribute('aria-pressed', c === b));
-      }));
+      sim.world.viewMode = viewMode;
       // the reset button puts the ship back to its initial state at once
       el('reset').addEventListener('click', () => {
         sim.reset(state);
@@ -237,7 +251,8 @@
     }
 
     velocityFigure('fig-classical', 1e-3);
-    velocityFigure('fig-relativistic', 1);
+    velocityFigure('fig-relativistic', 1, VIEW_NOW);
+    velocityFigure('fig-light-cone', 1, VIEW_SEEN);
   </script>
 </body>
 
