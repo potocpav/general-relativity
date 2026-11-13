@@ -31,11 +31,11 @@
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-classical-v">0.30&#x202F;c</div>
+          <div id="fig-classical-v">0.3&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Acceleration, <math><mi>a</mi></math></div>
-          <div id="fig-classical-a">0.00&#x202F;c/s</div>
+          <div id="fig-classical-a">0.0&#x202F;c/s</div>
         </div>
       </div>
       <div class="view">
@@ -102,7 +102,7 @@
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-relativistic-v">0.30&#x202F;c</div>
+          <div id="fig-relativistic-v">0.3&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
@@ -167,8 +167,11 @@
     import { thrust } from '../js/world.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
-    const speed = v => `${v.toFixed(2)}\u202fc`;
+    const speed = v => `${v.toFixed(1)}\u202fc`;
     const startSpeed = 0.3; // the ship's speed at the start, as a fraction of c
+    const rampTime = 0.5; // the time for the engine to go from off to full thrust, or back [s]
+    // the thrust, as a fraction of full, for the throttle at `t` (0 to 1): smooth at both ends
+    const smoothstep = t => t * t * (3 - 2 * t);
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
     async function velocityFigure(prefix, scale) {
@@ -181,6 +184,7 @@
         const r = canvas.getBoundingClientRect();
         pointer = [ev.clientX - r.left, r.bottom - ev.clientY];
       };
+      let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
       let flown = false; // whether the ship was flown since the start (or the last reset)
       canvas.addEventListener('pointerdown', ev => {
         canvas.setPointerCapture(ev.pointerId);
@@ -200,12 +204,16 @@
       const state = {...setup, ship: {...setup.ship, u: [g, g * vx, g * vy]}, viewportSize: 9 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         const dim = [canvas.clientWidth, canvas.clientHeight];
-        sim.step(dt, sim.world.control(dt, pointer, pointer != null, dim));
+        // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
+        const control = sim.world.control(dt, pointer, pointer != null, dim);
+        throttle = Math.min(1, Math.max(0, throttle + (pointer ? dt : -dt) / rampTime));
+        accel = sim.world.thrust * smoothstep(throttle);
+        sim.step(dt, {heading: control.heading, accel});
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
         show(`${prefix}-v`, speed(v));
         // figures show γ, or the engine's acceleration (in c per second of the figure's time)
         if (el('gamma')) show(`${prefix}-gamma`, ut.toFixed(2));
-        if (el('a')) show(`${prefix}-a`, `${(sim.world.obsvSprite ? sim.world.thrust / scale : 0).toFixed(2)}\u202fc/s`);
+        if (el('a')) show(`${prefix}-a`, `${(accel / scale).toFixed(1)}\u202fc/s`);
         el('reset').hidden = !flown;
       });
       if (!sim) {
@@ -224,6 +232,7 @@
       el('reset').addEventListener('click', () => {
         sim.reset(state);
         flown = false;
+        throttle = accel = 0;
       });
     }
 
