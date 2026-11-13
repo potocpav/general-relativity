@@ -82,15 +82,30 @@
       <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
     </figure>
 
+    <p>
+      The amount of length contraction, but also speed dilation and other effects, is given by the Lorentz factor, <math><mi>γ</mi></math>.
+  </p>
+
+    <p>
+    The figure above shows what the ship would see if it could magically see the whole universe at once - its <i>simultaneity plane</i>. 
+    In reality, it can only see the light that is arriving at it right now - its <i>past light cone</i>. This fact introduces a new effect
+    to the view - <a href="https://en.wikipedia.org/wiki/Relativistic_Doppler_effect">relativistic doppler effect</a>:
+    <ul>
+      <li>Light ahead is blueshifted and more intense, and light behind is redshifted and less intense.</li>
+      <li>The view of the world around the ship crowds into a cone in front of it, and behind it it thins out.</li>
+    </ul>
+    This is not merely theoretical - it is how high energy particles "see" the universe.
+    </p>
+
     <figure id="fig-light-cone">
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-light-cone-v">0.30&#x202F;c</div>
+          <div id="fig-light-cone-v">0.00&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
-          <div id="fig-light-cone-gamma">1.05</div>
+          <div id="fig-light-cone-gamma">1.00</div>
         </div>
       </div>
       <div class="view">
@@ -102,9 +117,6 @@
       <p class="note" id="fig-light-cone-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
     </figure>
 
-    <p>
-      The amount of length contraction is given by the Lorentz factor, <math><mi>γ</mi></math>.
-  </p>
     <p>
       To keep things simple, the simulated universe is flat in one more sense: space has only two dimensions. The ship
       moves in a plane, and so does light. We look down on that plane with the ship in the centre. Each point around
@@ -196,12 +208,12 @@
       while (end < digits.length - 1 && digits[end] == '9') end++;
       return `${digits.slice(0, end + 2)}\u202fc`;
     };
-    const startSpeed = 0.3; // the ship's speed at the start, as a fraction of c
     const rampTime = 0.25; // the time for the engine to go from off to full thrust, or back [s]
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
     // `viewMode`: what the figure shows, what the ship sees or what is there now (see VIEW_SEEN)
-    async function velocityFigure(prefix, scale, viewMode = VIEW_SEEN) {
+    // `startSpeed`: the ship's speed at the start, as a fraction of c
+    async function velocityFigure(prefix, scale, viewMode = VIEW_SEEN, startSpeed = 0.3) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
 
@@ -261,7 +273,7 @@
 
     velocityFigure('fig-classical', 1e-3);
     velocityFigure('fig-relativistic', 1, VIEW_NOW);
-    velocityFigure('fig-light-cone', 1, VIEW_SEEN);
+    velocityFigure('fig-light-cone', 1, VIEW_SEEN, 0);
   </script>
 </body>
 
