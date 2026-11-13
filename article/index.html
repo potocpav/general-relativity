@@ -66,7 +66,7 @@
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-relativistic-v">0.3&#x202F;c</div>
+          <div id="fig-relativistic-v">0.30&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
@@ -86,7 +86,7 @@
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-light-cone-v">0.3&#x202F;c</div>
+          <div id="fig-light-cone-v">0.30&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
@@ -188,13 +188,13 @@
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
-    // a speed below c, truncated after its leading nines and one more digit: 0.7 c, 0.995 c, 0.9998 c; so it
-    // never shows 1.0 c (the 14th decimal is rounded, to drop floating point noise)
+    // a speed below c, truncated after its leading nines and two more digits: 0.73 c, 0.9951 c, 0.99981 c; so it
+    // never shows 1.00 c (the 14th decimal is rounded, to drop floating point noise)
     const lightSpeedFraction = v => {
       const digits = v.toFixed(14);
       let end = 2; // after "0."
       while (end < digits.length - 1 && digits[end] == '9') end++;
-      return `${digits.slice(0, end + 1)}\u202fc`;
+      return `${digits.slice(0, end + 2)}\u202fc`;
     };
     const startSpeed = 0.3; // the ship's speed at the start, as a fraction of c
     const rampTime = 0.25; // the time for the engine to go from off to full thrust, or back [s]
