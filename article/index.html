@@ -350,36 +350,75 @@
       Its colour and brightness follow the shift: bluish ahead, orange behind.
     </p>
 
-    <figure id="fig-1">
+    <p>
+      To see what relativity changes, start with a world without it. In figure 1, light travels infinitely fast, and
+      the ship sees everything around it as it is right now. Figure 2 shows the same flight in flat spacetime.
+    </p>
+
+    <figure id="fig-classical">
       <div class="stats">
         <div class="stat">
           <div>Velocity, <math><mi>v</mi></math></div>
-          <div id="fig-1-v">0.00&#x202F;c</div>
+          <div id="fig-classical-v">0.00&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
-          <div id="fig-1-gamma">1.00</div>
+          <div id="fig-classical-gamma">1.00</div>
         </div>
       </div>
       <div class="view">
-        <canvas id="fig-1-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
+        <canvas id="fig-classical-canvas" aria-label="The view from a spaceship in a world without relativity, looking down on a square grid painted on space; the ship is in the centre."></canvas>
         <div class="overlay">
-          <button type="button" id="fig-1-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+          <button type="button" id="fig-classical-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
       </div>
       <div class="controls">
-        <label for="fig-1-target">Target velocity</label>
+        <label for="fig-classical-target">Target velocity</label>
         <div class="slider">
-          <input type="range" id="fig-1-target" min="-0.9" max="0.9" step="0.01" value="0">
-          <div class="marker" id="fig-1-actual" title="Actual velocity"></div>
+          <input type="range" id="fig-classical-target" min="-0.9" max="0.9" step="0.01" value="0">
+          <div class="marker" id="fig-classical-actual" title="Actual velocity"></div>
         </div>
-        <output for="fig-1-target" id="fig-1-target-out">0.00&#x202F;c</output>
+        <output for="fig-classical-target" id="fig-classical-target-out">0.00&#x202F;c</output>
       </div>
-      <p class="note" id="fig-1-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <p class="note" id="fig-classical-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>
-        <b>Figure 1.</b> A spaceship in flat spacetime, at rest relative to the grid. Set a target velocity with the
-        slider: when you let go, the ship turns and fires its engine until it reaches it. The slider's marker shows the ship's actual
-        velocity.
+        <b>Figure 1.</b> A spaceship in a world without relativity, as if light travelled infinitely fast.
+        Set a target velocity with the slider: when you let go, the ship turns and fires its engine until it reaches it.
+        The grid only slides past, undistorted. (Simulated as the same flight scaled down to a thousandth of the size
+        and speed, where the effects of relativity are far too small to see.)
+      </figcaption>
+    </figure>
+
+    <figure id="fig-relativistic">
+      <div class="stats">
+        <div class="stat">
+          <div>Velocity, <math><mi>v</mi></math></div>
+          <div id="fig-relativistic-v">0.00&#x202F;c</div>
+        </div>
+        <div class="stat">
+          <div>Lorentz factor, <math><mi>γ</mi></math></div>
+          <div id="fig-relativistic-gamma">1.00</div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="fig-relativistic-canvas" aria-label="The view from a spaceship in flat spacetime, looking down on a square grid painted on space; the ship is in the centre."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-relativistic-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
+      </div>
+      <div class="controls">
+        <label for="fig-relativistic-target">Target velocity</label>
+        <div class="slider">
+          <input type="range" id="fig-relativistic-target" min="-0.9" max="0.9" step="0.01" value="0">
+          <div class="marker" id="fig-relativistic-actual" title="Actual velocity"></div>
+        </div>
+        <output for="fig-relativistic-target" id="fig-relativistic-target-out">0.00&#x202F;c</output>
+      </div>
+      <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>
+        <b>Figure 2.</b> A spaceship in flat spacetime, at rest relative to the grid. Set a target velocity with the
+        slider: when you let go, the ship turns and fires its engine until it reaches it. The slider's marker shows the
+        ship's actual velocity.
       </figcaption>
     </figure>
 
@@ -398,12 +437,12 @@
       reaching the speed of light at the horizon, and the falling ship is carried along with it.
     </p>
 
-    <figure id="fig-2">
+    <figure id="fig-black-hole">
       <div class="view">
         <div class="placeholder">Interactive figure coming soon</div>
       </div>
       <figcaption>
-        <b>Figure 2.</b> A spaceship falling into a black hole from rest far away. Drag the slider to move along its
+        <b>Figure 3.</b> A spaceship falling into a black hole from rest far away. Drag the slider to move along its
         journey, from 3 <math><msub><mi>r</mi><mi>s</mi></msub></math> to 0.1
         <math><msub><mi>r</mi><mi>s</mi></msub></math>.
       </figcaption>
@@ -411,43 +450,56 @@
   </main>
 
   <script type="module">
-    // Figure 1: a ship in flat spacetime, flown to the slider's target velocity along x (see matchVelocity).
+    // Figures 1 and 2: a ship in flat spacetime, flown to the slider's target velocity along x (see matchVelocity).
+    // Figure 1 is the world without relativity: the same flight, scaled down by `scale` in size (the view and the
+    // ship) and speed (and acceleration, so it takes as long), where relativistic effects are too small to see.
     import { runFigure } from '../js/figure.js';
     import { scenarios } from '../js/scenarios.js';
+    import { thrust } from '../js/world.js';
     import { matchVelocity, velocityX } from './pilots.js';
 
     // a velocity as a fraction of the speed of light, e.g. +0.80 c
     const speed = v => `${v >= 0.005 ? '+' : v <= -0.005 ? '−' : ''}${Math.abs(v).toFixed(2)}\u202fc`;
-    const slider = document.getElementById('fig-1-target');
     const show = (id, text) => { document.getElementById(id).textContent = text; };
-    // The ship steers for the target once the slider is released ('change'; with the keyboard, each step); while
-    // dragging, only the shown value follows ('input').
-    let target = +slider.value;
-    const showTarget = () => show('fig-1-target-out', speed(+slider.value));
-    slider.addEventListener('input', showTarget);
-    slider.addEventListener('change', () => { target = +slider.value; });
 
-    showTarget();
-
-    const scenario = scenarios.find(sc => sc.id == 'flat');
-    const metric = new scenario.metric(scenario.params);
-    const state = {...scenario.setup(metric), viewportSize: 12};
-    const sim = await runFigure(document.getElementById('fig-1-canvas'), metric, state, (sim, dt) => {
-      sim.step(dt, matchVelocity(sim.world, target, dt));
-      const vNow = velocityX(sim.world);
-      show('fig-1-v', speed(vNow));
-      show('fig-1-gamma', sim.world.obsvU[0].toFixed(2));
-      document.getElementById('fig-1-actual').style.setProperty('--at', (vNow + 0.9) / 1.8);
-      document.getElementById('fig-1-reset').hidden = Math.abs(vNow) < 1e-9; // only while moving
-    });
-    if (!sim) document.getElementById('fig-1-note').hidden = false;
-    // the reset button puts the ship back to its initial state, at rest, at once
-    document.getElementById('fig-1-reset').addEventListener('click', () => {
-      slider.value = 0;
-      target = 0;
+    async function velocityFigure(prefix, scale) {
+      const el = name => document.getElementById(`${prefix}-${name}`);
+      const slider = el('target');
+      // The ship steers for the target once the slider is released ('change'; with the keyboard, each step);
+      // while dragging, only the shown value follows ('input').
+      let target = +slider.value;
+      const showTarget = () => show(`${prefix}-target-out`, speed(+slider.value));
+      slider.addEventListener('input', showTarget);
+      slider.addEventListener('change', () => { target = +slider.value; });
       showTarget();
-      if (sim) sim.reset(state);
-    });
+
+      const scenario = scenarios.find(sc => sc.id == 'flat');
+      const metric = new scenario.metric(scenario.params);
+      const state = {...scenario.setup(metric), viewportSize: 12 * scale};
+      const sim = await runFigure(el('canvas'), metric, state, (sim, dt) => {
+        sim.step(dt, matchVelocity(sim.world, target * scale, dt, thrust * scale));
+        const v = velocityX(sim.world) / scale;
+        show(`${prefix}-v`, speed(v));
+        show(`${prefix}-gamma`, sim.world.obsvU[0].toFixed(2));
+        el('actual').style.setProperty('--at', (v + 0.9) / 1.8);
+        el('reset').hidden = Math.abs(v) < 1e-9; // only while moving
+      });
+      if (!sim) {
+        el('note').hidden = false;
+        return;
+      }
+      sim.world.shipScale = scale;
+      // the reset button puts the ship back to its initial state, at rest, at once
+      el('reset').addEventListener('click', () => {
+        slider.value = 0;
+        target = 0;
+        showTarget();
+        sim.reset(state);
+      });
+    }
+
+    velocityFigure('fig-classical', 1e-3);
+    velocityFigure('fig-relativistic', 1);
   </script>
 </body>
 

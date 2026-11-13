@@ -10,6 +10,7 @@ uniform vec3 obsv_x;
 uniform vec3 obsv_u;
 uniform vec2 obsv_o; // heading, as spatial components in the ship's rest frame (see screen_to_frame)
 uniform int obsv_sprite;
+uniform float ship_scale; // the ship's sprite size relative to its normal size
 
 uniform float viewport_size;
 uniform bool show_photon_sphere;
@@ -264,7 +265,7 @@ void main( void ) {
 	// screen's, where the viewport vector is the pixel's offset from it (light
 	// travel across the ship is negligible), so it is never contracted.
 	vec4 obsv_color = render_obj(
-		obsv_sprite, 1.0, time, vec3(0.0, -screen_to_frame(obsv_x, pix_cartesian)), obsv_o);
+		obsv_sprite, 1.0, time, vec3(0.0, -screen_to_frame(obsv_x, pix_cartesian)) / ship_scale, obsv_o);
 
 	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
 

@@ -20,6 +20,7 @@ export class World {
     this.showEventHorizon = true;
     this.showInterior = false;
     this.showRedshift = true;
+    this.shipScale = 1; // the ship's sprite size relative to its normal size
   }
 
   // `heading` is the ship's initial heading, as an angle on the screen.
@@ -57,6 +58,7 @@ export class World {
     this.obsv_u_loc = gl.getUniformLocation(program, 'obsv_u');
     this.obsv_o_loc = gl.getUniformLocation(program, 'obsv_o');
     this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
+    this.ship_scale_loc = gl.getUniformLocation(program, 'ship_scale');
     this.metric_params_loc = gl.getUniformLocation(program, 'metric_params');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
     this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
@@ -145,6 +147,7 @@ export class World {
     gl.uniform3f(this.obsv_u_loc, ...this.obsvU);
     gl.uniform2f(this.obsv_o_loc, ...this.obsvO);
     gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
+    gl.uniform1f(this.ship_scale_loc, this.shipScale);
     gl.uniform4fv(this.metric_params_loc, this.metric.glslParams());
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
     gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);

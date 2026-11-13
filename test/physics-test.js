@@ -211,6 +211,10 @@ function checkMatchVelocityPilotJs() {
   if (Math.abs(velocityX(world) - 0.8) > 1e-9) errors.push(`retargeted: v = ${velocityX(world).toFixed(6)}`);
   // coasting: no thrust once there
   if (matchVelocity(world, 0.8, 1 / 60).accel) errors.push('thrusting after reaching the target');
+  // scaled down (figure 1, without relativity): target and acceleration 1000 times smaller, as long a flight
+  world.reset([0, 0, 0], [1, 0, 0], Math.PI / 2);
+  for (let t = 0; t < 5; t += 1 / 60) world.step(1 / 60, matchVelocity(world, 0.8e-3, 1 / 60, 0.5e-3));
+  if (Math.abs(velocityX(world) - 0.8e-3) > 1e-12) errors.push(`scaled down: v = ${velocityX(world)}`);
   return {ok: errors.length == 0, message: errors.length ? errors.join('; ') : 'reaches targets exactly, without overshooting, turning first'};
 }
 
