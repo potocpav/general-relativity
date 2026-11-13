@@ -188,6 +188,15 @@
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
+    // a speed below c, with as many decimals as it takes to end in a digit other than 9 (at least two):
+    // 0.73 c, 0.995 c, 0.9998 c; truncated, so that it never shows 1.00 c (the 14th decimal is rounded, to drop
+    // floating point noise)
+    const lightSpeedFraction = v => {
+      const digits = v.toFixed(14);
+      let end = 4; // after "0.xx"
+      while (end < digits.length - 1 && digits[end - 1] == '9') end++;
+      return `${digits.slice(0, end)}\u202fc`;
+    };
     const startSpeed = 0.3; // the ship's speed at the start, as a fraction of c
     const rampTime = 0.25; // the time for the engine to go from off to full thrust, or back [s]
     const show = (id, text) => { document.getElementById(id).textContent = text; };
@@ -229,7 +238,8 @@
         accel = sim.world.thrust * throttle;
         sim.step(dt, {heading: control.heading, accel});
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
-        show(`${prefix}-v`, speed(v));
+        // without relativity (scaled down), the speed can pass c
+        show(`${prefix}-v`, scale == 1 ? lightSpeedFraction(v) : speed(v));
         // figures show γ, or the engine's acceleration (in c per second of the figure's time)
         if (el('gamma')) show(`${prefix}-gamma`, ut.toFixed(2));
         if (el('a')) show(`${prefix}-a`, `${(accel / scale).toFixed(1)}\u202fc/s`);
