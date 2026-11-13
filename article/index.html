@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Flying Through Spacetime</title>
+  <title>General Relativity</title>
   <meta name="description"
     content="What special and general relativity look like from a spaceship, simulated by tracing light rays.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕓</text></svg>">
@@ -14,18 +14,45 @@
 <body>
   <main>
     <header>
-      <h1>Flying Through Spacetime</h1>
-      <p class="lede">What special and general relativity look like from a spaceship, simulated by tracing light rays.
+      <h1>General Relativity</h1>
+      <p class="lede">You have probably heard that moving clocks run slow and moving rulers shrink. This article shows 
+        what that would actually look like, using interactive simulations.
       </p>
-      <p class="byline"><a href="https://potocpav.github.io/">by Pavel Potoček</a> · <a href="../">open the
-          simulation</a></p>
+      <p class="byline"><a href="https://potocpav.github.io/">by Pavel Potoček</a>
     </header>
 
     <p>
-      You have probably heard that moving clocks run slow and moving rulers shrink. This article shows what that would
-      actually <i>look like</i>. The figures are a live simulation: for every pixel, a ray of light is traced backwards
-      through spacetime, from the ship to wherever it came from.
+      Meet the <b>white spaceship 🚀</b> - your guide through the world of general relativity. You can control it with your mouse or touch.
+      For now, it is flying through a classical, flat spacetime.
     </p>
+
+
+    <figure id="fig-classical">
+      <div class="stats">
+        <div class="stat">
+          <div>Speed, <math><mi>v</mi></math></div>
+          <div id="fig-classical-v">0.30&#x202F;c</div>
+        </div>
+        <div class="stat">
+          <div>Acceleration, <math><mi>a</mi></math></div>
+          <div id="fig-classical-a">0.00&#x202F;c/s</div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="fig-classical-canvas" aria-label="The view from a spaceship in a world without relativity, looking down on a square grid painted on space; the ship is in the centre."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-classical-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
+      </div>
+      <p class="note" id="fig-classical-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>
+        <b>Figure 1.</b> A spaceship in a world without relativity, as if light travelled infinitely fast.
+        Touch or click and hold the view to fire the ship's engine away from that point.
+        The grid only slides past, undistorted. (Simulated as the same flight scaled down to a thousandth of the size
+        and speed, where the effects of relativity are far too small to see.)
+      </figcaption>
+    </figure>
+
     <p>
       To keep things simple, the simulated universe is flat in one more sense: space has only two dimensions. The ship
       moves in a plane, and so does light. We look down on that plane with the ship in the centre. Each point around
@@ -71,41 +98,15 @@
       the ship sees everything around it as it is right now. Figure 2 shows the same flight in flat spacetime.
     </p>
 
-    <figure id="fig-classical">
-      <div class="stats">
-        <div class="stat">
-          <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-classical-v">0.00&#x202F;c</div>
-        </div>
-        <div class="stat">
-          <div>Lorentz factor, <math><mi>γ</mi></math></div>
-          <div id="fig-classical-gamma">1.00</div>
-        </div>
-      </div>
-      <div class="view">
-        <canvas id="fig-classical-canvas" aria-label="The view from a spaceship in a world without relativity, looking down on a square grid painted on space; the ship is in the centre."></canvas>
-        <div class="overlay">
-          <button type="button" id="fig-classical-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
-        </div>
-      </div>
-      <p class="note" id="fig-classical-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
-      <figcaption>
-        <b>Figure 1.</b> A spaceship in a world without relativity, as if light travelled infinitely fast.
-        Touch or click and hold the view to fire the ship's engine away from that point.
-        The grid only slides past, undistorted. (Simulated as the same flight scaled down to a thousandth of the size
-        and speed, where the effects of relativity are far too small to see.)
-      </figcaption>
-    </figure>
-
     <figure id="fig-relativistic">
       <div class="stats">
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-relativistic-v">0.00&#x202F;c</div>
+          <div id="fig-relativistic-v">0.30&#x202F;c</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
-          <div id="fig-relativistic-gamma">1.00</div>
+          <div id="fig-relativistic-gamma">1.05</div>
         </div>
       </div>
       <div class="view">
@@ -122,7 +123,7 @@
       </div>
       <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>
-        <b>Figure 2.</b> A spaceship in flat spacetime, at rest relative to the grid. Touch or click and hold the view
+        <b>Figure 2.</b> A spaceship in flat spacetime, coasting across the grid at 0.3 c. Touch or click and hold the view
         to fire the ship's engine away from that point. Switch the view to <i>what is there now</i> to see everything at the same moment, as
         the ship would measure it rather than see it: then the grid is simply contracted by <math><mi>γ</mi></math>
         along the direction of motion.
@@ -167,6 +168,7 @@
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
+    const startSpeed = 0.3; // the ship's speed at the start, as a fraction of c
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
     async function velocityFigure(prefix, scale) {
@@ -179,9 +181,11 @@
         const r = canvas.getBoundingClientRect();
         pointer = [ev.clientX - r.left, r.bottom - ev.clientY];
       };
+      let flown = false; // whether the ship was flown since the start (or the last reset)
       canvas.addEventListener('pointerdown', ev => {
         canvas.setPointerCapture(ev.pointerId);
         track(ev);
+        flown = true;
       });
       canvas.addEventListener('pointermove', ev => { if (pointer) track(ev); });
       // a long press (on Android, or a right click) steers too, rather than opening the context menu
@@ -190,14 +194,19 @@
 
       const scenario = scenarios.find(sc => sc.id == 'flat');
       const metric = new scenario.metric(scenario.params);
-      const state = {...scenario.setup(metric), viewportSize: 9 * scale};
+      // the ship starts out coasting at `startSpeed` diagonally, along (1, 2)
+      const [vx, vy] = [1, 2].map(c => c / Math.sqrt(5) * startSpeed * scale), g = 1 / Math.sqrt(1 - vx * vx - vy * vy);
+      const setup = scenario.setup(metric);
+      const state = {...setup, ship: {...setup.ship, u: [g, g * vx, g * vy]}, viewportSize: 9 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         const dim = [canvas.clientWidth, canvas.clientHeight];
         sim.step(dt, sim.world.control(dt, pointer, pointer != null, dim));
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
         show(`${prefix}-v`, speed(v));
-        show(`${prefix}-gamma`, ut.toFixed(2));
-        el('reset').hidden = v < 1e-9; // only while moving
+        // figures show γ, or the engine's acceleration (in c per second of the figure's time)
+        if (el('gamma')) show(`${prefix}-gamma`, ut.toFixed(2));
+        if (el('a')) show(`${prefix}-a`, `${(sim.world.obsvSprite ? sim.world.thrust / scale : 0).toFixed(2)}\u202fc/s`);
+        el('reset').hidden = !flown;
       });
       if (!sim) {
         el('note').hidden = false;
@@ -211,8 +220,11 @@
         sim.world.viewMode = +b.dataset.view;
         views.forEach(c => c.setAttribute('aria-pressed', c === b));
       }));
-      // the reset button puts the ship back to its initial state, at rest, at once
-      el('reset').addEventListener('click', () => sim.reset(state));
+      // the reset button puts the ship back to its initial state at once
+      el('reset').addEventListener('click', () => {
+        sim.reset(state);
+        flown = false;
+      });
     }
 
     velocityFigure('fig-classical', 1e-3);
