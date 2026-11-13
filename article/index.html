@@ -184,6 +184,8 @@
 
     .view canvas {
       display: block;
+      touch-action: none; /* touches steer the ship, they don't scroll */
+      cursor: crosshair;
       width: 100%;
       height: 100%;
     }
@@ -198,92 +200,14 @@
       font-size: 15px;
     }
 
-    /* Sliders and other controls below a figure's view. */
+    /* Controls below a figure's view. */
     .controls {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) 72px;
-      align-items: center;
-      gap: 6px 10px;
       margin: 14px 0;
-    }
-
-    .controls label {
-      white-space: nowrap;
-      font-size: 14px;
-      color: var(--muted);
-    }
-
-    .controls output {
-      font-size: 14px;
-      font-weight: 500;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
-
-    input[type=range] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 20px;
-      background: transparent;
-      margin: 0;
-    }
-
-    input[type=range]::-webkit-slider-runnable-track {
-      height: 4px;
-      border-radius: 2px;
-      background: var(--line);
-    }
-
-    input[type=range]::-moz-range-track {
-      height: 4px;
-      border-radius: 2px;
-      background: var(--line);
-    }
-
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--accent);
-      margin-top: -7px;
-      border: none;
-    }
-
-    input[type=range]::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--accent);
-      border: none;
-    }
-
-    /* A slider with a second marker (e.g. an actual value following the slider's target). The marker is
-       positioned along the track by --at (0 to 1), aligned with the thumb's centre. */
-    .slider {
-      position: relative;
-      margin-top: 16px; /* room for the marker */
-    }
-
-    /* A small triangle above the track, pointing down at the value. */
-    .slider .marker {
-      position: absolute;
-      bottom: calc(100% + 4px);
-      left: calc(9px + (100% - 18px) * var(--at, 0.5));
-      width: 0;
-      height: 0;
-      border-left: 9px solid transparent;
-      border-right: 9px solid transparent;
-      border-top: 12px solid var(--text);
-      transform: translateX(-50%);
-      pointer-events: none;
     }
 
     /* A choice between two or more options, as buttons side by side (as ../rope-twist's theme switch). */
     .switch {
       display: inline-flex;
-      justify-self: start;
       border: 1px solid var(--line);
       border-radius: 8px;
       overflow: hidden;
@@ -298,11 +222,6 @@
       color: var(--muted);
       font: inherit;
       cursor: pointer;
-    }
-
-    /* in a figure's controls, a row of its own */
-    .controls .switch {
-      grid-column: 1 / -1;
     }
 
     .switch button+button {
@@ -325,7 +244,6 @@
       margin: 10px 0 0;
     }
 
-    input:focus-visible,
     button:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -397,7 +315,7 @@
     <figure id="fig-classical">
       <div class="stats">
         <div class="stat">
-          <div>Velocity, <math><mi>v</mi></math></div>
+          <div>Speed, <math><mi>v</mi></math></div>
           <div id="fig-classical-v">0.00&#x202F;c</div>
         </div>
         <div class="stat">
@@ -411,18 +329,10 @@
           <button type="button" id="fig-classical-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
       </div>
-      <div class="controls">
-        <label for="fig-classical-target">Target velocity</label>
-        <div class="slider">
-          <input type="range" id="fig-classical-target" min="-0.9" max="0.9" step="0.01" value="0">
-          <div class="marker" id="fig-classical-actual" title="Actual velocity"></div>
-        </div>
-        <output for="fig-classical-target" id="fig-classical-target-out">0.00&#x202F;c</output>
-      </div>
       <p class="note" id="fig-classical-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>
         <b>Figure 1.</b> A spaceship in a world without relativity, as if light travelled infinitely fast.
-        Set a target velocity with the slider: when you let go, the ship turns and fires its engine until it reaches it.
+        Touch or click and hold the view to fire the ship's engine away from that point.
         The grid only slides past, undistorted. (Simulated as the same flight scaled down to a thousandth of the size
         and speed, where the effects of relativity are far too small to see.)
       </figcaption>
@@ -431,7 +341,7 @@
     <figure id="fig-relativistic">
       <div class="stats">
         <div class="stat">
-          <div>Velocity, <math><mi>v</mi></math></div>
+          <div>Speed, <math><mi>v</mi></math></div>
           <div id="fig-relativistic-v">0.00&#x202F;c</div>
         </div>
         <div class="stat">
@@ -446,12 +356,6 @@
         </div>
       </div>
       <div class="controls">
-        <label for="fig-relativistic-target">Target velocity</label>
-        <div class="slider">
-          <input type="range" id="fig-relativistic-target" min="-0.9" max="0.9" step="0.01" value="0">
-          <div class="marker" id="fig-relativistic-actual" title="Actual velocity"></div>
-        </div>
-        <output for="fig-relativistic-target" id="fig-relativistic-target-out">0.00&#x202F;c</output>
         <div class="switch" role="group" aria-label="View" id="fig-relativistic-view">
           <button type="button" data-view="0" aria-pressed="true" title="The light arriving at the ship now">What the ship sees</button>
           <button type="button" data-view="1" aria-pressed="false" title="Everything at the same moment, in the ship's rest frame">What is there now</button>
@@ -459,9 +363,8 @@
       </div>
       <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>
-        <b>Figure 2.</b> A spaceship in flat spacetime, at rest relative to the grid. Set a target velocity with the
-        slider: when you let go, the ship turns and fires its engine until it reaches it. The slider's marker shows the
-        ship's actual velocity. Switch the view to <i>what is there now</i> to see everything at the same moment, as
+        <b>Figure 2.</b> A spaceship in flat spacetime, at rest relative to the grid. Touch or click and hold the view
+        to fire the ship's engine away from that point. Switch the view to <i>what is there now</i> to see everything at the same moment, as
         the ship would measure it rather than see it: then the grid is simply contracted by <math><mi>γ</mi></math>
         along the direction of motion.
       </figcaption>
@@ -495,45 +398,52 @@
   </main>
 
   <script type="module">
-    // Figures 1 and 2: a ship in flat spacetime, flown to the slider's target velocity along x (see matchVelocity).
-    // Figure 1 is the world without relativity: the same flight, scaled down by `scale` in size (the view and the
-    // ship) and speed (and acceleration, so it takes as long), where relativistic effects are too small to see.
+    // Figures 1 and 2: a ship in flat spacetime, flown with the pointer as in the app: holding a touch or the mouse
+    // button on the view fires the engine away from that point (see World.control). Figure 1 is the world without
+    // relativity: the same flight, scaled down by `scale` in size (the view and the ship) and speed (and
+    // acceleration, so it takes as long), where relativistic effects are too small to see.
     import { runFigure } from '../js/figure.js';
     import { scenarios } from '../js/scenarios.js';
     import { thrust } from '../js/world.js';
-    import { matchVelocity, velocityX } from './pilots.js';
 
-    // a velocity as a fraction of the speed of light, e.g. +0.80 c
-    const speed = v => `${v >= 0.005 ? '+' : v <= -0.005 ? '−' : ''}${Math.abs(v).toFixed(2)}\u202fc`;
+    // a speed as a fraction of the speed of light, e.g. 0.80 c
+    const speed = v => `${v.toFixed(2)}\u202fc`;
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
     async function velocityFigure(prefix, scale) {
       const el = name => document.getElementById(`${prefix}-${name}`);
-      const slider = el('target');
-      // The ship steers for the target once the slider is released ('change'; with the keyboard, each step);
-      // while dragging, only the shown value follows ('input').
-      let target = +slider.value;
-      const showTarget = () => show(`${prefix}-target-out`, speed(+slider.value));
-      slider.addEventListener('input', showTarget);
-      slider.addEventListener('change', () => { target = +slider.value; });
-      showTarget();
+      const canvas = el('canvas');
+
+      // the pointer, held down on the view: [x, y] in CSS pixels from the lower left corner, or null
+      let pointer = null;
+      const track = ev => {
+        const r = canvas.getBoundingClientRect();
+        pointer = [ev.clientX - r.left, r.bottom - ev.clientY];
+      };
+      canvas.addEventListener('pointerdown', ev => {
+        canvas.setPointerCapture(ev.pointerId);
+        track(ev);
+      });
+      canvas.addEventListener('pointermove', ev => { if (pointer) track(ev); });
+      for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, () => { pointer = null; });
 
       const scenario = scenarios.find(sc => sc.id == 'flat');
       const metric = new scenario.metric(scenario.params);
-      const state = {...scenario.setup(metric), viewportSize: 12 * scale};
-      const sim = await runFigure(el('canvas'), metric, state, (sim, dt) => {
-        sim.step(dt, matchVelocity(sim.world, target * scale, dt, thrust * scale));
-        const v = velocityX(sim.world) / scale;
+      const state = {...scenario.setup(metric), viewportSize: 9 * scale};
+      const sim = await runFigure(canvas, metric, state, (sim, dt) => {
+        const dim = [canvas.clientWidth, canvas.clientHeight];
+        sim.step(dt, sim.world.control(dt, pointer, pointer != null, dim));
+        const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
         show(`${prefix}-v`, speed(v));
-        show(`${prefix}-gamma`, sim.world.obsvU[0].toFixed(2));
-        el('actual').style.setProperty('--at', (v + 0.9) / 1.8);
-        el('reset').hidden = Math.abs(v) < 1e-9; // only while moving
+        show(`${prefix}-gamma`, ut.toFixed(2));
+        el('reset').hidden = v < 1e-9; // only while moving
       });
       if (!sim) {
         el('note').hidden = false;
         return;
       }
       sim.world.shipScale = scale;
+      sim.world.thrust = thrust * scale;
       // the view switch, where the figure has one: what the ship sees, or what is there now (see VIEW_SEEN)
       const views = el('view') ? [...el('view').querySelectorAll('button')] : [];
       views.forEach(b => b.addEventListener('click', () => {
@@ -541,12 +451,7 @@
         views.forEach(c => c.setAttribute('aria-pressed', c === b));
       }));
       // the reset button puts the ship back to its initial state, at rest, at once
-      el('reset').addEventListener('click', () => {
-        slider.value = 0;
-        target = 0;
-        showTarget();
-        sim.reset(state);
-      });
+      el('reset').addEventListener('click', () => sim.reset(state));
     }
 
     velocityFigure('fig-classical', 1e-3);

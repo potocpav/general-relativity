@@ -28,6 +28,7 @@ export class World {
     this.showRedshift = true;
     this.shipScale = 1; // the ship's sprite size relative to its normal size
     this.viewMode = VIEW_SEEN;
+    this.thrust = thrust; // the engine's proper acceleration
   }
 
   // `heading` is the ship's initial heading, as an angle on the screen.
@@ -94,7 +95,12 @@ export class World {
     // after a crash, running backwards in time can bring the ship back
     if (this.crashed && !(this.dt < 0)) return;
     this.crashed = false;
+    this.step(this.dt, this.control(realTimeDt, mousePos, pointerDn, screenDim, keys));
+  }
 
+  // The ship's control (see step) from the pointer and keys (see update),
+  // over the next `realTimeDt` seconds of real time.
+  control(realTimeDt, mousePos, pointerDn, screenDim, keys = {thrust: false, turn: 0}) {
     // steering: turn the heading within the rest frame
     var heading = this.restHeading();
     const turn = keys.turn * turnRate * realTimeDt, c = Math.cos(turn), s = Math.sin(turn);
@@ -108,7 +114,7 @@ export class World {
         thrusting = true;
       }
     }
-    this.step(this.dt, {heading, accel: thrusting ? thrust : 0});
+    return {heading, accel: thrusting ? this.thrust : 0};
   }
 
   // Advance the ship by proper time `dt` (backwards if negative): point it

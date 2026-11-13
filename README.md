@@ -43,7 +43,7 @@ against the analytic critical angles, including relativistic aberration.
 
 Observer and object trajectories are computed in JS. A `Simulation` (`js/simulation.js`) is one simulated world
 drawn into a canvas, with its own WebGL context; the app (`js/main.js`) has one, and the article
-(`article/index.html`) one per figure (`js/figure.js`, with the figures' pilots in `article/pilots.js`).
+(`article/index.html`) one per figure (`js/figure.js`).
 
 Each spacetime is simulated in one metric (`js/metric.js`, with its shader code in
 `glsl/metrics/`), selectable in the top left, and has its own scenarios (`js/scenarios.js`):
