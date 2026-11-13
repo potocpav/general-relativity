@@ -4,6 +4,12 @@ import * as math from './math.js';
 export const thrust = 0.5;      // rocket acceleration in its rest frame
 export const turnRate = Math.PI; // ship rotation speed [rad per real-time second]
 
+// What the view shows (World.viewMode, view_mode in glsl/surface-frag.glsl):
+// what the ship sees, the light arriving at it now (its past light cone), or
+// what is happening now in its rest frame (its plane of simultaneity; flat
+// spacetime only).
+export const VIEW_SEEN = 0, VIEW_NOW = 1;
+
 export class World {
   constructor(gl_, metric) {
     this.gl = gl_;
@@ -21,6 +27,7 @@ export class World {
     this.showInterior = false;
     this.showRedshift = true;
     this.shipScale = 1; // the ship's sprite size relative to its normal size
+    this.viewMode = VIEW_SEEN;
   }
 
   // `heading` is the ship's initial heading, as an angle on the screen.
@@ -59,6 +66,7 @@ export class World {
     this.obsv_o_loc = gl.getUniformLocation(program, 'obsv_o');
     this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
     this.ship_scale_loc = gl.getUniformLocation(program, 'ship_scale');
+    this.view_mode_loc = gl.getUniformLocation(program, 'view_mode');
     this.metric_params_loc = gl.getUniformLocation(program, 'metric_params');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
     this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
@@ -148,6 +156,7 @@ export class World {
     gl.uniform2f(this.obsv_o_loc, ...this.obsvO);
     gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
     gl.uniform1f(this.ship_scale_loc, this.shipScale);
+    gl.uniform1i(this.view_mode_loc, this.viewMode);
     gl.uniform4fv(this.metric_params_loc, this.metric.glslParams());
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
     gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);

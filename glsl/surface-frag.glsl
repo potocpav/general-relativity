@@ -16,6 +16,10 @@ uniform float viewport_size;
 uniform bool show_photon_sphere;
 uniform bool show_event_horizon;
 uniform bool show_interior; // otherwise, the black hole's shadow is black
+// What a pixel shows: 0, what the ship sees, the light arriving at it now (its
+// past light cone); 1, what is happening now in its rest frame (its plane of
+// simultaneity, along straight lines: flat spacetime only), without light.
+uniform int view_mode;
 uniform bool show_redshift; // otherwise, colors and brightness are as emitted
 
 uniform sampler3D sprites;
@@ -207,21 +211,31 @@ vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orienta
 void main( void ) {
 	// screen to observer space transformation
 	vec2 pix_cartesian = s2v(gl_FragCoord.xy, resolution, viewport_size);
-	vec3 pix_u0 = screen_ray(obsv_x, obsv_u, pix_cartesian);
+	bool seen = view_mode == 0;
 
-	// raytracing along null geodesics
 	vec3 pix_x, pix_u;
-	float pix_l;
-	int steps;
-	int status = trace_ray(obsv_x, pix_u0, pix_x, pix_u, pix_l, steps);
+	int status;
+	if (seen) {
+		// raytracing along null geodesics
+		vec3 pix_u0 = screen_ray(obsv_x, obsv_u, pix_cartesian);
+		float pix_l;
+		int steps;
+		status = trace_ray(obsv_x, pix_u0, pix_x, pix_u, pix_l, steps);
+	} else {
+		// the viewport vector as a spatial offset in the ship's rest frame, now
+		pix_x = obsv_x + rest_to_coord(obsv_x, obsv_u) * vec3(0.0, screen_to_frame(obsv_x, pix_cartesian));
+		pix_u = vec3(0.0);
+		status = RAY_REACHED;
+	}
 	bool reached = status == RAY_REACHED;
 
 	// Redshift: photon energy where it was emitted, measured by the reference
 	// observer there (who carries the grid), divided by the energy measured
-	// by the observer, which is |pix_cartesian| (see screen_ray).
+	// by the observer, which is |pix_cartesian| (see screen_ray). Without
+	// light (view_mode 1), none.
 	mat3 T_pix_x = T(pix_x);
 	float obsv_energy = length(pix_cartesian);
-	float rshift = abs((T_pix_x * pix_u).x) / obsv_energy;
+	float rshift = seen ? abs((T_pix_x * pix_u).x) / obsv_energy : 1.0;
 
 	// compute output colors; rays that didn't arrive show the black hole's shadow
 	float grid_l = show_redshift ? rshift : 1.0;
@@ -253,7 +267,7 @@ void main( void ) {
 		if (!object_event(i, pix_x, obj_x, obj_u, obj_tau, obj_angle, obj_rest, obj_deltax)) continue;
 		vec4 obj_color = render_obj(
 			object_sprite(i),
-			show_redshift ? abs((obj_rest * pix_u).x) / obsv_energy : 1.0,
+			show_redshift && seen ? abs((obj_rest * pix_u).x) / obsv_energy : 1.0,
 			obj_tau,
 			obj_deltax,
 			vec2(cos(obj_angle), sin(obj_angle))
