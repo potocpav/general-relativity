@@ -173,7 +173,11 @@ figcaption b {
 
 .view canvas {
   display: block;
-  touch-action: none; /* touches steer the ship, they don't scroll */
+  /* touches steer the ship: they don't scroll, and a long press doesn't select or show iOS's callout */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   cursor: crosshair;
   width: 100%;
   height: 100%;

@@ -86,8 +86,12 @@ button.description {
 }
 
 #ui {
-  /* gestures on the view (pinch-to-zoom, dragging) are handled by the app */
+  /* gestures on the view (pinch-to-zoom, dragging) are handled by the app; a long press doesn't select text or
+     show iOS's callout */
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   position: absolute;
   top: 0;
   padding: 10px;

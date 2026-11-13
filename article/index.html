@@ -184,6 +184,8 @@
         track(ev);
       });
       canvas.addEventListener('pointermove', ev => { if (pointer) track(ev); });
+      // a long press (on Android, or a right click) steers too, rather than opening the context menu
+      canvas.addEventListener('contextmenu', ev => ev.preventDefault());
       for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, () => { pointer = null; });
 
       const scenario = scenarios.find(sc => sc.id == 'flat');

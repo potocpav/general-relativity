@@ -242,6 +242,12 @@ class App extends Component {
     }
   }
 
+  // a long press on the view (on Android, or a right click) steers the ship rather than opening the context menu
+  // (the same targets as onPointerDown's); on buttons and links, it still opens it
+  onContextMenu = ev => {
+    if (ev.target.tagName == "DIV" && !ev.target.closest('#top_right')) ev.preventDefault();
+  }
+
   onPointerDown = ev => {
     // While the display options are open, a press outside them closes them;
     // on the view, it does nothing else (no boost, spawn or pinch).
@@ -503,6 +509,7 @@ class App extends Component {
       onPointerDown=${this.onPointerDown}
       onPointerUp=${this.onPointerUp}
       onPointerCancel=${this.onPointerCancel}
+      onContextMenu=${this.onContextMenu}
       onWheel=${this.onWheel}>
       <div id="top_right">
         <div>
