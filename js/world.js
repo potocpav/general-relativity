@@ -27,6 +27,7 @@ export class World {
     this.showInterior = false;
     this.showRedshift = true;
     this.shipScale = 1; // the ship's size relative to its normal size
+    this.showShipClock = false; // a clock above the ship, showing its proper time
     this.viewMode = VIEW_SEEN;
     this.thrust = thrust; // the engine's proper acceleration
   }
@@ -67,6 +68,7 @@ export class World {
     this.obsv_o_loc = gl.getUniformLocation(program, 'obsv_o');
     this.obsv_thrusting_loc = gl.getUniformLocation(program, 'obsv_thrusting');
     this.ship_scale_loc = gl.getUniformLocation(program, 'ship_scale');
+    this.show_ship_clock_loc = gl.getUniformLocation(program, 'show_ship_clock');
     this.view_mode_loc = gl.getUniformLocation(program, 'view_mode');
     this.metric_params_loc = gl.getUniformLocation(program, 'metric_params');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
@@ -162,6 +164,7 @@ export class World {
     gl.uniform2f(this.obsv_o_loc, ...this.obsvO);
     gl.uniform1i(this.obsv_thrusting_loc, this.thrusting ? 1 : 0);
     gl.uniform1f(this.ship_scale_loc, this.shipScale);
+    gl.uniform1i(this.show_ship_clock_loc, this.showShipClock ? 1 : 0);
     gl.uniform1i(this.view_mode_loc, this.viewMode);
     gl.uniform4fv(this.metric_params_loc, this.metric.glslParams());
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);

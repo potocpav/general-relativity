@@ -11,6 +11,7 @@ uniform vec3 obsv_u;
 uniform vec2 obsv_o; // heading, as spatial components in the ship's rest frame (see screen_to_frame)
 uniform bool obsv_thrusting; // the ship shows its engine's flame
 uniform float ship_scale; // the ship's size relative to its normal size
+uniform bool show_ship_clock; // a clock above the ship, showing its proper time
 
 uniform float viewport_size;
 uniform bool show_photon_sphere;
@@ -411,6 +412,14 @@ void main( void ) {
 		rot(obsv_o) * screen_to_frame(obsv_x, pix_cartesian) / ship_scale, pixel_size / ship_scale);
 
 	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
+
+	// the ship's clock, above it on the screen (upright, whatever the ship's heading), 0.5 wide
+	if (show_ship_clock) {
+		const float clock_height = 0.2, clock_above = 0.38;
+		vec2 p = (pix_cartesian / ship_scale - vec2(0.0, clock_above)) / clock_height;
+		vec4 clock_color = render_clock(1.0, time, p, pixel_size / ship_scale / clock_height);
+		objects_color = mix(objects_color, clock_color, reached ? clock_color.a : 0.0);
+	}
 
 	out_color = mix(vec4(world_color, 1.0), objects_color, objects_color.a);
 }

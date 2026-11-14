@@ -261,9 +261,10 @@
 
     // `scale`: the size and speed of the flight (see above); `viewMode`: what the figure shows, what the ship sees or
     // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
-    // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state
+    // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
+    // a clock above the ship shows its proper time
     async function velocityFigure(prefix,
-      {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0], objects = []} = {}) {
+      {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0], objects = [], shipClock = false} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
@@ -340,6 +341,7 @@
       sim.world.shipScale = scale;
       sim.world.thrust = thrust * scale;
       sim.world.viewMode = viewMode;
+      sim.world.showShipClock = shipClock;
       // the reset button puts the ship back to its initial state at once
       el('reset').addEventListener('click', () => {
         sim.reset(state);
@@ -358,7 +360,7 @@
     // a planet at rest (its gravity disregarded), there since long enough before the start to be seen from the
     // ship as far as the history of objects reaches back
     velocityFigure('fig-planet', {
-      startSpeed: 0, startPosition: [1.5, 0], objects: [
+      startSpeed: 0, startPosition: [1.5, 0], shipClock: true, objects: [
         {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
         // reading 0:00 at the start (at rest, its proper time is the coordinate time)
         {type: clockId, x: [-40, 0, 0], u: [1, 0, 0], size: 1.2, tau: -40}, // over the planet (drawn after it)
