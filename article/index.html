@@ -262,9 +262,9 @@
     // `scale`: the size and speed of the flight (see above); `viewMode`: what the figure shows, what the ship sees or
     // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
-    // a clock above the ship shows its proper time
-    async function velocityFigure(prefix,
-      {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0], objects = [], shipClock = false} = {}) {
+    // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset)
+    async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
+      objects = [], shipClock = false, viewOffset = [0, 0]} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
@@ -342,6 +342,7 @@
       sim.world.thrust = thrust * scale;
       sim.world.viewMode = viewMode;
       sim.world.showShipClock = shipClock;
+      sim.world.viewOffset = viewOffset;
       // the reset button puts the ship back to its initial state at once
       el('reset').addEventListener('click', () => {
         sim.reset(state);
@@ -360,7 +361,8 @@
     // a planet at rest (its gravity disregarded), there since long enough before the start to be seen from the
     // ship as far as the history of objects reaches back
     velocityFigure('fig-planet', {
-      startSpeed: 0, startPosition: [1.5, 0], shipClock: true, objects: [
+      // the ship at 3/4 of the view's width, looking back at the planet
+      startSpeed: 0, startPosition: [1.5, 0], shipClock: true, viewOffset: [0.25, 0], objects: [
         {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
         // over the planet (drawn after it), the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as
         // high (0.38), ahead by the light travel time to the ship, so that it's seen in sync with the ship's clock

@@ -18,6 +18,7 @@ export class World {
     this.time = 0;
     this.timeScale = 1;
     this.viewportSize = 10; // the view's span [world units] across the mean of its width and height
+    this.viewOffset = [0, 0]; // where the ship is on the screen: from its center, as fractions of its width and height
     this.metric = metric;
     this.dt = 0.017;
     this.fps = 1 / this.dt;
@@ -72,6 +73,7 @@ export class World {
     this.view_mode_loc = gl.getUniformLocation(program, 'view_mode');
     this.metric_params_loc = gl.getUniformLocation(program, 'metric_params');
     this.viewport_size_loc = gl.getUniformLocation(program, 'viewport_size');
+    this.view_offset_loc = gl.getUniformLocation(program, 'view_offset');
     this.show_photon_sphere_loc = gl.getUniformLocation(program, 'show_photon_sphere');
     this.show_event_horizon_loc = gl.getUniformLocation(program, 'show_event_horizon');
     this.show_interior_loc = gl.getUniformLocation(program, 'show_interior');
@@ -109,7 +111,7 @@ export class World {
     heading = [c * heading[0] - s * heading[1], s * heading[0] + c * heading[1]];
     var thrusting = keys.thrust;
     if (pointerDn && mousePos) {
-      const mouseViewport = screenToViewport(mousePos, screenDim, this.viewportSize);
+      const mouseViewport = this.screenToView(mousePos, screenDim);
       if (math.norm(mouseViewport) > 1e-9) {
         // point away from the pointer
         heading = this.metric.cartesianToLocal(this.obsvX, math.scale(mouseViewport, -1));
@@ -148,12 +150,17 @@ export class World {
   // get world coordinates under the screen coordinates,
   // or null if the ray doesn't reach them
   getWorldPos(screen, screenDim) {
-    const viewport = screenToViewport(screen, screenDim, this.viewportSize);
+    const viewport = this.screenToView(screen, screenDim);
     const u0 = screenRay(this.metric, this.obsvX, this.obsvU, viewport);
 
     // raytracing along null geodesics, affine parameter from 0 to 1
     const ray = this.metric.traceRay(this.obsvX, u0);
     return ray.status == math.RAY_REACHED ? ray.x : null;
+  }
+
+  // The viewport vector (from the ship, see screenToViewport) at screen coordinates `s` [px].
+  screenToView(s, screenDim) {
+    return screenToViewport(s.map((v, i) => v - this.viewOffset[i] * screenDim[i]), screenDim, this.viewportSize);
   }
 
   render() {
@@ -168,6 +175,7 @@ export class World {
     gl.uniform1i(this.view_mode_loc, this.viewMode);
     gl.uniform4fv(this.metric_params_loc, this.metric.glslParams());
     gl.uniform1f(this.viewport_size_loc, this.viewportSize);
+    gl.uniform2f(this.view_offset_loc, ...this.viewOffset);
     gl.uniform1i(this.show_photon_sphere_loc, this.showPhotonSphere ? 1 : 0);
     gl.uniform1i(this.show_event_horizon_loc, this.showEventHorizon ? 1 : 0);
     gl.uniform1i(this.show_interior_loc, this.showInterior ? 1 : 0);
