@@ -41,11 +41,12 @@ int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int
 
 // --- Shared
 
-// Screen-space [px] to viewport-space, scaled by the mean of screen dimensions
-// to look good on both vertical and horizontal devices
+// Screen-space [px] to viewport-space: the view spans `size` world units
+// across the mean of the screen's dimensions (to look good on both vertical
+// and horizontal devices)
 vec2 s2v(vec2 screen, vec2 res, float size) {
 	float meanRes = (res.x + res.y) / 2.0;
-	return ((screen - res / 2.0) / meanRes) * size / 2.0;
+	return ((screen - res / 2.0) / meanRes) * size;
 }
 
 // Where the coordinates break down, from local quantities only (the same for

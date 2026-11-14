@@ -43,7 +43,7 @@ vec3 grid_color(vec3 pos) {
 	// length of a unit coordinate step, measured in the reference frame
 	mat3 Tx = T(pos);
 	vec3 coordinate_scale = vec3(abs(Tx[0][0]), length(Tx[1]), length(Tx[2]));
-	float grids_per_screen = 20.0;
+	float grids_per_screen = 10.0;
 	vec3 stride_raw = viewport_size / coordinate_scale / grids_per_screen;
 	vec3 stride_log = log2(stride_raw);
 	vec3 stride_floor = floor(stride_log);
@@ -102,7 +102,7 @@ float radius_line(float r, float radius, bool continuous) {
 	// Where neighbouring rays end far apart (around extreme lensing), `w` is
 	// meaningless and would smear the line. The threshold grows with the world
 	// size of a pixel, so that the line stays visible when zoomed out.
-	float pixel_size = viewport_size / (resolution.x + resolution.y);
+	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
 	bool discontinuous = !continuous || w > max(0.25 * rs, 2.0 * pixel_size);
 	return (discontinuous || isnan(a)) ? 0.0 : a;
 }
@@ -272,8 +272,8 @@ vec4 render_clock(float rshift, float tau, vec2 p, float pixel) {
 // `deltax` is the offset from the pixel to the object, as components in the
 // object's frame.
 vec4 render_obj(int type, float size, float rshift, float tau, vec3 deltax, vec2 orientation) {
-	// the world size of a pixel near the observer, for antialiasing
-	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
+	// for antialiasing: twice the world size of a pixel near the observer (edges are smoothed over about two pixels)
+	float pixel_size = 4.0 * viewport_size / (resolution.x + resolution.y);
 	// the pixel's offset from the object, along the object's (right, axis)
 	vec2 p = rot(orientation) * -deltax.yz;
 	if (type == PLANET_ID) {
@@ -407,7 +407,7 @@ void main( void ) {
 	// The ship as seen by itself: in its rest frame, whose axes are the
 	// screen's, where the viewport vector is the pixel's offset from it (light
 	// travel across the ship is negligible), so it is never contracted.
-	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
+	float pixel_size = 4.0 * viewport_size / (resolution.x + resolution.y); // twice a pixel, as in render_obj
 	vec4 obsv_color = render_ship(obsv_thrusting, time,
 		rot(obsv_o) * screen_to_frame(obsv_x, pix_cartesian) / ship_scale, pixel_size / ship_scale);
 

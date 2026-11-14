@@ -17,7 +17,7 @@ export class World {
     this.lastRealTime = undefined;
     this.time = 0;
     this.timeScale = 1;
-    this.viewportSize = 20;
+    this.viewportSize = 10; // the view's span [world units] across the mean of its width and height
     this.metric = metric;
     this.dt = 0.017;
     this.fps = 1 / this.dt;
@@ -180,7 +180,7 @@ const headingVector = angle => [Math.cos(angle), Math.sin(angle)];
 // screen coords  [px] to viewport coords  [s]
 export function screenToViewport(s, screenDim, viewportSize) {
   const meanRes = (screenDim[0] + screenDim[1]) / 2.0;
-  return s.map((v, i) => (v - screenDim[i] / 2.0) / meanRes * viewportSize / 2.0);
+  return s.map((v, i) => (v - screenDim[i] / 2.0) / meanRes * viewportSize);
 }
 
 // The light ray (past-directed null vector, coordinate components) that the

@@ -89,7 +89,7 @@ function backwards(metric, [x, u], tau) {
 const ship = ([x, u], heading = Math.PI / 2) => ({x, u, heading});
 const object = (type, [x, u]) => ({type, x, u});
 
-const defaults = {viewportSize: 20, timeScale: 1, paused: false};
+const defaults = {viewportSize: 10, timeScale: 1, paused: false};
 
 // --- scenarios
 
@@ -123,7 +123,7 @@ const gpScenarios = [
       const {E, L} = orbitConstants(rs, 4 * rs, ra);
       return {
         ...defaults,
-        viewportSize: 11, timeScale: 4,
+        viewportSize: 5.5, timeScale: 4,
         ship: ship(orbitState(metric, ra, 0, E, L)),
         objects: [],
       };
@@ -158,7 +158,7 @@ const gpScenarios = [
       const E = Math.sqrt(potential(rs, ru, L) * (1 - 1e-4));
       return {
         ...defaults,
-        viewportSize: 12, timeScale: 2,
+        viewportSize: 6, timeScale: 2,
         ship: ship(orbitState(metric, 10 * rs, 0, E, L)),
         objects: [],
       };
@@ -179,7 +179,7 @@ const gpScenarios = [
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 8 * rs,
+        viewportSize: 4 * rs,
         ship: ship(raindrop(metric, 2 * rs, 0), Math.PI),
         objects: [],
       };
@@ -200,7 +200,7 @@ const gpScenarios = [
       const [x, u] = atRest(metric, 6 * rs, 0.6);
       return {
         ...defaults,
-        viewportSize: 22, timeScale: 0.25,
+        viewportSize: 11, timeScale: 0.25,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
         objects: [object(planetId, [[x[0] - 9.5, x[1], x[2]], u])],
       };
@@ -216,7 +216,7 @@ const gpScenarios = [
       const rs = metric.rs;
       return {
         ...defaults,
-        viewportSize: 22,
+        viewportSize: 11,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
         objects: [object(planetId, circularOrbit(metric, 5 * rs, Math.PI - 1.0))],
       };

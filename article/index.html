@@ -306,7 +306,7 @@
       const [vx, vy] = [1, 2].map(c => c / Math.sqrt(5) * startSpeed * scale), g = 1 / Math.sqrt(1 - vx * vx - vy * vy);
       const setup = scenario.setup(metric);
       const ship = {...setup.ship, x: [setup.ship.x[0], ...startPosition], u: [g, g * vx, g * vy]};
-      const state = {...setup, ship, objects, viewportSize: 9 * scale};
+      const state = {...setup, ship, objects, viewportSize: 4.5 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         if (slider) {
           const control = flyToX(sim.world, target, dt, sim.world.thrust);
