@@ -262,9 +262,10 @@
     // `scale`: the size and speed of the flight (see above); `viewMode`: what the figure shows, what the ship sees or
     // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
-    // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset)
+    // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
+    // `zoom`: if given, the view's size (World.viewportSize) for the world's state, at every frame
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
-      objects = [], shipClock = false, viewOffset = [0, 0]} = {}) {
+      objects = [], shipClock = false, viewOffset = [0, 0], zoom = null} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
@@ -333,6 +334,7 @@
           show(`${prefix}-gamma`, ut.toFixed(2));
         }
         el('reset').hidden = !flown;
+        if (zoom) sim.world.viewportSize = zoom(sim.world);
       });
       if (!sim) {
         el('note').hidden = false;
@@ -361,8 +363,11 @@
     // a planet at rest (its gravity disregarded), there since long enough before the start to be seen from the
     // ship as far as the history of objects reaches back
     velocityFigure('fig-planet', {
-      // the ship at 3/4 of the view's width, looking back at the planet
-      startSpeed: 0, startPosition: [1.5, 0], shipClock: true, viewOffset: [0.25, 0], objects: [
+      // the ship at 3/4 of the view's width, looking back at the planet, zoomed out to show it (roughly: aberration
+      // at speed squeezes the view behind the ship, here roughly made up for by γ, but not entirely)
+      startSpeed: 0, startPosition: [1.5, 0], shipClock: true, viewOffset: [0.25, 0],
+      zoom: world => (world.obsvX[1] + 1.5) / 0.75 * world.obsvU[0],
+      objects: [
         {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
         // over the planet (drawn after it), the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as
         // high (0.38), ahead by the light travel time to the ship, so that it's seen in sync with the ship's clock
