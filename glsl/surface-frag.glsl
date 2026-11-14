@@ -1,6 +1,6 @@
 // Raytracing fragment shader. Appended to glsl/common.glsl, the metric's file and
 // glsl/objects.glsl by js/shaders.js, which also defines the object types'
-// ids (PROJECTILE_ID, PLANET_ID). Everything is drawn procedurally.
+// ids (PROJECTILE_ID, PLANET_ID, CLOCK_ID). Everything is drawn procedurally.
 
 precision highp sampler2D;
 
@@ -218,14 +218,70 @@ vec4 render_planet(float rshift, float tau, vec2 p, float pixel) {
 	return vec4(redshift(rshift, color, vec3(1.0)), coverage);
 }
 
-// A planet or a projectile, of diameter `size`. `deltax` is the pixel's
-// offset from the object, as components in the object's frame.
+// A digital clock showing `tau` (its proper time) as minutes:seconds, like
+// 1:00 or 10:00, wrapping after 59:59: dark red seven-segment digits on
+// white, in a dark red frame. `p` is the pixel's offset from its center along
+// (right, up), `pixel` the size of a pixel, both in units of its height; it
+// is 2.5 wide.
+const vec3 clock_red = vec3(0.45, 0.02, 0.02), clock_white = vec3(0.95);
+// the segments lit for each digit, as bits: top, upper right, lower right,
+// bottom, lower left, upper left, middle
+const int clock_digits[10] = int[10](0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F);
+// distance to the line segment from a to b
+float segment_distance(vec2 p, vec2 a, vec2 b) {
+	vec2 ab = b - a;
+	return length(p - a - ab * clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0));
+}
+// distance to the lit segments of `digit` (-1: blank), centered at the origin, 0.32 wide and 0.6 tall
+float digit_distance(vec2 p, int digit) {
+	if (digit < 0) return 1e3;
+	const float w = 0.13, h = 0.25, gap = 0.03; // segment centerlines' half extents; gap at the ends
+	vec2 ends[14] = vec2[14](
+		vec2(-w + gap, h), vec2(w - gap, h),     // top
+		vec2(w, h - gap), vec2(w, gap),          // upper right
+		vec2(w, -gap), vec2(w, -h + gap),        // lower right
+		vec2(-w + gap, -h), vec2(w - gap, -h),   // bottom
+		vec2(-w, -gap), vec2(-w, -h + gap),      // lower left
+		vec2(-w, h - gap), vec2(-w, gap),        // upper left
+		vec2(-w + gap, 0.0), vec2(w - gap, 0.0)); // middle
+	int lit = clock_digits[digit];
+	float d = 1e3;
+	for (int i = 0; i < 7; i++) {
+		if ((lit & (1 << i)) != 0) d = min(d, segment_distance(p, ends[2 * i], ends[2 * i + 1]));
+	}
+	return d - 0.035; // the segments' half thickness
+}
+vec4 render_clock(float rshift, float tau, vec2 p, float pixel) {
+	vec2 half_size = vec2(1.25, 0.5);
+	float outside = max(abs(p.x) - half_size.x, abs(p.y) - half_size.y);
+	if (outside > pixel) return vec4(0.0);
+	int t = int(floor(mod(tau, 3600.0))), minutes = t / 60, seconds = t % 60;
+	// digits at x = -0.74, -0.32 (minutes; the tens blank below 10), 0.32, 0.74 (seconds); a colon between
+	float ink = min(min(digit_distance(p - vec2(-0.74, 0.0), minutes >= 10 ? minutes / 10 : -1),
+	                    digit_distance(p - vec2(-0.32, 0.0), minutes % 10)),
+	                min(digit_distance(p - vec2(0.32, 0.0), seconds / 10),
+	                    digit_distance(p - vec2(0.74, 0.0), seconds % 10)));
+	ink = min(ink, length(vec2(p.x, abs(p.y) - 0.12)) - 0.04); // the colon
+	ink = min(ink, -outside - 0.08); // the frame
+	vec3 color = mix(clock_white, clock_red, clamp(0.5 - ink / pixel, 0.0, 1.0));
+	return vec4(redshift(rshift, color, vec3(1.0)), clamp(0.5 - outside / pixel, 0.0, 1.0));
+}
+
+// A planet, clock or projectile, of size `size` (see js/object-types.js).
+// `deltax` is the offset from the pixel to the object, as components in the
+// object's frame.
 vec4 render_obj(int type, float size, float rshift, float tau, vec3 deltax, vec2 orientation) {
 	// the world size of a pixel near the observer, for antialiasing
 	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
+	// the pixel's offset from the object, along the object's (right, axis)
+	vec2 p = rot(orientation) * -deltax.yz;
 	if (type == PLANET_ID) {
 		float radius = 0.5 * size;
-		return render_planet(rshift, tau, rot(orientation) * deltax.yz / radius, pixel_size / radius);
+		return render_planet(rshift, tau, p / radius, pixel_size / radius);
+	}
+	if (type == CLOCK_ID) {
+		float height = size / sqrt(1.0 + 2.5 * 2.5); // the diagonal is `size`
+		return render_clock(rshift, tau, p / height, pixel_size / height);
 	}
 	// a projectile: a dot, round in its rest frame, antialiased over about a pixel
 	float d = length(deltax.yz) - 0.5 * size;

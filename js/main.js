@@ -5,7 +5,7 @@ import htm from 'https://esm.sh/htm@3.1.1';
 
 import * as math from './math.js';
 import { Simulation } from './simulation.js';
-import { planetId, projectileId } from './object-types.js';
+import { planetId, clockId, projectileId } from './object-types.js';
 import { scenarios, scenariosOf } from './scenarios.js';
 import { AdaptiveResolution } from './adaptive-resolution.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
@@ -104,13 +104,20 @@ function spawnVelocityFromDrag(origin, pos) {
   return math.scale(vLinear, vScale);
 }
 
-// Spawn a planet at `screenPos`, with `velocity` (see spawnVelocityFromDrag).
-function spawn(screenPos, velocity) {
+// The objects the Spawn tool can create, by name.
+const spawnTypes = {planet: planetId, clock: clockId};
+const nextSpawnType = name => {
+  const names = Object.keys(spawnTypes);
+  return names[(names.indexOf(name) + 1) % names.length];
+};
+
+// Spawn an object of type `type` at `screenPos`, with `velocity` (see spawnVelocityFromDrag).
+function spawn(type, screenPos, velocity) {
   const x = world.getWorldPos(screenPos, params.screenDim);
   if (!x) return;
   const u = localVelocity3(metric, x, velocity);
   if (!u) return;
-  objects.spawn(planetId, x, u);
+  objects.spawn(type, x, u);
 }
 
 const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
@@ -124,6 +131,7 @@ const timeScaleOf = state => state.pause ? 0 : sliderToTimeScale(state.timeSlide
 class App extends Component {
   state = {
     tool: 'boost',
+    spawnType: 'planet', // see spawnTypes
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
     timeSlider: timeScaleToSlider(1),
@@ -283,9 +291,9 @@ class App extends Component {
       if (touches.size == 0) pinchDistance = null;
       return;
     }
-    const {tool, spawnDragOrigin, spawnVelocity} = this.state;
+    const {tool, spawnDragOrigin, spawnVelocity, spawnType} = this.state;
     if (tool == 'spawn' && spawnDragOrigin) {
-      spawn(spawnDragOrigin, spawnVelocity);
+      spawn(spawnTypes[spawnType], spawnDragOrigin, spawnVelocity);
     }
     this.cancelPointer();
   }
@@ -322,7 +330,10 @@ class App extends Component {
     }
     switch (ev.code) {
       case "Digit1": this.activateBoost();
-      break; case "Digit2": this.activateSpawn();
+      break; case "Digit2":
+        // the Spawn tool, or with it active, the next type of object
+        if (this.state.tool != 'spawn') this.activateSpawn();
+        else this.setState({spawnType: nextSpawnType(this.state.spawnType)});
     }
     if (ev.key == " " || ev.key == "Enter") {
       // Don't let Space or Enter also activate a focused button (e.g. the pause button).
@@ -584,6 +595,12 @@ class App extends Component {
           <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost (1)</button>
           <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn (2)</button>
         </div>
+        ${this.state.tool == 'spawn' && html`
+        <div>
+          <button class=${this.state.spawnType == 'planet' ? "clicked" : ""} onClick=${() => this.setState({spawnType: 'planet'})}>Planet</button>
+          <button class=${this.state.spawnType == 'clock' ? "clicked" : ""} onClick=${() => this.setState({spawnType: 'clock'})}>Clock</button>
+        </div>
+        `}
         ${this.state.crashed && html`
         <div>
           <button onClick=${this.reset}>${metric.constructor.endMessage} press R to reset.</button>

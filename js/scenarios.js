@@ -99,7 +99,7 @@ const gpScenarios = [
     id: 'free',
     name: 'Free play',
     description: 'A circular orbit at 10 rs, with a planet falling past. ' +
-      'Boost with the mouse or the arrow keys, spawn planets, and explore.',
+      'Boost with the mouse or the arrow keys, spawn planets and clocks, and explore.',
     setup: metric => {
       const rs = metric.rs;
       const planet = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
@@ -251,7 +251,7 @@ const minkowskiScenarios = [
     id: 'flat',
     name: 'Free play',
     description: 'A ship at rest in flat spacetime, without gravity: only special relativity. ' +
-      'Boost with the mouse or the arrow keys, spawn planets, and explore.',
+      'Boost with the mouse or the arrow keys, spawn planets and clocks, and explore.',
     setup: metric => ({
       ...defaults,
       ship: ship([[0, 0, 0], [1, 0, 0]]),
