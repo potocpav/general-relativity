@@ -5,7 +5,7 @@
 // quality.
 
 const minFps = 45;   // below this, averaged over a window, the resolution is lowered
-const fpsWindow = 5; // the averaging window [s of animation]
+const fpsWindow = 2; // the averaging window [s of animation]
 
 export class AdaptiveResolution {
   // `maxFactor`: the lowest resolution, in physical pixels per rendered pixel
