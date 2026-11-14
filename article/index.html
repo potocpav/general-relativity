@@ -47,6 +47,7 @@
         </div>
       </div>
       <p class="note" id="fig-classical-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>Flying in a classical space-time</figcaption>
     </figure>
 
     <p>
@@ -69,6 +70,7 @@
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
           <div id="fig-relativistic-v">0.30&#x202F;c</div>
+          <div class="sub" id="fig-relativistic-v-si">89,938&#x202F;km/s</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
@@ -82,6 +84,7 @@
         </div>
       </div>
       <p class="note" id="fig-relativistic-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>Plane of simultaneity in relativistic space-time</figcaption>
     </figure>
 
     <p>
@@ -105,6 +108,7 @@
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
           <div id="fig-light-cone-v">0.00&#x202F;c</div>
+          <div class="sub" id="fig-light-cone-v-si">0&#x202F;km/s</div>
         </div>
         <div class="stat">
           <div>Lorentz factor, <math><mi>γ</mi></math></div>
@@ -118,7 +122,10 @@
         </div>
       </div>
       <p class="note" id="fig-light-cone-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>Ship's perspective in relativistic space-time</figcaption>
     </figure>
+
+    <p class="wip">The following text is a placeholder for now.</p>
 
     <p>
       To keep things simple, the simulated universe is flat in one more sense: space has only two dimensions. The ship
@@ -185,7 +192,7 @@
         <div class="placeholder">Interactive figure coming soon</div>
       </div>
       <figcaption>
-        <b>Figure 4.</b> A spaceship falling into a black hole from rest far away. Drag the slider to move along its
+        A spaceship falling into a black hole from rest far away. Drag the slider to move along its
         journey, from 3 <math><msub><mi>r</mi><mi>s</mi></msub></math> to 0.1
         <math><msub><mi>r</mi><mi>s</mi></msub></math>.
       </figcaption>
@@ -256,13 +263,16 @@
         accel = sim.world.thrust * throttle;
         sim.step(dt, {heading: control.heading, accel});
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
-        // without relativity (scaled down), the speed can pass c
+        // the speed (without relativity, scaled down, it can pass c)
         show(`${prefix}-v`, scale == 1 ? lightSpeedFraction(v) : speed(v));
-        // figures show γ, or the engine's acceleration (in c per second of the figure's time)
-        if (el('gamma')) show(`${prefix}-gamma`, ut.toFixed(2));
-        if (el('a')) show(`${prefix}-a`, `${(accel / scale).toFixed(1)}\u202fc/s`);
-        if (el('v-si')) show(`${prefix}-v-si`, kmPerS(v));
-        if (el('a-si')) show(`${prefix}-a-si`, inG(accel / scale));
+        show(`${prefix}-v-si`, kmPerS(v));
+        // and either the engine's acceleration (in c per second of the figure's time), or γ
+        if (el('a')) {
+          show(`${prefix}-a`, `${(accel / scale).toFixed(1)}\u202fc/s`);
+          show(`${prefix}-a-si`, inG(accel / scale));
+        } else {
+          show(`${prefix}-gamma`, ut.toFixed(2));
+        }
         el('reset').hidden = !flown;
       });
       if (!sim) {

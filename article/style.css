@@ -198,6 +198,14 @@ figcaption b {
   font-size: 15px;
 }
 
+/* A note that a part of the article is a work in progress. */
+.wip {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
 .note {
   font-size: 13px;
   color: var(--muted);
