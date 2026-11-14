@@ -209,7 +209,7 @@ figcaption b {
 
 .wip-note {
   border-left: 3px solid var(--accent);
-  padding: 4px 0 4px 12px;
+  padding: 4px 20px;
   margin-top: 16px;
   color: var(--muted);
   font-style: italic;
