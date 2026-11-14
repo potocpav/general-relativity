@@ -181,7 +181,7 @@ vec3 grid_tint(float l) {
 const vec3 projectile_color = vec3(1.0, 0.9, 0.2);
 
 // An Earth-like planet, drawn procedurally: a globe seen from the side, its
-// axis along the object's orientation axis, turning once per objSize.x of
+// axis along the object's orientation axis, turning once per planet_period of
 // its proper time `tau`. `p` is the pixel's offset from its center, in units
 // of its radius, along (right, axis).
 float hash3(vec3 p) {
@@ -208,12 +208,13 @@ float fbm(vec3 p) {
 	return sum;
 }
 const vec3 planet_light = vec3(-0.48, 0.48, 0.73); // toward the light, which comes from the upper left (unit)
-vec4 render_planet(float period, float rshift, float tau, vec2 p, float pixel) {
+const float planet_period = 8.0;
+vec4 render_planet(float rshift, float tau, vec2 p, float pixel) {
 	float r = length(p);
 	float coverage = clamp((1.0 - r) / pixel + 0.5, 0.0, 1.0); // antialiased edge
 	if (coverage == 0.0) return vec4(0.0);
 	vec3 n = vec3(p, sqrt(max(0.0, 1.0 - r * r))); // the surface normal: right, axis, toward the viewer
-	float a = 6.2831853 * tau / period, c = cos(a), s = sin(a);
+	float a = 6.2831853 * tau / planet_period, c = cos(a), s = sin(a);
 	vec3 q = vec3(c * n.x + s * n.z, n.y, c * n.z - s * n.x); // the surface point, turning with the planet
 	float h = fbm(2.5 * q);
 	vec3 color = h > 0.52
@@ -226,18 +227,19 @@ vec4 render_planet(float period, float rshift, float tau, vec2 p, float pixel) {
 	return vec4(redshift(rshift, color, vec3(1.0)), coverage);
 }
 
-// `deltax` is the pixel's offset from the object, as components in the object's frame.
-vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
+// An object of type `type` and diameter `size` (planets and projectiles; the
+// ship's sprites have their own size). `deltax` is the pixel's offset from
+// the object, as components in the object's frame.
+vec4 render_obj(int sprite_i, float size, float rshift, float tau, vec3 deltax, vec2 orientation) {
+	// the world size of a pixel near the observer, for antialiasing
+	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
 	if (sprite_i == PLANET_ID) {
-		float radius = 0.5 * objSize[sprite_i].y;
-		float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
-		return render_planet(objSize[sprite_i].x, rshift, tau, rot(orientation) * deltax.yz / radius, pixel_size / radius);
+		float radius = 0.5 * size;
+		return render_planet(rshift, tau, rot(orientation) * deltax.yz / radius, pixel_size / radius);
 	}
 	if (sprite_i == PROJECTILE_ID) {
 		// a dot, round in its rest frame, antialiased over about a pixel
-		// (the world size of a pixel near the observer)
-		float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
-		float d = length(deltax.yz) - 0.5 * objSize[sprite_i].y;
+		float d = length(deltax.yz) - 0.5 * size;
 		float a = clamp(0.5 - d / pixel_size, 0.0, 1.0);
 		return vec4(redshift(rshift, projectile_color, vec3(1.0)), a);
 	}
@@ -317,7 +319,8 @@ void main( void ) {
 		mat3 obj_rest; // coordinate components -> object's rest frame components
 		if (!object_event(i, pix_x, obj_x, obj_u, obj_tau, obj_angle, obj_rest, obj_deltax)) continue;
 		vec4 obj_color = render_obj(
-			object_sprite(i),
+			object_type(i),
+			object_size(i),
 			show_redshift && seen ? abs((obj_rest * pix_u).x) / obsv_energy : 1.0,
 			obj_tau,
 			obj_deltax,
@@ -330,7 +333,7 @@ void main( void ) {
 	// screen's, where the viewport vector is the pixel's offset from it (light
 	// travel across the ship is negligible), so it is never contracted.
 	vec4 obsv_color = render_obj(
-		obsv_sprite, 1.0, time, vec3(0.0, -screen_to_frame(obsv_x, pix_cartesian)) / ship_scale, obsv_o);
+		obsv_sprite, 0.0, 1.0, time, vec3(0.0, -screen_to_frame(obsv_x, pix_cartesian)) / ship_scale, obsv_o);
 
 	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
 

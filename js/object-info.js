@@ -5,46 +5,37 @@ const spritesShape = [64*3, 64, 60]; // x, y, d
 export const
   shipId = 0,
   shipThrustingId = 1,
-  asteroidId = 2,
-  photonClockId = 3,
-  projectileId = 4, // drawn as a dot by the shader, not from the sprite image
-  planetId = 5;     // drawn procedurally by the shader
+  projectileId = 2, // drawn as a dot by the shader, not from the sprite image
+  planetId = 3;     // drawn procedurally by the shader
+
+// Objects' default diameters, by type (an object can have its own, see Objects.spawn).
+export const defaultSize = {
+  [projectileId]: 0.125, // 1/4 of the rocket's width
+  [planetId]: 0.3,
+};
+
+// The farthest an object reaches from its position.
+export const objectRadius = o => 0.5 * o.size;
 
 // Sprite extents in world coordinates, including time coordinate.
 const objSize = new Float32Array([
   2, 0.5, 0.5, -1,   // rocket
   2, 0.5, 0.5, -1,   // thrusting rocket
-  5, 0.3, 0.3, -1, // asteroid
-  1, 64/38/2, 64/38/2, -1,   // photon clock
-  1, 0.125, 0.125, -1,       // projectile: the dot's diameter, 1/4 of the rocket's width
-  8, 2, 2, -1,               // planet: its rotation period, and diameter
   ]);
 
 // Minimum pixel coordinates of sprites in the combined sprite image (inclusive)
 const objTexMin = new Float32Array([
   0, 0, 0, -1,
   0, 0, 30, -1,
-  64, 0, 0, -1,
-  128, 0, 0, -1,
-  0, 0, 0, -1,     // projectile: unused
-  0, 0, 0, -1,     // planet: unused
   ]);
 
 // Maximum pixel coordinates of sprites in the combined sprite image (inclusive)
 const objTexMax = new Float32Array([
   63, 63, 29, -1,
   63, 63, 59, -1,
-  127, 63, 59, -1,
-  191, 63, 59, -1,
-  0, 0, 0, -1,     // projectile: unused
-  0, 0, 0, -1,     // planet: unused
   ]);
 
 const uniformBlockBinding = 0;
-
-// Half of the diagonal of a sprite's spatial extent: the farthest it reaches
-// from the object's position.
-export const objectRadius = type => 0.5 * Math.hypot(objSize[type * 4 + 1], objSize[type * 4 + 2]);
 
 // Number of sprites; passed to the shader as N_SPRITES.
 export const nSprites = objSize.length / 4;

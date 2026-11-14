@@ -1,4 +1,4 @@
-// Objects (asteroids, photon clocks, ...) simulated live, with a rolling
+// Objects (planets, projectiles) simulated live, with a rolling
 // history of their recent past.
 //
 // Rendering only needs the past: each pixel shows an event on the ship's past
@@ -15,7 +15,7 @@
 // time; an object rewound past its first row is removed.
 
 import * as math from './math.js';
-import { objectRadius } from './object-info.js';
+import { defaultSize, objectRadius } from './object-info.js';
 
 export const maxObjects = 256;
 export const historyRows = 1024;
@@ -54,8 +54,9 @@ const stateSize = 10, rowSize = 11;
 const ring = k => ((k % historyRows) + historyRows) % historyRows;
 
 class SimObject {
-  constructor(type, slot) {
+  constructor(type, size, slot) {
     this.type = type;
+    this.size = size; // diameter
     this.slot = slot;
     this.state = null;       // [x, u, tau, h] at row lastRow
     this.angle = undefined;  // orientation angle of the last row written, for continuity
@@ -89,14 +90,14 @@ export class Objects {
     this.now = Math.ceil(T / this.dt); // row the objects are advanced to
   }
 
-  // Add an object at event x with 4-velocity u (x[0] may be in the past),
-  // simulating it up to now. Its orientation axis starts pointing up on the
-  // screen. Returns false if there is no free slot or it can't be followed
-  // from there.
-  spawn(type, x, u) {
+  // Add an object of `type` and diameter `size` at event x with 4-velocity u
+  // (x[0] may be in the past), simulating it up to now. Its orientation axis
+  // starts pointing up on the screen. Returns false if there is no free slot
+  // or it can't be followed from there.
+  spawn(type, x, u, size = defaultSize[type]) {
     const slot = this.slots.indexOf(null);
     if (slot < 0) return false;
-    const o = new SimObject(type, slot);
+    const o = new SimObject(type, size, slot);
     const first = Math.ceil(x[0] / this.dt);
     const up = this.metric.cartesianToLocal(x, [0, 1]);
     const h = math.matVec(math.restToCoord(this.metric, x, u), [0, ...up]);
@@ -211,7 +212,7 @@ export class Objects {
   // stored history, padded by its size: the chunks overlapping its valid rows.
   bounds(o) {
     const [first, last] = this.validRows(o);
-    const pad = objectRadius(o.type);
+    const pad = objectRadius(o);
     const box = [Infinity, Infinity, -Infinity, -Infinity];
     for (let c = Math.floor(first / chunkRows); c <= Math.floor(last / chunkRows); c++) {
       const b = o.chunks.get(c);
@@ -240,7 +241,7 @@ export class Objects {
     };
     this.texA = texture(maxObjects, historyRows); // (r, phi, tau, orientation angle)
     this.texB = texture(maxObjects, historyRows); // (u^t, u^r, u^phi, -)
-    this.texInfo = texture(maxObjects, 2);        // (first row, last row, sprite, used), bounds
+    this.texInfo = texture(maxObjects, 2);        // (first row, last row, type, size), bounds
     this.rowA = new Float32Array(maxObjects * 4);
     this.rowB = new Float32Array(maxObjects * 4);
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -277,7 +278,7 @@ export class Objects {
     let count = 0;
     for (const o of this.objects) {
       const [first, last] = this.validRows(o);
-      info.set([first, last, o.type, 1], o.slot * 4);
+      info.set([first, last, o.type, o.size], o.slot * 4);
       info.set(this.bounds(o), (maxObjects + o.slot) * 4);
       count = Math.max(count, o.slot + 1);
     }

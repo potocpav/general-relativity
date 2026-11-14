@@ -4,7 +4,7 @@
 
 uniform highp sampler2D obj_a;    // (r, phi, tau, orientation angle)
 uniform highp sampler2D obj_b;    // (u^t, u^r, u^phi, -)
-uniform highp sampler2D obj_info; // row 0: (first row, last row, sprite, used); row 1: bounding box
+uniform highp sampler2D obj_info; // row 0: (first row, last row, type, size; 0 if unused); row 1: bounding box
 uniform int n_objects;            // objects are in columns below this
 uniform float history_dt;
 
@@ -27,8 +27,13 @@ void object_sample(int i, float k, out vec3 x, out vec3 u, out float tau, out fl
 	angle = A.w;
 }
 
-int object_sprite(int i) {
+int object_type(int i) {
 	return int(texelFetch(obj_info, ivec2(i, 0), 0).z);
+}
+
+// the object's diameter
+float object_size(int i) {
+	return texelFetch(obj_info, ivec2(i, 0), 0).w;
 }
 
 // The event on object i's worldline that is simultaneous with the pixel's

@@ -7,13 +7,12 @@
 
 import { fetchText, physicsFragmentShader } from '../js/shaders.js';
 import { GullstrandPainleve, Minkowski, metricTypes, localVelocity3 } from '../js/metric.js';
-import { nSprites } from '../js/object-info.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
 import { scenarios, velocity3 } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { World } from '../js/world.js';
-import { asteroidId, photonClockId, objectRadius } from '../js/object-info.js';
+import { planetId, objectRadius } from '../js/object-info.js';
 
 const root = '../';
 const nSamples = 64;
@@ -802,7 +801,8 @@ function objectsFixture(gl, rand) {
   for (let i = 0; i < 3; i++) {
     const x = [-3 + rand(), (4 + 6 * rand()) * rs, 6 * rand()];
     const u = localVelocity3(metric, x, [0.2 * rand() - 0.1, 0.25 + 0.1 * rand()]);
-    objs.spawn(i % 2 ? photonClockId : asteroidId, x, u);
+    // planets of two sizes, both larger than the offsets of the lookup test's pixels
+    objs.spawn(planetId, x, u, i % 2 ? 0.8 : 0.4);
     spawned.push({x, u});
   }
   for (let T = 0; T < 5; T += 0.37 + 0.2 * rand()) objs.advance(T);
@@ -856,7 +856,7 @@ function checkObjectHistoryJs() {
   for (const o of objs.objects) {
     const b = objs.bounds(o);
     for (const [, y] of rowsOf(objs, o)) {
-      const [px, py] = metric.toPlane(y), pad = objectRadius(o.type) - 1e-9;
+      const [px, py] = metric.toPlane(y), pad = objectRadius(o) - 1e-9;
       if (px < b[0] + pad || py < b[1] + pad || px > b[2] - pad || py > b[3] - pad) {
         errors.push('a stored position is outside the culling box');
         break;
@@ -879,7 +879,7 @@ function checkObjectOrientationJs() {
   const errors = [];
   for (const k of [10, 4]) {
     const objs = new Objects(null, metric), r = k * rs, x = [0, r, 0];
-    objs.spawn(asteroidId, x, velocity3(metric, x, [0, Math.sqrt(rs / (2 * r))]));
+    objs.spawn(planetId, x, velocity3(metric, x, [0, Math.sqrt(rs / (2 * r))]));
     const period = 2 * Math.PI * Math.sqrt(2 * r ** 3 / rs); // in coordinate time
     objs.advance(period);
     const o = objs.objects[0], rows = rowsOf(objs, o);
@@ -954,7 +954,7 @@ async function checkObjectLookupGpu(gl, vertexSource) {
 }
 
 // No ghost copies of objects falling into the black hole: every event the
-// GPU lookup accepts (inside the sprite) must also be inside the sprite for
+// GPU lookup accepts (inside the object's square) must also be inside it for
 // one of the exact solutions. (Close to the singularity, the object's
 // velocity changes so fast that the simultaneity condition can have more
 // than one root.) Events where the lookup doesn't find the object although
@@ -965,10 +965,11 @@ async function checkObjectNoGhostsGpu(gl, vertexSource) {
   const rand = prng(14);
   const objs = new Objects(gl, metric);
   const xc = [-3, 5 * rs, 0.35];
-  objs.spawn(photonClockId, xc, localVelocity3(metric, xc, [0, 0]));
+  const size = 0.8; // a large planet, so that many events are near it
+  objs.spawn(planetId, xc, localVelocity3(metric, xc, [0, 0]), size);
   objs.advance(5);
   const o = objs.objects[0], [first, last] = objs.validRows(o), dt = objs.dt;
-  const half = 64 / 38 / 2 / 2;
+  const half = size / 2;
   const sample = k => {
     const k0 = Math.floor(k), a = k - k0, y0 = objs.rowState(o, k0), y1 = objs.rowState(o, k0 + 1);
     const y = y0.map((v, c) => (1 - a) * v + a * y1[c]);
@@ -980,7 +981,7 @@ async function checkObjectNoGhostsGpu(gl, vertexSource) {
     return math.matVec(math.coordToRest(metric, pix, s.u), d);
   };
   const inside = d => d !== null && Math.max(Math.abs(d[1]), Math.abs(d[2])) < half;
-  // inside the sprite at any root of the simultaneity condition: scan the
+  // inside the square at any root of the simultaneity condition: scan the
   // history finely, refine sign changes by bisection, and also take
   // near-touching minima within the shader's tolerance (0.02)
   const exactInside = pix => {
@@ -1015,7 +1016,7 @@ async function checkObjectNoGhostsGpu(gl, vertexSource) {
   };
   let events = 0, ghosts = 0, oldGhosts = 0, drawn = 0;
   for (let batch = 0; batch < 8; batch++) {
-    // events around the clock's path, while it approaches the horizon
+    // events around the planet's path, while it approaches the horizon
     const pixes = [...Array(nSamples)].map(() => [-1 + 4 * rand(), (1.05 + 6 * rand()) * rs, 0.7 * rand()]);
     const gpu = await runOnGpu(gl, vertexSource, test, pixes.map(p => [p, [o.slot]]), 1);
     pixes.forEach((pix, i) => {
@@ -1034,21 +1035,14 @@ async function checkObjectNoGhostsGpu(gl, vertexSource) {
   };
 }
 
-// The full raytracing shader compiles and its uniform block matches the JS sprite tables.
+// The full raytracing shader compiles, also without the metric's features
+// (e.g. the black hole's overlays).
 async function checkSurfaceShader(gl, vertexSource) {
   const source = await fetchText(root + 'glsl/surface-frag.glsl');
-  const program = compileProgram(gl, vertexSource, await physicsFragmentShader(source, metric, root));
-  const block = gl.getUniformBlockIndex(program, 'objectInfo');
-  const size = gl.getActiveUniformBlockParameter(program, block, gl.UNIFORM_BLOCK_DATA_SIZE);
-  const expectedSize = 3 * nSprites * 16; // 3 arrays of std140 vec3
-  gl.deleteProgram(program);
-  // it also compiles without the metric's features (e.g. the black hole's overlays)
+  gl.deleteProgram(compileProgram(gl, vertexSource, await physicsFragmentShader(source, metric, root)));
   const variant = Object.create(metric, {constructor: {value: class extends metric.constructor { static features = {}; }}});
   gl.deleteProgram(compileProgram(gl, vertexSource, await physicsFragmentShader(source, variant, root)));
-  return {
-    ok: size == expectedSize,
-    message: `objectInfo block size ${size}, expected ${expectedSize}; compiles without the metric's features`,
-  };
+  return {ok: true, message: "compiles, also without the metric's features"};
 }
 
 async function main() {

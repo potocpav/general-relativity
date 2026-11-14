@@ -45,12 +45,12 @@ export class Simulation {
   }
 
   // Start from `state` (as returned by a scenario's setup):
-  // {ship: {x, u, heading}, objects: [{type, x, u}], viewportSize}.
+  // {ship: {x, u, heading}, objects: [{type, x, u, size (optional)}], viewportSize}.
   reset(state) {
     this.world.viewportSize = state.viewportSize;
     this.world.reset(state.ship.x, state.ship.u, state.ship.heading);
     this.objects.reset(this.metric, this.world.obsvX[0]);
-    for (const o of state.objects) this.objects.spawn(o.type, o.x, o.u);
+    for (const o of state.objects) this.objects.spawn(o.type, o.x, o.u, o.size);
   }
 
   // Set the canvas's drawing buffer size [pixels].

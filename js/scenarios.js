@@ -12,7 +12,7 @@
 
 import * as math from './math.js';
 import { GullstrandPainleve, Minkowski, localVelocity3 } from './metric.js';
-import { asteroidId, photonClockId } from './object-info.js';
+import { planetId } from './object-info.js';
 
 // --- helpers; positions are (r, phi)
 
@@ -98,16 +98,16 @@ const gpScenarios = [
   {
     id: 'free',
     name: 'Free play',
-    description: 'A circular orbit at 10 rs, with a photon clock falling past. ' +
-      'Boost with the mouse or the arrow keys, spawn objects, and explore.',
+    description: 'A circular orbit at 10 rs, with a planet falling past. ' +
+      'Boost with the mouse or the arrow keys, spawn planets, and explore.',
     setup: metric => {
       const rs = metric.rs;
-      const clock = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
+      const planet = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
       return {
         ...defaults,
         ship: ship(circularOrbit(metric, 10 * rs, 0)),
-        // started in the past, so that the clock is visible right away
-        objects: [object(photonClockId, backwards(metric, clock, 40))],
+        // started in the past, so that the planet is visible right away
+        objects: [object(planetId, backwards(metric, planet, 40))],
       };
     },
   },
@@ -188,7 +188,7 @@ const gpScenarios = [
   {
     id: 'frozen-star',
     name: 'The frozen star',
-    description: 'An asteroid falling from 6 rs, shown at 0.25× speed. In its own time it ' +
+    description: 'A planet falling from 6 rs, shown at 0.25× speed. In its own time it ' +
       'crosses the horizon within seconds, but seen from the ship it slows down, reddens ' +
       'and fades out as it nears the horizon, never seen to cross: its light is redshifted ' +
       'by a further factor e every 2 rs/c, so a "frozen star" is practically black.',
@@ -202,14 +202,14 @@ const gpScenarios = [
         ...defaults,
         viewportSize: 22, timeScale: 0.25,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
-        objects: [object(asteroidId, [[x[0] - 9.5, x[1], x[2]], u])],
+        objects: [object(planetId, [[x[0] - 9.5, x[1], x[2]], u])],
       };
     },
   },
   {
     id: 'lensing',
     name: 'Gravitational lensing',
-    description: 'A photon clock orbits at 5 rs. When it passes behind the black hole, ' +
+    description: 'A planet orbits at 5 rs. When it passes behind the black hole, ' +
       'its light bends around both sides: it appears twice, on either side of the ' +
       'black hole\'s shadow (the 2D version of an Einstein ring).',
     setup: metric => {
@@ -218,14 +218,14 @@ const gpScenarios = [
         ...defaults,
         viewportSize: 22,
         ship: ship(circularOrbit(metric, 15 * rs, 0)),
-        objects: [object(photonClockId, circularOrbit(metric, 5 * rs, Math.PI - 1.0))],
+        objects: [object(planetId, circularOrbit(metric, 5 * rs, Math.PI - 1.0))],
       };
     },
   },
   {
     id: 'flyby',
     name: 'Relativistic flyby',
-    description: 'Flying past photon clocks at 90% of the speed of light: relativistic beaming, ' +
+    description: 'Flying past planets at 90% of the speed of light: relativistic beaming, ' +
       'Doppler shift and length contraction.',
   },
   {
@@ -251,7 +251,7 @@ const minkowskiScenarios = [
     id: 'flat',
     name: 'Free play',
     description: 'A ship at rest in flat spacetime, without gravity: only special relativity. ' +
-      'Boost with the mouse or the arrow keys, spawn objects, and explore.',
+      'Boost with the mouse or the arrow keys, spawn planets, and explore.',
     setup: metric => ({
       ...defaults,
       ship: ship([[0, 0, 0], [1, 0, 0]]),

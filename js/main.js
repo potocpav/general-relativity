@@ -5,7 +5,7 @@ import htm from 'https://esm.sh/htm@3.1.1';
 
 import * as math from './math.js';
 import { Simulation } from './simulation.js';
-import { asteroidId, photonClockId, projectileId } from './object-info.js';
+import { planetId, projectileId } from './object-info.js';
 import { scenarios, scenariosOf } from './scenarios.js';
 import { AdaptiveResolution } from './adaptive-resolution.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
@@ -65,15 +65,6 @@ var metric = new initialScenario.metric(initialScenario.params);
 const projectileSpeed = 0.5;
 const maxProjectiles = 64;
 
-const objectIds = {
-  'asteroid': asteroidId,
-  'photonClock': photonClockId,
-};
-const nextObjectId = id => {
-  const keys = Object.keys(objectIds);
-  return keys[(keys.indexOf(id) + 1) % keys.length];
-};
-
 var canvas;
 var overlay;
 var sim;     // the Simulation
@@ -113,12 +104,13 @@ function spawnVelocityFromDrag(origin, pos) {
   return math.scale(vLinear, vScale);
 }
 
-function spawn(objectName, screenPos, velocity) {
+// Spawn a planet at `screenPos`, with `velocity` (see spawnVelocityFromDrag).
+function spawn(screenPos, velocity) {
   const x = world.getWorldPos(screenPos, params.screenDim);
   if (!x) return;
   const u = localVelocity3(metric, x, velocity);
   if (!u) return;
-  objects.spawn(objectIds[objectName], x, u);
+  objects.spawn(planetId, x, u);
 }
 
 const isArrowControl = key => key == "ArrowUp" || key == "ArrowLeft" || key == "ArrowRight";
@@ -132,7 +124,6 @@ const timeScaleOf = state => state.pause ? 0 : sliderToTimeScale(state.timeSlide
 class App extends Component {
   state = {
     tool: 'boost',
-    spawnObject: 'asteroid',
     spawnDragOrigin: undefined,
     spawnVelocity: undefined,
     timeSlider: timeScaleToSlider(1),
@@ -292,9 +283,9 @@ class App extends Component {
       if (touches.size == 0) pinchDistance = null;
       return;
     }
-    const {tool, spawnDragOrigin, spawnVelocity, spawnObject} = this.state;
+    const {tool, spawnDragOrigin, spawnVelocity} = this.state;
     if (tool == 'spawn' && spawnDragOrigin) {
-      spawn(spawnObject, spawnDragOrigin, spawnVelocity);
+      spawn(spawnDragOrigin, spawnVelocity);
     }
     this.cancelPointer();
   }
@@ -331,12 +322,7 @@ class App extends Component {
     }
     switch (ev.code) {
       case "Digit1": this.activateBoost();
-      break; case "Digit2":
-        if (this.state.tool != 'spawn')
-          this.activateSpawn();
-        else {
-          this.setState({spawnObject: nextObjectId(this.state.spawnObject)});
-        }
+      break; case "Digit2": this.activateSpawn();
     }
     if (ev.key == " " || ev.key == "Enter") {
       // Don't let Space or Enter also activate a focused button (e.g. the pause button).
@@ -429,9 +415,6 @@ class App extends Component {
   activateBoost = _ => this.setTool('boost');
 
   activateSpawn = _ => this.setTool('spawn');
-
-  onSpawnAsteroid = _ => this.setState({spawnObject: 'asteroid'});
-  onSpawnPhotonClock = _ => this.setState({spawnObject: 'photonClock'});
 
   // Reset the world to the initial state of `scenario`, in its metric.
   async loadScenario(scenario) {
@@ -601,12 +584,6 @@ class App extends Component {
           <button class=${this.state.tool == 'boost' ? "clicked" : ""} onClick=${this.activateBoost}>Boost (1)</button>
           <button class=${this.state.tool == 'spawn' ? "clicked" : ""} onClick=${this.activateSpawn}>Spawn (2)</button>
         </div>
-        ${this.state.tool != 'spawn' ? '' : html`
-        <div>
-          <button class=${this.state.spawnObject == 'asteroid' ? "clicked" : ""} onClick=${this.onSpawnAsteroid}>Asteroid</button>
-          <button class=${this.state.spawnObject == 'photonClock' ? "clicked" : ""} onClick=${this.onSpawnPhotonClock}>Clock</button>
-        </div>
-        `}
         ${this.state.crashed && html`
         <div>
           <button onClick=${this.reset}>${metric.constructor.endMessage} press R to reset.</button>
