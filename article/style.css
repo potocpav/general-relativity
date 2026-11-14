@@ -114,12 +114,18 @@ figcaption b {
   text-align: center;
 }
 
-.stat div:first-child {
+/* a stat's header, and below its value, the value in other units */
+.stat div:first-child,
+.stat .sub {
   font-size: 13px;
   color: var(--muted);
 }
 
-.stat div:last-child {
+.stat .sub {
+  font-variant-numeric: tabular-nums;
+}
+
+.stat div:nth-child(2) {
   font-size: 22px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;

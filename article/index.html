@@ -32,10 +32,12 @@
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
           <div id="fig-classical-v">0.30&#x202F;c</div>
+          <div class="sub" id="fig-classical-v-si">89,938&#x202F;km/s</div>
         </div>
         <div class="stat">
           <div>Acceleration, <math><mi>a</mi></math></div>
           <div id="fig-classical-a">0.0&#x202F;c/s</div>
+          <div class="sub" id="fig-classical-a-si">0&#x202F;g</div>
         </div>
       </div>
       <div class="view">
@@ -201,6 +203,10 @@
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
+    // the same in everyday units: a speed (fraction of c) in km/s, an acceleration (c/s) in g
+    const lightSpeed = 299792.458, standardGravity = 9.80665e-3; // [km/s], [km/s²]
+    const kmPerS = v => `${Math.round(v * lightSpeed).toLocaleString('en-US')}\u202fkm/s`;
+    const inG = a => `${(a * lightSpeed / standardGravity).toLocaleString('en-US', {maximumSignificantDigits: 3})}\u202fg`;
     // a speed below c, truncated after its leading nines and two more digits: 0.73 c, 0.9951 c, 0.99981 c; so it
     // never shows 1.00 c (the 14th decimal is rounded, to drop floating point noise)
     const lightSpeedFraction = v => {
@@ -255,6 +261,8 @@
         // figures show γ, or the engine's acceleration (in c per second of the figure's time)
         if (el('gamma')) show(`${prefix}-gamma`, ut.toFixed(2));
         if (el('a')) show(`${prefix}-a`, `${(accel / scale).toFixed(1)}\u202fc/s`);
+        if (el('v-si')) show(`${prefix}-v-si`, kmPerS(v));
+        if (el('a-si')) show(`${prefix}-a-si`, inG(accel / scale));
         el('reset').hidden = !flown;
       });
       if (!sim) {
