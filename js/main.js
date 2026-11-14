@@ -7,6 +7,7 @@ import * as math from './math.js';
 import { Simulation } from './simulation.js';
 import { asteroidId, photonClockId, projectileId } from './object-info.js';
 import { scenarios, scenariosOf } from './scenarios.js';
+import { AdaptiveResolution } from './adaptive-resolution.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
 
 const html = htm.bind(h);
@@ -18,10 +19,14 @@ const devicePixelRatio = () => window.devicePixelRatio || 1;
 const viewWidth = () => (canvas && canvas.clientWidth) || window.innerWidth;
 const viewHeight = () => (canvas && canvas.clientHeight) || window.innerHeight;
 
-// Device pixels per rendered pixel. The default is about one CSS pixel.
+// Quality: device pixels per rendered pixel, or 'auto' (the default), which
+// starts at 1 and lowers the resolution while the frame rate is too low.
 const quality_levels = [1, 2, 4, 8];
-var quality = quality_levels.reduce((best, q) =>
-  Math.abs(q - devicePixelRatio()) < Math.abs(best - devicePixelRatio()) ? q : best);
+var quality = 'auto';
+const autoResolution = new AdaptiveResolution(quality_levels[quality_levels.length - 1]);
+const pixelFactor = () => quality == 'auto' ? autoResolution.factor : quality;
+// a factor as shown, e.g. 2x, 1.4x
+const factorLabel = f => `${+f.toFixed(1)}x`;
 
 // Settings remembered across visits, in local storage: the quality, the
 // scenario and the overlays. (Storage may be unavailable, e.g. in some
@@ -181,6 +186,8 @@ class App extends Component {
 
   animate = t => {
     requestAnimationFrame(this.animate);
+    if (quality == 'auto' && autoResolution.frame((t - (this.lastFrame ?? t)) / 1000)) refreshWindow();
+    this.lastFrame = t;
     world.timeScale = timeScaleOf(this.state);
     sim.update(t / 1000, params.mousePos, params.pointerDn, params.screenDim, shipControls());
     sim.render();
@@ -480,8 +487,10 @@ class App extends Component {
   }
 
   selectQuality = ev => {
-    quality = quality_levels[ev.target.selectedIndex];
+    quality = ev.target.selectedIndex == 0 ? 'auto' : quality_levels[ev.target.selectedIndex - 1];
     saveSettings({quality});
+    if (quality == 'auto') autoResolution.factor = 1; // start sharp again
+    autoResolution.restart();
     refreshWindow();
   }
 
@@ -532,7 +541,8 @@ class App extends Component {
         <div class="popup">
           <div>
             <select onChange=${this.selectQuality} title="Quality: device pixels per rendered pixel">
-            ${quality_levels.map(ql => html`<option selected=${ql == quality}>${ql+"x"}</option>`)}
+            <option selected=${quality == 'auto'}>auto (${factorLabel(autoResolution.factor)})</option>
+            ${quality_levels.map(ql => html`<option selected=${ql == quality}>${factorLabel(ql)}</option>`)}
             </select>
             <button onClick=${this.zoomIn} title="Zoom in">+</button>
             <button onClick=${this.zoomOut} title="Zoom out">−</button>
@@ -637,7 +647,7 @@ render(html`<${App} />`, document.body);
 function refreshWindow() {
   const dpr = devicePixelRatio();
   const w = viewWidth(), h = viewHeight();
-  sim.resize(Math.max(1, Math.round(w * dpr / quality)), Math.max(1, Math.round(h * dpr / quality)));
+  sim.resize(Math.max(1, Math.round(w * dpr / pixelFactor())), Math.max(1, Math.round(h * dpr / pixelFactor())));
   overlay.width = Math.max(1, Math.round(w * dpr));
   overlay.height = Math.max(1, Math.round(h * dpr));
   params.screenDim = [w, h];
