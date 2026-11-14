@@ -198,6 +198,88 @@ figcaption b {
   font-size: 15px;
 }
 
+/* Sliders below a figure's view: a label, the slider and its value. */
+.controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 14px 0;
+}
+
+.controls label {
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.controls output {
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  margin: 0;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+input[type=range]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -7px;
+  border: none;
+}
+
+input[type=range]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+
+/* A slider with a second marker (e.g. an actual value following the slider's target). The marker is
+   positioned along the track by --at (0 to 1), aligned with the thumb's center. */
+.slider {
+  position: relative;
+  margin-top: 16px; /* room for the marker */
+}
+
+/* A small triangle above the track, pointing down at the value. */
+.slider .marker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: calc(9px + (100% - 18px) * var(--at, 0.5));
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 12px solid var(--text);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 /* A note that the article is a work in progress from here on: framed, on its own background. */
 .wip {
   border: 1px dashed var(--line);

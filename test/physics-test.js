@@ -13,6 +13,7 @@ import { scenarios, velocity3 } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { World } from '../js/world.js';
 import { planetId, objectRadius } from '../js/object-types.js';
+import { flyToX } from '../article/pilots.js';
 
 const root = '../';
 const nSamples = 64;
@@ -173,6 +174,36 @@ function checkSpecialRelativityJs() {
   if (!(maxAberration < 1e-8 && maxDoppler < 1e-8)) errors.push(`aberration off by ${maxAberration.toExponential(1)}, Doppler by ${maxDoppler.toExponential(1)}`);
   return {ok: errors.length == 0, message: errors.length ? errors.join('; ') :
     `straight lines to ${maxError.toExponential(1)}; aberration and Doppler factor match`};
+}
+
+// The article's autopilot (flyToX, in flat spacetime): flown to a target x,
+// the ship stops exactly there, without overshooting and without moving
+// sideways; also for tiny moves, and with the target changed mid-flight.
+function checkFlyToXPilotJs() {
+  const errors = [], dt = 1 / 60, accel = 0.5;
+  const world = new World(null, new Minkowski());
+  world.reset([0, 1.5, 0], [1, 0, 0], Math.PI / 2);
+  const fly = (target, seconds) => {
+    const dir = Math.sign(target - world.obsvX[1]);
+    let overshoot = 0;
+    for (let t = 0; t < seconds; t += dt) {
+      world.step(dt, flyToX(world, target, dt, accel));
+      overshoot = Math.max(overshoot, dir * (world.obsvX[1] - target));
+    }
+    return overshoot;
+  };
+  const check = (label, target, overshoot = 0) => {
+    const x = world.obsvX[1], v = world.obsvU[1] / world.obsvU[0];
+    if (!(Math.abs(x - target) < 1e-3 && Math.abs(v) < 1e-9)) errors.push(`${label}: x = ${x.toFixed(4)}, v = ${v.toExponential(1)}`);
+    if (overshoot > 1e-3) errors.push(`${label}: overshot by ${overshoot.toFixed(4)}`);
+    if (Math.abs(world.obsvU[2]) > 1e-9) errors.push(`${label}: moving sideways`);
+  };
+  for (const target of [10, 1.5, 5, 4.8, 4.79, 9, 2]) check(`to ${target}`, target, fly(target, 20));
+  // a new target mid-flight, which the ship may be too fast to stop at (so no overshoot check): it comes back
+  fly(10, 5);
+  fly(6, 30);
+  check('retargeted', 6);
+  return {ok: errors.length == 0, message: errors.length ? errors.slice(0, 5).join('; ') : 'stops exactly at its targets, without overshooting'};
 }
 
 // The reference and static frames are orthonormal, and T, Tinv are inverses.
@@ -1066,6 +1097,7 @@ async function main() {
   };
   await run('metric parameters (JS)', async () => checkMetricParamsJs());
   await run('scenarios (JS)', async () => checkScenariosJs());
+  await run("article: the autopilot (JS)", async () => checkFlyToXPilotJs());
   for (const type of metricTypes) {
     metric = new type({rs});
     random = prng(42);

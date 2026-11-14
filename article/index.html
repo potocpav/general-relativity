@@ -145,6 +145,14 @@
           <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
       </div>
+      <div class="controls">
+        <label for="fig-planet-target">Target position</label>
+        <div class="slider">
+          <input type="range" id="fig-planet-target" min="1.5" max="10" step="0.1" value="1.5">
+          <div class="marker" id="fig-planet-actual" title="Actual position"></div>
+        </div>
+        <output for="fig-planet-target" id="fig-planet-target-out">1.5</output>
+      </div>
       <p class="note" id="fig-planet-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>A planet seen from the ship</figcaption>
     </figure>
@@ -232,6 +240,7 @@
     import { scenarios } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
     import { planetId, clockId } from '../js/object-types.js';
+    import { flyToX } from './pilots.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
@@ -257,6 +266,22 @@
       {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0], objects = []} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
+      let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
+      let flown = false; // whether the ship was flown since the start (or the last reset)
+
+      // A figure with a target slider is flown by the autopilot, to the slider's x position (see flyToX), once the
+      // slider is released ('change'; with the keyboard, each step); the slider's marker shows the ship's position.
+      // Otherwise, by the pointer.
+      const slider = el('target');
+      let target = slider ? +slider.value : null;
+      const showTarget = () => show(`${prefix}-target-out`, (+slider.value).toFixed(1));
+      if (slider) {
+        slider.addEventListener('input', showTarget);
+        slider.addEventListener('change', () => {
+          target = +slider.value;
+          flown = true;
+        });
+      }
 
       // the pointer, held down on the view: [x, y] in CSS pixels from the lower left corner, or null
       let pointer = null;
@@ -264,9 +289,7 @@
         const r = canvas.getBoundingClientRect();
         pointer = [ev.clientX - r.left, r.bottom - ev.clientY];
       };
-      let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
-      let flown = false; // whether the ship was flown since the start (or the last reset)
-      canvas.addEventListener('pointerdown', ev => {
+      if (!slider) canvas.addEventListener('pointerdown', ev => {
         canvas.setPointerCapture(ev.pointerId);
         track(ev);
         flown = true;
@@ -284,12 +307,19 @@
       const ship = {...setup.ship, x: [setup.ship.x[0], ...startPosition], u: [g, g * vx, g * vy]};
       const state = {...setup, ship, objects, viewportSize: 9 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
-        const dim = [canvas.clientWidth, canvas.clientHeight];
-        // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
-        const control = sim.world.control(dt, pointer, pointer != null, dim);
-        throttle = Math.min(1, Math.max(0, throttle + (pointer ? dt : -dt) / rampTime));
-        accel = sim.world.thrust * throttle;
-        sim.step(dt, {heading: control.heading, accel});
+        if (slider) {
+          const control = flyToX(sim.world, target, dt, sim.world.thrust);
+          accel = control.accel ?? 0;
+          sim.step(dt, control);
+          el('actual').style.setProperty('--at', (sim.world.obsvX[1] - slider.min) / (slider.max - slider.min));
+        } else {
+          const dim = [canvas.clientWidth, canvas.clientHeight];
+          // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
+          const control = sim.world.control(dt, pointer, pointer != null, dim);
+          throttle = Math.min(1, Math.max(0, throttle + (pointer ? dt : -dt) / rampTime));
+          accel = sim.world.thrust * throttle;
+          sim.step(dt, {heading: control.heading, accel});
+        }
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
         // the speed (without relativity, scaled down, it can pass c)
         show(`${prefix}-v`, scale == 1 ? lightSpeedFraction(v) : speed(v));
@@ -315,6 +345,10 @@
         sim.reset(state);
         flown = false;
         throttle = accel = 0;
+        if (slider) {
+          slider.value = target = startPosition[0];
+          showTarget();
+        }
       });
     }
 
@@ -327,7 +361,7 @@
       startSpeed: 0, startPosition: [1.5, 0], objects: [
         {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
         // reading 0:00 at the start (at rest, its proper time is the coordinate time)
-        {type: clockId, x: [-40, 3, 0], u: [1, 0, 0], size: 1.2, tau: -40},
+        {type: clockId, x: [-40, 0, 0], u: [1, 0, 0], size: 1.2, tau: -40}, // over the planet (drawn after it)
       ],
     });
   </script>
