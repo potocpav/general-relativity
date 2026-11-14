@@ -26,7 +26,7 @@ export class World {
     this.showEventHorizon = true;
     this.showInterior = false;
     this.showRedshift = true;
-    this.shipScale = 1; // the ship's sprite size relative to its normal size
+    this.shipScale = 1; // the ship's size relative to its normal size
     this.viewMode = VIEW_SEEN;
     this.thrust = thrust; // the engine's proper acceleration
   }
@@ -40,7 +40,7 @@ export class World {
     this.obsvX = x;
     this.obsvU = u;
     this.setHeading(this.metric.cartesianToLocal(x, headingVector(heading)));
-    this.obsvSprite = 0;
+    this.thrusting = false; // the engine fired during the last step (the ship shows its flame)
     this.crashed = false;
   }
 
@@ -65,7 +65,7 @@ export class World {
     this.obsv_x_loc = gl.getUniformLocation(program, 'obsv_x');
     this.obsv_u_loc = gl.getUniformLocation(program, 'obsv_u');
     this.obsv_o_loc = gl.getUniformLocation(program, 'obsv_o');
-    this.obsv_sprite_loc = gl.getUniformLocation(program, 'obsv_sprite');
+    this.obsv_thrusting_loc = gl.getUniformLocation(program, 'obsv_thrusting');
     this.ship_scale_loc = gl.getUniformLocation(program, 'ship_scale');
     this.view_mode_loc = gl.getUniformLocation(program, 'view_mode');
     this.metric_params_loc = gl.getUniformLocation(program, 'metric_params');
@@ -91,7 +91,7 @@ export class World {
     realTimeDt = Math.max(0.005, Math.min(0.1, realTimeDt));
     this.dt = realTimeDt * this.timeScale;
 
-    this.obsvSprite = 0;
+    this.thrusting = false;
     // after a crash, running backwards in time can bring the ship back
     if (this.crashed && !(this.dt < 0)) return;
     this.crashed = false;
@@ -123,14 +123,14 @@ export class World {
   // first `thrustTime` of it (by default, all of it). Where it can't be
   // followed, it stops exactly at the threshold (and `crashed` is set).
   step(dt, {heading = null, accel = 0, thrustTime = Math.abs(dt)} = {}) {
-    this.obsvSprite = 0;
+    this.thrusting = false;
     if (heading) this.setHeading(heading);
     const sign = Math.sign(dt), burn = accel > 0 ? Math.min(Math.abs(dt), thrustTime) : 0;
     for (const [duration, a] of [[burn, accel], [Math.abs(dt) - burn, 0]]) {
       if (!(duration > 0) || this.crashed) continue;
       // rocket motor, in the ship's rest frame
       const accel3_rest = a > 0 ? [0, a * this.obsvO[0], a * this.obsvO[1]] : undefined;
-      if (a > 0) this.obsvSprite = 1;
+      if (a > 0) this.thrusting = true;
       const f = math.geo_fw_f(this.metric, accel3_rest);
       const {xu: xuh, done, ended} = math.integrate(
         this.metric, f, [...this.obsvX, ...this.obsvU, ...this.obsvH], sign * duration, math.maxProperStep);
@@ -160,7 +160,7 @@ export class World {
     gl.uniform3f(this.obsv_x_loc, ...this.obsvX);
     gl.uniform3f(this.obsv_u_loc, ...this.obsvU);
     gl.uniform2f(this.obsv_o_loc, ...this.obsvO);
-    gl.uniform1i(this.obsv_sprite_loc, this.obsvSprite);
+    gl.uniform1i(this.obsv_thrusting_loc, this.thrusting ? 1 : 0);
     gl.uniform1f(this.ship_scale_loc, this.shipScale);
     gl.uniform1i(this.view_mode_loc, this.viewMode);
     gl.uniform4fv(this.metric_params_loc, this.metric.glslParams());

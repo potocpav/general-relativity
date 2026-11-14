@@ -12,7 +12,7 @@
 
 import * as math from './math.js';
 import { GullstrandPainleve, Minkowski, localVelocity3 } from './metric.js';
-import { planetId } from './object-info.js';
+import { planetId } from './object-types.js';
 
 // --- helpers; positions are (r, phi)
 

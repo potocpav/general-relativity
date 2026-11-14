@@ -25,7 +25,7 @@ The physics is implemented twice: in JS (`js/metric.js`, `js/math.js`, `js/world
 observer and object trajectories, and in GLSL (`glsl/common.glsl`, and per metric in `glsl/metrics/`)
 for raytracing.
 The tests evaluate both on random inputs and check that they agree, so a change to one side
-must be mirrored in the other. Constants shared with the shaders (e.g. `N_SPRITES`) are defined
+must be mirrored in the other. Constants shared with the shaders (e.g. the object types' ids) are defined
 in JS and injected by `js/shaders.js`.
 
 ## How it works

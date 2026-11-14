@@ -1,11 +1,10 @@
 // A simulated world drawn into a canvas: the ship (the observer, whose view
 // is drawn), the objects around it, and the metric. Each Simulation has its
 // own WebGL 2 context, so several can run on one page (the app has one, the
-// article one per figure); shader sources and sprites are loaded once.
+// article one per figure); shader sources are loaded once.
 
 import { World } from './world.js';
 import { Objects } from './objects.js';
-import { ObjectInfo } from './object-info.js';
 import { Renderer } from './renderer.js';
 
 export class Simulation {
@@ -15,9 +14,8 @@ export class Simulation {
     this.gl = gl;
     this.root = root;
     this.world = new World(gl, metric);
-    this.objectInfo = new ObjectInfo(gl);
     this.objects = new Objects(gl, metric);
-    this.renderer = new Renderer(gl, this.world, this.objectInfo, this.objects, root);
+    this.renderer = new Renderer(gl, this.world, this.objects, root);
   }
 
   // A simulation in `canvas`, in `metric`; `root` is the URL of the
@@ -27,7 +25,6 @@ export class Simulation {
     const gl = canvas.getContext('webgl2', {antialias: false, depth: false, stencil: false, premultipliedAlpha: false});
     if (!gl) return null;
     const sim = new Simulation(canvas, gl, metric, root);
-    await sim.objectInfo.initialize(root);
     await sim.renderer.init(metric);
     return sim;
   }

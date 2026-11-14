@@ -1,6 +1,6 @@
 // Shader source loading and assembly.
 
-import { nSprites, projectileId, planetId } from './object-info.js';
+import { projectileId, planetId } from './object-types.js';
 import { maxFrameCondition } from './metric.js';
 
 // Fetches a text file, once per page (shaders are shared by all simulations).
@@ -20,7 +20,6 @@ export function fetchText(url) {
 // `metric` selects the metric's file and features, see physicsFragmentShader.
 export function shaderDefines(metric) {
   return {
-    N_SPRITES: nSprites,
     PROJECTILE_ID: projectileId,
     PLANET_ID: planetId,
     MAX_FRAME_CONDITION: maxFrameCondition.toExponential(),

@@ -1,14 +1,13 @@
 import { fetchText, physicsFragmentShader } from './shaders.js';
 
-// Draws a world (World, Objects, ObjectInfo) into a WebGL 2 context: the
+// Draws a world (World, Objects) into a WebGL 2 context: the
 // raytracing shader renders into an HDR target, which is then copied to the
 // canvas. One per Simulation.
 export class Renderer {
   // `root` is the URL of the repository root, relative to the page.
-  constructor(gl, world, objectInfo, objects, root = '') {
+  constructor(gl, world, objects, root = '') {
     this.gl = gl;
     this.world = world;
-    this.objectInfo = objectInfo;
     this.objects = objects;
     this.root = root;
     this.colorBufferFloat = gl.getExtension('EXT_color_buffer_float');
@@ -48,7 +47,6 @@ export class Renderer {
     this.cacheUniformLocation(program, 'resolution');
     this.world.compile(program);
     this.objects.compile(program);
-    this.objectInfo.compile(program);
     if (this.surfaceProgram) this.gl.deleteProgram(this.surfaceProgram);
     this.surfaceProgram = program;
   }
@@ -144,7 +142,6 @@ export class Renderer {
 
     this.world.render();
     this.objects.render();
-    this.objectInfo.render();
 
     // the raytracing shader, into the target (covers all of it, no clear needed)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);

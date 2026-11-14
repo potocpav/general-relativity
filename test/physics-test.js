@@ -12,7 +12,7 @@ import * as math from '../js/math.js';
 import { scenarios, velocity3 } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { World } from '../js/world.js';
-import { planetId, objectRadius } from '../js/object-info.js';
+import { planetId, objectRadius } from '../js/object-types.js';
 
 const root = '../';
 const nSamples = 64;

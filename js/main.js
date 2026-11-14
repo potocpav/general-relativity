@@ -5,7 +5,7 @@ import htm from 'https://esm.sh/htm@3.1.1';
 
 import * as math from './math.js';
 import { Simulation } from './simulation.js';
-import { planetId, projectileId } from './object-info.js';
+import { planetId, projectileId } from './object-types.js';
 import { scenarios, scenariosOf } from './scenarios.js';
 import { AdaptiveResolution } from './adaptive-resolution.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';

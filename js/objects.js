@@ -15,7 +15,7 @@
 // time; an object rewound past its first row is removed.
 
 import * as math from './math.js';
-import { defaultSize, objectRadius } from './object-info.js';
+import { defaultSize, objectRadius } from './object-types.js';
 
 export const maxObjects = 256;
 export const historyRows = 1024;

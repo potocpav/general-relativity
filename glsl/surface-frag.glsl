@@ -1,7 +1,7 @@
 // Raytracing fragment shader. Appended to glsl/common.glsl, the metric's file and
-// glsl/objects.glsl by js/shaders.js, which also defines N_SPRITES.
+// glsl/objects.glsl by js/shaders.js, which also defines the object types'
+// ids (PROJECTILE_ID, PLANET_ID). Everything is drawn procedurally.
 
-precision mediump sampler3D;
 precision highp sampler2D;
 
 uniform float time;
@@ -9,8 +9,8 @@ uniform vec2 resolution;
 uniform vec3 obsv_x;
 uniform vec3 obsv_u;
 uniform vec2 obsv_o; // heading, as spatial components in the ship's rest frame (see screen_to_frame)
-uniform int obsv_sprite;
-uniform float ship_scale; // the ship's sprite size relative to its normal size
+uniform bool obsv_thrusting; // the ship shows its engine's flame
+uniform float ship_scale; // the ship's size relative to its normal size
 
 uniform float viewport_size;
 uniform bool show_photon_sphere;
@@ -21,15 +21,6 @@ uniform bool show_interior; // otherwise, the black hole's shadow is black
 // simultaneity, along straight lines: flat spacetime only), without light.
 uniform int view_mode;
 uniform bool show_redshift; // otherwise, colors and brightness are as emitted
-
-uniform sampler3D sprites;
-
-
-layout(std140) uniform objectInfo {
-	vec3 objSize[N_SPRITES];
-	vec3 objTexMin[N_SPRITES];
-	vec3 objTexMax[N_SPRITES];
-};
 
 out vec4 out_color;
 
@@ -227,38 +218,65 @@ vec4 render_planet(float rshift, float tau, vec2 p, float pixel) {
 	return vec4(redshift(rshift, color, vec3(1.0)), coverage);
 }
 
-// An object of type `type` and diameter `size` (planets and projectiles; the
-// ship's sprites have their own size). `deltax` is the pixel's offset from
-// the object, as components in the object's frame.
-vec4 render_obj(int sprite_i, float size, float rshift, float tau, vec3 deltax, vec2 orientation) {
+// A planet or a projectile, of diameter `size`. `deltax` is the pixel's
+// offset from the object, as components in the object's frame.
+vec4 render_obj(int type, float size, float rshift, float tau, vec3 deltax, vec2 orientation) {
 	// the world size of a pixel near the observer, for antialiasing
 	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
-	if (sprite_i == PLANET_ID) {
+	if (type == PLANET_ID) {
 		float radius = 0.5 * size;
 		return render_planet(rshift, tau, rot(orientation) * deltax.yz / radius, pixel_size / radius);
 	}
-	if (sprite_i == PROJECTILE_ID) {
-		// a dot, round in its rest frame, antialiased over about a pixel
-		float d = length(deltax.yz) - 0.5 * size;
-		float a = clamp(0.5 - d / pixel_size, 0.0, 1.0);
-		return vec4(redshift(rshift, projectile_color, vec3(1.0)), a);
-	}
-	vec2 obj_texcoord2 = rot(orientation) * deltax.yz / objSize[sprite_i].yz;
-	if (max(abs(obj_texcoord2.x), abs(obj_texcoord2.y)) < 0.5) {
-		vec3 lo = objTexMin[sprite_i], hi = objTexMax[sprite_i];
-		// Pixel coordinates -> texel centers, so that linear filtering
-		// doesn't bleed into neighbouring sprites.
-		vec2 xy = mix(lo.xy, hi.xy, obj_texcoord2 + 0.5) + 0.5;
-		// Animation frames are sampled exactly at slice centers, which avoids
-		// blending in frames of other sprites and makes the loop seamless.
-		float n_frames = hi.z - lo.z + 1.0;
-		float frame = min(floor(fract(tau / objSize[sprite_i].x) * n_frames), n_frames - 1.0);
-		vec3 obj_texcoord = vec3(xy, lo.z + frame + 0.5);
-		vec4 obj_color = texture(sprites, obj_texcoord / vec3(textureSize(sprites, 0)));
-		return vec4(redshift(rshift, obj_color.xyz, vec3(1.0)), obj_color.a);
+	// a projectile: a dot, round in its rest frame, antialiased over about a pixel
+	float d = length(deltax.yz) - 0.5 * size;
+	float a = clamp(0.5 - d / pixel_size, 0.0, 1.0);
+	return vec4(redshift(rshift, projectile_color, vec3(1.0)), a);
+}
+
+// The ship, drawn procedurally: a white rocket with a window, two fins, a
+// nozzle and, while `thrusting`, a flickering flame. `p` is the pixel's
+// offset from the ship's center along (right, forward), `pixel` the size of
+// a pixel, both in units of the ship's size; `t` (time) animates the flame.
+// The body is 0.125 wide, the fins 0.2 across, 0.37 from nose to nozzle.
+const float ship_body_width = 0.0625; // half
+const float ship_nose = 0.203, ship_shoulder = 0.094, ship_tail = -0.094, ship_nozzle = -0.164;
+vec4 render_ship(bool thrusting, float t, vec2 p, float pixel) {
+	if (abs(p.x) > 0.25 || p.y > 0.25 || p.y < -0.3) return vec4(0.0);
+	float x = abs(p.x);
+	// body: straight, then a pointed nose; distances are horizontal, a good
+	// approximation except at the very tip
+	float nose = clamp((p.y - ship_shoulder) / (ship_nose - ship_shoulder), 0.0, 1.0);
+	float body_w = ship_body_width * pow(1.0 - nose, 0.6);
+	float body = max(x - body_w, max(p.y - ship_nose, ship_tail - p.y));
+	// fins: flaring out from the body's lower part
+	float fin_w = ship_body_width + 0.036 * clamp(-p.y / 0.07, 0.0, 1.0);
+	float fins = max(x - fin_w, max(p.y, -0.08 - p.y));
+	// nozzle, slightly flared
+	float nozzle = max(x - 0.035 - 0.08 * (ship_tail - p.y), max(p.y - ship_tail, ship_nozzle - p.y));
+	// flame: an ellipse below the nozzle, flickering in length
+	float flicker = 0.5 + 0.25 * sin(t * 47.0) + 0.25 * sin(t * 73.0 + 1.3);
+	float flame_len = 0.035 + 0.025 * flicker; // half
+	vec2 f = vec2(x / 0.042, (p.y - ship_nozzle - 0.01 + flame_len) / flame_len); // from just inside the nozzle
+	float flame = thrusting ? (length(f) - 1.0) * 0.042 : 1.0;
+
+	// colored as the nearest part
+	float hull = min(body, fins);
+	vec3 color;
+	if (nozzle <= min(hull, flame)) {
+		color = vec3(0.25);
+	} else if (hull <= flame) {
+		// white, shaded as a cylinder lit from the upper left
+		float c = clamp(p.x / max(body_w, 1e-3), -1.0, 1.0);
+		float shade = (0.55 + 0.45 * sqrt(1.0 - c * c)) * (1.0 - 0.2 * c);
+		color = body < fins ? vec3(0.92) * shade : vec3(0.75) * (1.0 - 0.2 * sign(p.x));
+		// the window
+		float window = length(p - vec2(-0.012, 0.075)) - 0.022;
+		color = mix(color, vec3(0.15, 0.25, 0.75) * (1.2 - 0.6 * c), clamp(0.5 - window / pixel, 0.0, 1.0) * float(body < fins));
 	} else {
-		return vec4(0.0);
+		// yellow, whiter towards the nozzle
+		color = mix(vec3(1.0, 0.95, 0.7), vec3(1.0, 0.75, 0.1), clamp(length(f), 0.0, 1.0));
 	}
+	return vec4(color, clamp(0.5 - min(min(hull, nozzle), flame) / pixel, 0.0, 1.0));
 }
 
 void main( void ) {
@@ -332,8 +350,9 @@ void main( void ) {
 	// The ship as seen by itself: in its rest frame, whose axes are the
 	// screen's, where the viewport vector is the pixel's offset from it (light
 	// travel across the ship is negligible), so it is never contracted.
-	vec4 obsv_color = render_obj(
-		obsv_sprite, 0.0, 1.0, time, vec3(0.0, -screen_to_frame(obsv_x, pix_cartesian)) / ship_scale, obsv_o);
+	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
+	vec4 obsv_color = render_ship(obsv_thrusting, time,
+		rot(obsv_o) * screen_to_frame(obsv_x, pix_cartesian) / ship_scale, pixel_size / ship_scale);
 
 	objects_color = mix(objects_color, obsv_color, reached ? obsv_color.a : 0.0);
 
