@@ -90,18 +90,18 @@ export class Objects {
     this.now = Math.ceil(T / this.dt); // row the objects are advanced to
   }
 
-  // Add an object of `type` and diameter `size` at event x with 4-velocity u
-  // (x[0] may be in the past), simulating it up to now. Its orientation axis
-  // starts pointing up on the screen. Returns false if there is no free slot
-  // or it can't be followed from there.
-  spawn(type, x, u, size = defaultSize[type]) {
+  // Add an object of `type` and size `size` at event x with 4-velocity u
+  // (x[0] may be in the past) and proper time `tau` there, simulating it up
+  // to now. Its orientation axis starts pointing up on the screen. Returns
+  // false if there is no free slot or it can't be followed from there.
+  spawn(type, x, u, size = defaultSize[type], tau = 0) {
     const slot = this.slots.indexOf(null);
     if (slot < 0) return false;
     const o = new SimObject(type, size, slot);
     const first = Math.ceil(x[0] / this.dt);
     const up = this.metric.cartesianToLocal(x, [0, 1]);
     const h = math.matVec(math.restToCoord(this.metric, x, u), [0, ...up]);
-    const y = integrateToTime(this.metric, [...x, ...u, 0, ...h], first * this.dt);
+    const y = integrateToTime(this.metric, [...x, ...u, tau, ...h], first * this.dt);
     if (y === null) return false;
     o.firstRow = o.lastRow = first;
     this.slots[slot] = o;
