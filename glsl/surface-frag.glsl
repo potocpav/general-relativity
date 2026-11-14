@@ -200,7 +200,7 @@ float fbm(vec3 p) {
 	return sum;
 }
 const vec3 planet_light = vec3(-0.48, 0.48, 0.73); // toward the light, which comes from the upper left (unit)
-const float planet_period = 8.0;
+const float planet_period = 16.0;
 vec4 render_planet(float rshift, float tau, vec2 p, float pixel) {
 	float r = length(p);
 	float coverage = clamp((1.0 - r) / pixel + 0.5, 0.0, 1.0); // antialiased edge

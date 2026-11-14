@@ -362,9 +362,10 @@
     velocityFigure('fig-planet', {
       startSpeed: 0, startPosition: [1.5, 0], shipClock: true, objects: [
         {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
-        // over the planet (drawn after it), ahead by the light travel time to the ship (1.5), so that it's seen in
-        // sync with the ship's clock (at rest, its proper time is the coordinate time)
-        {type: clockId, x: [-40, 0, 0], u: [1, 0, 0], size: 1.2, tau: -40 + 1.5},
+        // over the planet (drawn after it), the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as
+        // high (0.38), ahead by the light travel time to the ship, so that it's seen in sync with the ship's clock
+        // (at rest, its proper time is the coordinate time)
+        {type: clockId, x: [-40, 0, 0.38], u: [1, 0, 0], size: Math.hypot(0.5, 0.2), tau: -40 + Math.hypot(1.5, 0.38)},
       ],
     });
   </script>
