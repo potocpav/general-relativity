@@ -363,10 +363,17 @@
     // a planet at rest (its gravity disregarded), there since long enough before the start to be seen from the
     // ship as far as the history of objects reaches back
     velocityFigure('fig-planet', {
-      // the ship at 3/4 of the view's width, looking back at the planet, zoomed out to show it (roughly: aberration
-      // at speed squeezes the view behind the ship, here roughly made up for by γ, but not entirely)
+      // The ship at 3/4 of the view's width, looking back at the planet, zoomed to keep it in view. The view shows
+      // the light arriving at the ship now, from where it was emitted, in the ship's rest frame: from the planet's far
+      // edge (x = -1), at the ship's distance X + 1 away, moving away at v, it appears (X + 1) sqrt((1 - v) / (1 + v))
+      // behind the ship (the Doppler factor: closer when moving away, farther when approaching); across the motion,
+      // its radius 1 is unchanged. So the view, 3/4 of which is behind the ship, spans that (with a margin of 0.5),
+      // and at least 3, the planet's height with a margin.
       startSpeed: 0, startPosition: [1.5, 0], shipClock: true, viewOffset: [0.25, 0],
-      zoom: world => (world.obsvX[1] + 1.5) / 0.75 * world.obsvU[0],
+      zoom: world => {
+        const [ut, ux] = world.obsvU, v = ux / ut;
+        return Math.max(3, (world.obsvX[1] + 1.5) * Math.sqrt((1 - v) / (1 + v)) / 0.75);
+      },
       objects: [
         {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
         // over the planet (drawn after it), the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as
