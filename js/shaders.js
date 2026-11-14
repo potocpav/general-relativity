@@ -1,6 +1,6 @@
 // Shader source loading and assembly.
 
-import { nSprites, projectileId } from './object-info.js';
+import { nSprites, projectileId, planetId } from './object-info.js';
 import { maxFrameCondition } from './metric.js';
 
 // Fetches a text file, once per page (shaders are shared by all simulations).
@@ -22,6 +22,7 @@ export function shaderDefines(metric) {
   return {
     N_SPRITES: nSprites,
     PROJECTILE_ID: projectileId,
+    PLANET_ID: planetId,
     MAX_FRAME_CONDITION: maxFrameCondition.toExponential(),
     // features of the metric's spacetime, see `features` in js/metric.js
     ...(metric.constructor.features.blackHole ? {BLACK_HOLE: 1} : {}),

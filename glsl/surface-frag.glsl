@@ -180,8 +180,59 @@ vec3 grid_tint(float l) {
 
 const vec3 projectile_color = vec3(1.0, 0.9, 0.2);
 
+// An Earth-like planet, drawn procedurally: a globe seen from the side, its
+// axis along the object's orientation axis, turning once per objSize.x of
+// its proper time `tau`. `p` is the pixel's offset from its center, in units
+// of its radius, along (right, axis).
+float hash3(vec3 p) {
+	p = fract(p * 0.3183099 + 0.1) * 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+float noise3(vec3 x) {
+	vec3 i = floor(x), f = fract(x);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(
+		mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
+		mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y),
+		f.z);
+}
+// octaves of noise, each rotated against the last, so that the noise's grid doesn't show
+const mat3 octave_rotation = mat3(0.0, 0.8, 0.6, -0.8, 0.36, -0.48, -0.6, -0.48, 0.64);
+float fbm(vec3 p) {
+	float sum = 0.0, amplitude = 0.5;
+	for (int i = 0; i < 5; i++) {
+		sum += amplitude * noise3(p);
+		p = octave_rotation * p * 2.03 + 1.7;
+		amplitude *= 0.5;
+	}
+	return sum;
+}
+const vec3 planet_light = vec3(-0.48, 0.48, 0.73); // toward the light, which comes from the upper left (unit)
+vec4 render_planet(float period, float rshift, float tau, vec2 p, float pixel) {
+	float r = length(p);
+	float coverage = clamp((1.0 - r) / pixel + 0.5, 0.0, 1.0); // antialiased edge
+	if (coverage == 0.0) return vec4(0.0);
+	vec3 n = vec3(p, sqrt(max(0.0, 1.0 - r * r))); // the surface normal: right, axis, toward the viewer
+	float a = 6.2831853 * tau / period, c = cos(a), s = sin(a);
+	vec3 q = vec3(c * n.x + s * n.z, n.y, c * n.z - s * n.x); // the surface point, turning with the planet
+	float h = fbm(2.5 * q);
+	vec3 color = h > 0.52
+		? mix(vec3(0.13, 0.35, 0.1), vec3(0.5, 0.42, 0.25), smoothstep(0.55, 0.7, h)) // land: green to brown
+		: mix(vec3(0.0, 0.04, 0.18), vec3(0.04, 0.18, 0.42), smoothstep(0.3, 0.52, h)); // sea: deep to shallow
+	color = mix(color, vec3(0.9), smoothstep(0.78, 0.82, abs(q.y) + 0.2 * (h - 0.5))); // ice caps
+	color = mix(color, vec3(1.0), 0.8 * smoothstep(0.55, 0.75, fbm(4.0 * q + vec3(0.0, 0.0, 0.02 * tau)))); // clouds
+	color *= 0.15 + 0.85 * max(dot(n, planet_light), 0.0); // day and night
+	color += vec3(0.25, 0.45, 1.0) * 0.5 * pow(1.0 - n.z, 3.0); // the atmosphere, seen edge-on at the limb
+	return vec4(redshift(rshift, color, vec3(1.0)), coverage);
+}
+
 // `deltax` is the pixel's offset from the object, as components in the object's frame.
 vec4 render_obj(int sprite_i, float rshift, float tau, vec3 deltax, vec2 orientation) {
+	if (sprite_i == PLANET_ID) {
+		float radius = 0.5 * objSize[sprite_i].y;
+		float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
+		return render_planet(objSize[sprite_i].x, rshift, tau, rot(orientation) * deltax.yz / radius, pixel_size / radius);
+	}
 	if (sprite_i == PROJECTILE_ID) {
 		// a dot, round in its rest frame, antialiased over about a pixel
 		// (the world size of a pixel near the observer)

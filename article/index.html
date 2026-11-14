@@ -102,7 +102,7 @@
     </ul>
     <p>
     Speeds this close to the speed of light are not just theoretical—high-energy particles in particle accelerators and in cosmic rays
-    can reach over 99.999% of the speed of light.
+    can reach well beyond 99.999% of the speed of light.
     </p>
 
     <figure id="fig-light-cone">
@@ -125,6 +125,28 @@
       </div>
       <p class="note" id="fig-light-cone-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>The ship's perspective in relativistic spacetime</figcaption>
+    </figure>
+
+    <figure id="fig-planet">
+      <div class="stats">
+        <div class="stat">
+          <div>Speed, <math><mi>v</mi></math></div>
+          <div id="fig-planet-v">0.00&#x202F;c</div>
+          <div class="sub" id="fig-planet-v-si">0&#x202F;km/s</div>
+        </div>
+        <div class="stat">
+          <div>Lorentz factor, <math><mi>γ</mi></math></div>
+          <div id="fig-planet-gamma">1.00</div>
+        </div>
+      </div>
+      <div class="view">
+        <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space and a spinning, Earth-like planet; the ship is in the center."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
+      </div>
+      <p class="note" id="fig-planet-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>A planet seen from the ship</figcaption>
     </figure>
 
     <p class="wip">The following text is a placeholder for now.</p>
@@ -209,6 +231,7 @@
     import { runFigure } from '../js/figure.js';
     import { scenarios } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
+    import { planetId } from '../js/object-info.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
@@ -227,9 +250,10 @@
     const rampTime = 0.25; // the time for the engine to go from off to full thrust, or back [s]
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
-    // `viewMode`: what the figure shows, what the ship sees or what is there now (see VIEW_SEEN)
-    // `startSpeed`: the ship's speed at the start, as a fraction of c
-    async function velocityFigure(prefix, scale, viewMode = VIEW_SEEN, startSpeed = 0.3) {
+    // `scale`: the size and speed of the flight (see above); `viewMode`: what the figure shows, what the ship sees or
+    // what is there now (see VIEW_SEEN); `startSpeed`: the ship's speed at the start, as a fraction of c; `objects`:
+    // the objects around it, as in a scenario's state
+    async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, objects = []} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
 
@@ -256,7 +280,7 @@
       // the ship starts out coasting at `startSpeed` diagonally, along (1, 2)
       const [vx, vy] = [1, 2].map(c => c / Math.sqrt(5) * startSpeed * scale), g = 1 / Math.sqrt(1 - vx * vx - vy * vy);
       const setup = scenario.setup(metric);
-      const state = {...setup, ship: {...setup.ship, u: [g, g * vx, g * vy]}, viewportSize: 9 * scale};
+      const state = {...setup, ship: {...setup.ship, u: [g, g * vx, g * vy]}, objects, viewportSize: 9 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         const dim = [canvas.clientWidth, canvas.clientHeight];
         // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
@@ -292,9 +316,12 @@
       });
     }
 
-    velocityFigure('fig-classical', 1e-3);
-    velocityFigure('fig-relativistic', 1, VIEW_NOW);
-    velocityFigure('fig-light-cone', 1, VIEW_SEEN, 0);
+    velocityFigure('fig-classical', {scale: 1e-3});
+    velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
+    velocityFigure('fig-light-cone', {startSpeed: 0});
+    // a planet at rest (its gravity disregarded), there since long enough before the start to be seen from the
+    // ship as far as the history of objects reaches back
+    velocityFigure('fig-planet', {startSpeed: 0, objects: [{type: planetId, x: [-40, 1.3, 0.6], u: [1, 0, 0]}]});
   </script>
 </body>
 
