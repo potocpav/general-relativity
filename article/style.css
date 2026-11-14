@@ -198,10 +198,19 @@ figcaption b {
   font-size: 15px;
 }
 
-/* A note that a part of the article is a work in progress. */
+/* A part of the article that is a work in progress: framed, on its own background, under a note saying so. */
 .wip {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #201f1c;
+  padding: 4px 20px 0;
+  margin: 30px 0;
+}
+
+.wip-note {
   border-left: 3px solid var(--accent);
   padding: 4px 0 4px 12px;
+  margin-top: 16px;
   color: var(--muted);
   font-style: italic;
 }
