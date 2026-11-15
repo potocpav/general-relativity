@@ -1,6 +1,6 @@
 // Raytracing fragment shader. Appended to glsl/common.glsl, the metric's file and
 // glsl/objects.glsl by js/shaders.js, which also defines the object types'
-// ids (PROJECTILE_ID, PLANET_ID, CLOCK_ID). Everything is drawn procedurally.
+// ids (PROJECTILE_ID, PLANET_ID, CLOCK_ID, JUPITER_ID, SUN_ID). Everything is drawn procedurally.
 
 precision highp sampler2D;
 
@@ -220,6 +220,62 @@ vec4 render_planet(float rshift, float tau, vec2 p, float pixel) {
 	return vec4(redshift(rshift, color, vec3(1.0)), coverage);
 }
 
+// Jupiter, drawn like the planet above, lit from the same side: cream zones
+// and brown belts, turbulent at their edges, greyer toward the poles, and the
+// Great Red Spot. It turns as much faster than the Earth-like planet as the
+// real one does than the Earth (9.9 h a turn, against 23.9 h).
+const float jupiter_period = planet_period * 9.93 / 23.93;
+vec4 render_jupiter(float rshift, float tau, vec2 p, float pixel) {
+	float r = length(p);
+	float coverage = clamp((1.0 - r) / pixel + 0.5, 0.0, 1.0); // antialiased edge
+	if (coverage == 0.0) return vec4(0.0);
+	vec3 n = vec3(p, sqrt(max(0.0, 1.0 - r * r))); // the surface normal: right, axis, toward the viewer
+	float a = 6.2831853 * tau / jupiter_period, c = cos(a), s = sin(a);
+	vec3 q = vec3(c * n.x + s * n.z, n.y, c * n.z - s * n.x); // the surface point, turning with the planet
+	// bands across the sine of the latitude, their edges wavy with noise
+	float w = q.y + 0.035 * (fbm(vec3(4.0, 10.0, 4.0) * q) - 0.5);
+	float band = 0.5 + 0.5 * sin(19.0 * w + 2.5 * sin(6.0 * w));
+	vec3 color = mix(vec3(0.62, 0.42, 0.28), vec3(0.93, 0.86, 0.74), smoothstep(0.3, 0.7, band)); // belt to zone
+	color *= 0.88 + 0.24 * fbm(vec3(3.0, 40.0, 3.0) * q); // fine streaks, along the bands
+	color = mix(color, vec3(0.6, 0.55, 0.5), smoothstep(0.75, 0.95, abs(q.y))); // the poles
+	// the Great Red Spot, at 22° south, an oval about 0.3 by 0.15 rad, with a pale rim
+	float lon = atan(q.x, q.z), lat = asin(clamp(q.y, -1.0, 1.0));
+	vec2 d = vec2(lon, lat + 0.38) / vec2(0.15, 0.075);
+	float spot = length(d);
+	color = mix(color, vec3(0.95, 0.88, 0.78), 0.6 * (1.0 - smoothstep(0.0, 0.25, abs(spot - 1.15))));
+	color = mix(color, vec3(0.78, 0.36, 0.22), 1.0 - smoothstep(0.85, 1.0, spot));
+	color *= 0.1 + 0.9 * max(dot(n, planet_light), 0.0); // day and night
+	color *= 0.75 + 0.25 * n.z; // a slightly darker limb
+	return vec4(redshift(rshift, color, vec3(1.0)), coverage);
+}
+
+// The Sun, drawn procedurally: a glowing disk, not lit but shining as a
+// blackbody of sun_temperature, darker and cooler toward the limb (limb
+// darkening), with granulation and sunspots, turning once per 25.4 days for
+// every 23.9 hours of the Earth-like planet's turn. The redshift `rshift`
+// shifts its color as a blackbody's (see grid_tint), and its brightness.
+const float sun_temperature = 5772.0; // [K]
+const float sun_period = planet_period * 25.4 * 24.0 / 23.93;
+vec4 render_sun(float rshift, float tau, vec2 p, float pixel) {
+	float r = length(p);
+	float coverage = clamp((1.0 - r) / pixel + 0.5, 0.0, 1.0); // antialiased edge
+	if (coverage == 0.0) return vec4(0.0);
+	vec3 n = vec3(p, sqrt(max(0.0, 1.0 - r * r))); // the surface normal: right, axis, toward the viewer
+	float a = 6.2831853 * tau / sun_period, c = cos(a), s = sin(a);
+	vec3 q = vec3(c * n.x + s * n.z, n.y, c * n.z - s * n.x); // the surface point, turning with the Sun
+	// limb darkening, linear in the cosine of the angle from the normal
+	float intensity = 1.0 - 0.6 * (1.0 - n.z);
+	// granulation, slowly changing, faded out where finer than a pixel
+	float granules = fbm(40.0 * q + vec3(0.0, 0.0, 0.05 * tau)) - 0.5;
+	intensity *= 1.0 + 0.25 * granules * (1.0 - smoothstep(0.01, 0.05, pixel));
+	// sunspots, within 35° of the equator
+	float spots = smoothstep(0.71, 0.74, fbm(5.0 * q + 3.1)) * (1.0 - smoothstep(0.4, 0.6, abs(q.y)));
+	intensity *= 1.0 - 0.75 * spots;
+	// the local temperature, as the fourth root of the brightness (Stefan–Boltzmann)
+	vec3 tint = blackbody_rgb(sun_temperature * pow(intensity, 0.25) / rshift);
+	return vec4(redshift(rshift, vec3(pow(intensity, 1.0 / 2.2)), tint), coverage);
+}
+
 // A digital clock showing `tau` (its proper time) as minutes:seconds, like
 // 1:00 or 10:00, wrapping after 59:59: dark red seven-segment digits on
 // white, in a dark red frame. `p` is the pixel's offset from its center along
@@ -269,7 +325,7 @@ vec4 render_clock(float rshift, float tau, vec2 p, float pixel) {
 	return vec4(redshift(rshift, color, vec3(1.0)), clamp(0.5 - outside / pixel, 0.0, 1.0));
 }
 
-// A planet, clock or projectile, of size `size` (see js/object-types.js).
+// A planet, clock, Jupiter, the Sun or a projectile, of size `size` (see js/object-types.js).
 // `deltax` is the offset from the pixel to the object, as components in the
 // object's frame.
 vec4 render_obj(int type, float size, float rshift, float tau, vec3 deltax, vec2 orientation) {
@@ -280,6 +336,12 @@ vec4 render_obj(int type, float size, float rshift, float tau, vec3 deltax, vec2
 	if (type == PLANET_ID) {
 		float radius = 0.5 * size;
 		return render_planet(rshift, tau, p / radius, pixel_size / radius);
+	}
+	if (type == JUPITER_ID || type == SUN_ID) {
+		float radius = 0.5 * size;
+		return type == JUPITER_ID
+			? render_jupiter(rshift, tau, p / radius, pixel_size / radius)
+			: render_sun(rshift, tau, p / radius, pixel_size / radius);
 	}
 	if (type == CLOCK_ID) {
 		float height = size / sqrt(1.0 + 2.5 * 2.5); // the diagonal is `size`

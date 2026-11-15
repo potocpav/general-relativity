@@ -160,7 +160,7 @@
         </div>
       </div>
       <div class="view">
-        <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space and a spinning, Earth-like planet; the ship is in the center."></canvas>
+        <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space, Jupiter and the Sun next to it, both at their real sizes; the ship is to the right of Jupiter."></canvas>
         <div class="overlay">
           <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
@@ -259,7 +259,7 @@
     import { runFigure } from '../js/figure.js';
     import { scenarios } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
-    import { planetId, clockId } from '../js/object-types.js';
+    import { clockId, jupiterId, sunId, sunDiameter, jupiterDiameter } from '../js/object-types.js';
     import { flyToX } from './pilots.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
@@ -380,25 +380,28 @@
     velocityFigure('fig-classical', {scale: 1e-3});
     velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
     velocityFigure('fig-light-cone', {startSpeed: 0});
-    // a planet at rest (its gravity disregarded), there since long enough before the start to be seen from the
-    // ship as far as the history of objects reaches back
+    // Jupiter and the Sun at rest (their gravity disregarded), at their real sizes (in light seconds), there since
+    // long enough before the start to be seen from the ship as far as the history of objects reaches back. The Sun
+    // is to the upper left of Jupiter, where Jupiter's light comes from, its edge 0.6 away from Jupiter's.
+    const sunCenter = (jupiterDiameter / 2 + 0.6 + sunDiameter / 2) / Math.SQRT2;
     velocityFigure('fig-planet', {
-      // The ship at 3/4 of the view's width, looking back at the planet, zoomed to keep it in view. The view shows
-      // the light arriving at the ship now, from where it was emitted, in the ship's rest frame: from the planet's far
-      // edge (x = -1), at the ship's distance X + 1 away, moving away at v, it appears (X + 1) sqrt((1 - v) / (1 + v))
-      // behind the ship (the Doppler factor: closer when moving away, farther when approaching); across the motion,
-      // its radius 1 is unchanged. So the view, 3/4 of which is behind the ship, spans that, but never less than at
-      // the start, at rest at x = 1.5: (1.5 + 1) / 0.75 (it never zooms in).
+      // The ship at 3/4 of the view's width, looking back at Jupiter, zoomed to keep it in view, and the Sun's near
+      // edge. The view shows the light arriving at the ship now, from where it was emitted, in the ship's rest frame:
+      // from x = -1 (past Jupiter's far edge), at the ship's distance X + 1 away, moving away at v, it appears
+      // (X + 1) sqrt((1 - v) / (1 + v)) behind the ship (the Doppler factor: closer when moving away, farther when
+      // approaching); across the motion, distances are unchanged. So the view, 3/4 of which is behind the ship,
+      // spans that, but never less than at the start, at rest at x = 1.5: (1.5 + 1) / 0.75 (it never zooms in).
       startSpeed: 0, startPosition: [1.5, 0], shipClock: true, viewOffset: [0.25, 0],
       zoom: world => {
         const [ut, ux] = world.obsvU, v = ux / ut;
         return Math.max((1.5 + 1) / 0.75, (world.obsvX[1] + 1) * Math.sqrt((1 - v) / (1 + v)) / 0.75);
       },
       objects: [
-        {type: planetId, x: [-40, 0, 0], u: [1, 0, 0], size: 2},
-        // over the planet (drawn after it), the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as
-        // high (0.38), ahead by the light travel time to the ship, so that it's seen in sync with the ship's clock
-        // (at rest, its proper time is the coordinate time)
+        {type: sunId, x: [-40, -sunCenter, sunCenter], u: [1, 0, 0]},
+        {type: jupiterId, x: [-40, 0, 0], u: [1, 0, 0]},
+        // above Jupiter, the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as high (0.38), ahead
+        // by the light travel time to the ship, so that it's seen in sync with the ship's clock (at rest, its proper
+        // time is the coordinate time)
         {type: clockId, x: [-40, 0, 0.38], u: [1, 0, 0], size: Math.hypot(0.5, 0.2), tau: -40 + Math.hypot(1.5, 0.38)},
       ],
     });
