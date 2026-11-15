@@ -10,9 +10,10 @@ const maxCssPerPixel = 2; // the lowest resolution: CSS pixels per rendered pixe
 // Start a simulation in `canvas`, in `metric`, from `state` (as returned by a
 // scenario's setup). On each animation frame, `onFrame(sim, dt)` advances it
 // by `dt` seconds (real time, at most 0.1 s), e.g. with sim.step, and it is
-// drawn. Returns the Simulation, or null if WebGL 2 is not available.
-export async function runFigure(canvas, metric, state, onFrame, {root = '../'} = {}) {
-  const sim = await Simulation.create(canvas, metric, {root});
+// drawn. `historyDt`: the objects' history step (see Objects). Returns the
+// Simulation, or null if WebGL 2 is not available.
+export async function runFigure(canvas, metric, state, onFrame, {root = '../', historyDt = undefined} = {}) {
+  const sim = await Simulation.create(canvas, metric, {root, historyDt});
   if (!sim) return null;
   sim.reset(state);
 

@@ -9,22 +9,22 @@ import { Renderer } from './renderer.js';
 
 export class Simulation {
   // Use Simulation.create.
-  constructor(canvas, gl, metric, root) {
+  constructor(canvas, gl, metric, root, historyDt) {
     this.canvas = canvas;
     this.gl = gl;
     this.root = root;
     this.world = new World(gl, metric);
-    this.objects = new Objects(gl, metric);
+    this.objects = new Objects(gl, metric, {dt: historyDt});
     this.renderer = new Renderer(gl, this.world, this.objects, root);
   }
 
   // A simulation in `canvas`, in `metric`; `root` is the URL of the
-  // repository root, relative to the page. Returns null if WebGL 2 is not
-  // available.
-  static async create(canvas, metric, {root = ''} = {}) {
+  // repository root, relative to the page; `historyDt`, the objects' history
+  // step (see Objects). Returns null if WebGL 2 is not available.
+  static async create(canvas, metric, {root = '', historyDt = undefined} = {}) {
     const gl = canvas.getContext('webgl2', {antialias: false, depth: false, stencil: false, premultipliedAlpha: false});
     if (!gl) return null;
-    const sim = new Simulation(canvas, gl, metric, root);
+    const sim = new Simulation(canvas, gl, metric, root, historyDt);
     await sim.renderer.init(metric);
     return sim;
   }

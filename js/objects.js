@@ -4,7 +4,8 @@
 // Rendering only needs the past: each pixel shows an event on the ship's past
 // light cone. So objects are advanced together with the ship, and their
 // states are recorded at regular steps of coordinate time: row k holds the
-// state at time k * historyDt. The last `historyRows` rows are
+// state at time k * dt (historyDt by default, see Objects). The last
+// `historyRows` rows, reaching back historyRows * dt, are
 // kept, as a ring buffer (row k is stored at k mod historyRows), both in JS
 // (float64, the source of truth, used when rewinding) and on the GPU
 // (float32 textures, one column per object), where glsl/objects.glsl looks
@@ -19,7 +20,7 @@ import { defaultSize, objectRadius } from './object-types.js';
 
 export const maxObjects = 256;
 export const historyRows = 1024;
-export const historyDt = 0.05; // coordinate time between history rows
+export const historyDt = 0.05; // coordinate time between history rows, by default
 const chunkRows = 64;          // rows per chunk of bounding boxes
 
 // Integrate y = [x, u, tau] or [x, u, tau, h] of a free-falling body (or
@@ -68,9 +69,13 @@ class SimObject {
 }
 
 export class Objects {
-  // `gl` may be null (no GPU textures, for tests)
-  constructor(gl, metric) {
+  // `gl` may be null (no GPU textures, for tests). `dt`: the coordinate time
+  // between history rows; a longer one reaches further back (for far objects,
+  // whose light is old), exactly for objects moving inertially in flat
+  // spacetime (rows are interpolated linearly), coarsely otherwise.
+  constructor(gl, metric, {dt = historyDt} = {}) {
     this.gl = gl;
+    this._dt = dt;
     this.history = new Float64Array(maxObjects * historyRows * rowSize);
     this.dirtyRows = new Set();
     this.infoData = new Float32Array(maxObjects * 2 * 4);
@@ -79,7 +84,7 @@ export class Objects {
   }
 
   get dt() {
-    return historyDt;
+    return this._dt;
   }
 
   // Remove all objects; the ship is at coordinate time T.
