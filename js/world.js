@@ -27,6 +27,7 @@ export class World {
     this.showEventHorizon = true;
     this.showInterior = false;
     this.showRedshift = true;
+    this.backgroundTemperature = 0; // [K] of the radiation filling space, glowing when blueshifted (0: none)
     this.shipScale = 1; // the ship's size relative to its normal size
     this.showShipClock = false; // a clock above the ship, showing its proper time
     this.viewMode = VIEW_SEEN;
@@ -78,6 +79,7 @@ export class World {
     this.show_event_horizon_loc = gl.getUniformLocation(program, 'show_event_horizon');
     this.show_interior_loc = gl.getUniformLocation(program, 'show_interior');
     this.show_redshift_loc = gl.getUniformLocation(program, 'show_redshift');
+    this.background_temperature_loc = gl.getUniformLocation(program, 'background_temperature');
   }
 
   // `mousePos` is null when the pointer position is unknown.
@@ -180,6 +182,7 @@ export class World {
     gl.uniform1i(this.show_event_horizon_loc, this.showEventHorizon ? 1 : 0);
     gl.uniform1i(this.show_interior_loc, this.showInterior ? 1 : 0);
     gl.uniform1i(this.show_redshift_loc, this.showRedshift ? 1 : 0);
+    gl.uniform1f(this.background_temperature_loc, this.backgroundTemperature);
   }
 }
 

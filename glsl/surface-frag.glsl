@@ -24,6 +24,7 @@ uniform bool show_interior; // otherwise, the black hole's shadow is black
 // simultaneity, along straight lines: flat spacetime only), without light.
 uniform int view_mode;
 uniform bool show_redshift; // otherwise, colors and brightness are as emitted
+uniform float background_temperature; // [K] of the radiation filling space, between the grid lines (0: none)
 
 out vec4 out_color;
 
@@ -167,6 +168,14 @@ vec3 blackbody_rgb(float T) {
 // one at grid_temperature, of luminance 1. Doppler and gravitational shifts
 // map a blackbody spectrum exactly to another blackbody's, at T / l.
 const float grid_temperature = 6500.0; // [K]
+// The visible luminance of a blackbody at temperature T [K], relative to the
+// Sun's surface (shown white, see render_sun): Planck's law at a single
+// effective wavelength, 0.583 µm, fitted to the eye-weighted integral (within
+// about 30% from 1000 K to 6000 K; next to nothing where T is low).
+float blackbody_luminance(float T) {
+	const float c = 24660.0; // [K], h c / (k * 0.583 µm)
+	return (exp(c / 5772.0) - 1.0) / (exp(min(c / max(T, 1.0), 80.0)) - 1.0); // (bounded, not to overflow)
+}
 vec3 grid_tint(float l) {
 	vec3 rgb = blackbody_rgb(grid_temperature / l) / blackbody_rgb(grid_temperature);
 	return rgb / dot(rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -432,6 +441,13 @@ void main( void ) {
 	// compute output colors; rays that didn't arrive show the black hole's shadow
 	float grid_l = show_redshift ? rshift : 1.0;
 	vec3 world_color = reached ? redshift(grid_l, grid_color(pix_x), grid_tint(grid_l)) : vec3(0.0);
+	// The radiation filling space, a blackbody seen at background_temperature / l (Doppler and gravitational
+	// shifts keep a blackbody's spectrum one), added to the grid's light (linear).
+	if (reached && background_temperature > 0.0) {
+		float T = background_temperature / grid_l;
+		vec3 glow = blackbody_rgb(T) * blackbody_luminance(T);
+		world_color = pow(pow(world_color, vec3(2.2)) + glow, vec3(1.0 / 2.2));
+	}
 
 #ifdef BLACK_HOLE
 	if (!reached && show_interior) world_color = shadow_color;
