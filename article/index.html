@@ -388,14 +388,14 @@
     // in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
     velocityFigure('fig-planet', {
-      // The ship at 3/4 of the view's width, looking back at the Sun, its top speed 0.999 c, zoomed to keep the Sun's
+      // The ship at 3/4 of the view's width, looking back at the Sun, its top speed 0.99999 c, zoomed to keep the Sun's
       // center in view: at first, the Sun doesn't fit (it's taller than the view), but it does once the ship is far
       // enough. The view shows the light arriving at the ship now, from where it was emitted, in the ship's rest
       // frame: from the center, at the ship's distance X away, moving away at v, it appears X sqrt((1 - v) / (1 + v))
       // behind the ship (the Doppler factor: closer when moving away, farther when approaching); across the motion,
       // distances are unchanged. So the view, 3/4 of which is behind the ship, spans that, but never less than at
       // the start, at rest at X = shipStart (it never zooms in).
-      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, viewOffset: [0.25, 0], maxSpeed: 0.999,
+      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, viewOffset: [0.25, 0], maxSpeed: 0.99999,
       historyDt: 3,
       zoom: world => {
         const [ut, ux] = world.obsvU, v = ux / ut;
