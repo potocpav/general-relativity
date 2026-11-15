@@ -159,8 +159,8 @@
           <div id="fig-planet-gamma">1.00</div>
         </div>
       </div>
-      <div class="view">
-        <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space and the Sun, at its real size; the ship is to the right of the Sun, half a solar radius from its surface."></canvas>
+      <div class="view split">
+        <canvas id="fig-planet-canvas" aria-label="Two views from a spaceship in flat spacetime, both of the light arriving at it now, looking down on a square grid painted on space and the Sun, at its real size: on the left centered on the Sun, on the right on the ship. The ship starts to the right of the Sun, half a solar radius from its surface."></canvas>
         <div class="overlay">
           <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
@@ -283,10 +283,10 @@
     // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
-    // `zoom`: if given, the view's size (World.viewportSize) for the world's state, at every frame; `maxSpeed`: the
+    // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `maxSpeed`: the
     // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects)
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
-      objects = [], shipClock = false, viewOffset = [0, 0], zoom = null, maxSpeed = undefined,
+      objects = [], shipClock = false, viewOffset = [0, 0], views = null, maxSpeed = undefined,
       historyDt = undefined} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
@@ -356,7 +356,7 @@
           show(`${prefix}-gamma`, ut.toFixed(2));
         }
         el('reset').hidden = !flown;
-        if (zoom) sim.world.viewportSize = zoom(sim.world);
+        if (views) sim.renderer.views = views(sim.world);
       }, {historyDt});
       if (!sim) {
         el('note').hidden = false;
@@ -387,6 +387,17 @@
     // Jupiter's orbit. Seen from there, the Sun's light is 2600 s old, so the objects' history reaches back further,
     // in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
+    // Where the ship sees a point at rest at `p` (x, y): the viewport vector (see screenRay) of its light arriving at
+    // the ship now, the offset of the light's emission in the ship's rest frame. The emission is at (Δt, Δs) from the
+    // ship, Δs = p - the ship's position, Δt = -|Δs|; boosted by the ship's 4-velocity (γ, w), its spatial part is
+    // Δs + w ((w · Δs) / (γ + 1) - Δt). For the ship moving away along x at v, from X away: X sqrt((1 - v) / (1 + v))
+    // behind it (the Doppler factor: closer when moving away, farther when approaching).
+    const seenFromShip = (world, p) => {
+      const [, x, y] = world.obsvX, [g, wx, wy] = world.obsvU;
+      const [dx, dy] = [p[0] - x, p[1] - y], dt = -Math.hypot(dx, dy);
+      const k = (wx * dx + wy * dy) / (g + 1) - dt;
+      return [dx + wx * k, dy + wy * k];
+    };
     // Above the slider, the planets' orbits (their semi-major axes, in light seconds) out to Jupiter's, as letters;
     // the planets aren't in the simulation (at their real sizes, they'd be too small to see).
     const orbits = [
@@ -405,19 +416,14 @@
       }
     }
     velocityFigure('fig-planet', {
-      // The ship at 3/4 of the view's width, looking back at the Sun, its top speed 0.99999 c, zoomed to keep the Sun's
-      // center in view: at first, the Sun doesn't fit (it's taller than the view), but it does once the ship is far
-      // enough. The view shows the light arriving at the ship now, from where it was emitted, in the ship's rest
-      // frame: from the center, at the ship's distance X away, moving away at v, it appears X sqrt((1 - v) / (1 + v))
-      // behind the ship (the Doppler factor: closer when moving away, farther when approaching); across the motion,
-      // distances are unchanged. So the view, 3/4 of which is behind the ship, spans that, but never less than at
-      // the start, at rest at X = shipStart (it never zooms in).
-      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, viewOffset: [0.25, 0], maxSpeed: 0.99999,
-      historyDt: 3,
-      zoom: world => {
-        const [ut, ux] = world.obsvU, v = ux / ut;
-        return Math.max(shipStart / 0.75, world.obsvX[1] * Math.sqrt((1 - v) / (1 + v)) / 0.75);
-      },
+      // Two views of the light arriving at the ship now, at fixed zooms: on the left, centered on the Sun, where the
+      // ship sees it (6 light seconds across, the whole Sun); on the right, on the ship (4.5 across). The ship's top
+      // speed is 0.99999 c.
+      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, maxSpeed: 0.99999, historyDt: 3,
+      views: world => [
+        {from: 0, to: 0.5, viewportSize: 6, center: seenFromShip(world, [0, 0])},
+        {from: 0.5, to: 1, viewportSize: 4.5, center: [0, 0]},
+      ],
       objects: [
         {type: sunId, x: [sunSince, 0, 0], u: [1, 0, 0]},
         // on the Sun's near edge, the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as high (0.38),

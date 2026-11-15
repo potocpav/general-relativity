@@ -16,6 +16,12 @@ export class Renderer {
     }
     this.surfaceProgram = null;
     this.target = null;
+    // The views drawn side by side, each a vertical strip of the canvas, all of the same ship's view (its past light
+    // cone), centered and zoomed differently: null for one view filling the canvas, as the world's viewportSize and
+    // viewOffset say; or [{from, to, viewportSize, center}], with `from` and `to` the strip's edges as fractions of
+    // the canvas's width, `viewportSize` as World's, and `center` the viewport vector (see screenToViewport in
+    // js/world.js: the offset from the ship in its rest frame) at the strip's center.
+    this.views = null;
   }
 
   async init(metric) {
@@ -44,7 +50,9 @@ export class Renderer {
   async setMetric(metric) {
     const program = this.compileProgram(this.surfaceVert,
       await physicsFragmentShader(this.surfaceFragMain, metric, this.root));
-    this.cacheUniformLocation(program, 'resolution');
+    for (const name of ['resolution', 'view_origin', 'viewport_size', 'view_offset']) {
+      this.cacheUniformLocation(program, name);
+    }
     this.world.compile(program);
     this.objects.compile(program);
     if (this.surfaceProgram) this.gl.deleteProgram(this.surfaceProgram);
@@ -136,16 +144,28 @@ export class Renderer {
   render() {
     const gl = this.gl, surface = this.surfaceProgram, screen = this.screenProgram;
     gl.useProgram(surface);
-    gl.uniform2f(surface.uniformsCache['resolution'], this.width, this.height);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
     gl.vertexAttribPointer(surface.vertexPosition, 2, gl.FLOAT, false, 0, 0);
 
     this.world.render();
     this.objects.render();
 
-    // the raytracing shader, into the target (covers all of it, no clear needed)
+    // the raytracing shader, into the target, once per view (together, they cover all of it: no clear needed)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    const uniforms = surface.uniformsCache;
+    for (const view of this.views ?? [{from: 0, to: 1, viewportSize: this.world.viewportSize}]) {
+      const x0 = Math.round(view.from * this.width), w = Math.round(view.to * this.width) - x0, h = this.height;
+      // the ship's place in the view, as fractions of its width and height (see view_offset)
+      const span = [w, h].map(d => d / ((w + h) / 2) * view.viewportSize);
+      const offset = view.center ? view.center.map((c, i) => -c / span[i]) : this.world.viewOffset;
+      gl.viewport(x0, 0, w, h);
+      gl.uniform2f(uniforms['resolution'], w, h);
+      gl.uniform2f(uniforms['view_origin'], x0, 0);
+      gl.uniform1f(uniforms['viewport_size'], view.viewportSize);
+      gl.uniform2f(uniforms['view_offset'], ...offset);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    gl.viewport(0, 0, this.width, this.height);
 
     // the target, onto the canvas
     gl.useProgram(screen);

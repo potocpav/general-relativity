@@ -15,6 +15,7 @@ uniform bool show_ship_clock; // a clock above the ship, showing its proper time
 
 uniform float viewport_size;
 uniform vec2 view_offset; // where the ship is on the screen: from its center, as fractions of its width and height
+uniform vec2 view_origin; // the view's lower left corner in the canvas [px] (several views can share it, see Renderer.views)
 uniform bool show_photon_sphere;
 uniform bool show_event_horizon;
 uniform bool show_interior; // otherwise, the black hole's shadow is black
@@ -401,7 +402,7 @@ vec4 render_ship(bool thrusting, float t, vec2 p, float pixel) {
 
 void main( void ) {
 	// screen to observer space transformation
-	vec2 pix_cartesian = s2v(gl_FragCoord.xy - view_offset * resolution, resolution, viewport_size);
+	vec2 pix_cartesian = s2v(gl_FragCoord.xy - view_origin - view_offset * resolution, resolution, viewport_size);
 	bool seen = view_mode == 0;
 
 	vec3 pix_x, pix_u;

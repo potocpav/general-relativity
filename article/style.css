@@ -141,6 +141,22 @@ figcaption b {
   background: #000;
 }
 
+/* A view split in two, side by side (see Renderer.views), with a line between them. */
+.view.split {
+  aspect-ratio: 2 / 1;
+}
+
+.view.split::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--outline);
+  pointer-events: none;
+}
+
 /* Buttons overlaid on the view's lower left corner (as in ../rope-twist, but dark, over space). */
 .view .overlay {
   position: absolute;
