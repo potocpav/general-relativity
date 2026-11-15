@@ -161,7 +161,7 @@
       </div>
       <div class="view">
         <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space and the Sun, at its real size, with an inset of the same view centered on the Sun in the upper left corner. The ship starts to the right of the Sun, half a solar radius from its surface."></canvas>
-        <div class="inset" id="fig-planet-inset"></div>
+        <div class="inset" id="fig-planet-inset"><span>Sun cam</span></div>
         <div class="overlay">
           <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
@@ -388,9 +388,9 @@
     // Jupiter's orbit. Seen from there, the Sun's light is 2600 s old, so the objects' history reaches back further,
     // in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
-    // The inset, as fractions of the 4:3 view: a square 2/3 of its height, in its upper left corner, 4% of its height
-    // away from the top and left edges; its frame is placed over it.
-    const insetSide = 2 / 3, insetMargin = 0.04, aspect = 4 / 3;
+    // The inset, as fractions of the 4:3 view: a square 1/2 of its height, in its upper left corner, 4% of its height
+    // away from the top and left edges; its frame and label are placed over it.
+    const insetSide = 1 / 2, insetMargin = 0.04, aspect = 4 / 3;
     const sunInset = {left: insetMargin / aspect, bottom: 1 - insetMargin - insetSide,
       width: insetSide / aspect, height: insetSide};
     Object.assign(document.getElementById('fig-planet-inset').style, {

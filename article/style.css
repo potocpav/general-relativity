@@ -141,11 +141,27 @@ figcaption b {
   background: #000;
 }
 
-/* The frame of an inset view (see Renderer.views), placed over it by the figure's script. */
+/* The frame of an inset view (see Renderer.views), placed over it by the figure's script: a 3px line just outside
+   it, and a label across the middle of its bottom line. */
 .view .inset {
   position: absolute;
-  outline: 1px solid var(--outline);
+  outline: 3px solid var(--outline);
   pointer-events: none;
+}
+
+.view .inset span {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  /* centered on the bottom line, 1.5px below the inset's edge */
+  transform: translate(-50%, calc(50% + 1.5px));
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #000;
+  color: #e8e6e0;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 /* Buttons overlaid on the view's lower left corner (as in ../rope-twist, but dark, over space). */
