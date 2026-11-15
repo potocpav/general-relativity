@@ -266,6 +266,22 @@ input[type=range]::-moz-range-thumb {
   margin-top: 16px; /* room for the marker */
 }
 
+/* Labels above the marker (e.g. the planets' orbits along a distance slider), positioned by --at like it. */
+.slider.labeled {
+  margin-top: 34px; /* room for the labels and the marker */
+}
+
+.slider .label {
+  position: absolute;
+  bottom: calc(100% + 18px);
+  left: calc(9px + (100% - 18px) * var(--at, 0.5));
+  transform: translateX(-50%);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: default;
+}
+
 /* A small triangle above the track, pointing down at the value. */
 .slider .marker {
   position: absolute;

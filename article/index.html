@@ -167,7 +167,7 @@
       </div>
       <div class="controls">
         <label for="fig-planet-target">Target position</label>
-        <div class="slider">
+        <div class="slider labeled">
           <input type="range" id="fig-planet-target" min="3.5" max="2600" step="0.1" value="3.5">
           <div class="marker" id="fig-planet-actual" title="Actual position"></div>
         </div>
@@ -387,6 +387,23 @@
     // Jupiter's orbit. Seen from there, the Sun's light is 2600 s old, so the objects' history reaches back further,
     // in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
+    // Above the slider, the planets' orbits (their semi-major axes, in light seconds) out to Jupiter's, as letters;
+    // the planets aren't in the simulation (at their real sizes, they'd be too small to see).
+    const orbits = [
+      ['M', 'Mercury', 57.909e6], ['V', 'Venus', 108.209e6], ['E', 'Earth', 149.598e6], ['M', 'Mars', 227.939e6],
+      ['J', 'Jupiter', 778.479e6],
+    ];
+    {
+      const slider = document.getElementById('fig-planet-target');
+      for (const [letter, name, km] of orbits) {
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.textContent = letter;
+        label.title = `${name}'s orbit, ${Math.round(km / 299792.458)} light seconds from the Sun`;
+        label.style.setProperty('--at', (km / 299792.458 - slider.min) / (slider.max - slider.min));
+        slider.before(label);
+      }
+    }
     velocityFigure('fig-planet', {
       // The ship at 3/4 of the view's width, looking back at the Sun, its top speed 0.99999 c, zoomed to keep the Sun's
       // center in view: at first, the Sun doesn't fit (it's taller than the view), but it does once the ship is far
