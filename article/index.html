@@ -285,11 +285,10 @@
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
     // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `maxSpeed`: the
-    // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects);
-    // `backgroundTemperature`: of the radiation filling space (see World.backgroundTemperature)
+    // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects)
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
       objects = [], shipClock = false, viewOffset = [0, 0], views = null, maxSpeed = undefined,
-      historyDt = undefined, backgroundTemperature = 0} = {}) {
+      historyDt = undefined} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
@@ -392,7 +391,6 @@
       sim.world.thrust = thrust * scale;
       sim.world.viewMode = viewMode;
       sim.world.showShipClock = shipClock;
-      sim.world.backgroundTemperature = backgroundTemperature;
       sim.world.viewOffset = viewOffset;
       // the reset button puts the ship back to its initial state at once
       el('reset').addEventListener('click', () => {
@@ -456,8 +454,6 @@
       // whole Sun). The ship's top speed is 0.99999 c.
       startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, maxSpeed: 0.99999, historyDt: 3,
       viewOffset: [0.2, 0],
-      // testing: space filled with radiation at 270 K (the CMB at redshift 98), glowing ahead of the ship above ~0.96 c
-      backgroundTemperature: 270,
       views: world => [
         {left: 0, bottom: 0, width: 1, height: 1, viewportSize: 4.5, viewOffset: world.viewOffset},
         {...sunInset, viewportSize: 6, center: seenFromShip(world, [0, 0])},
