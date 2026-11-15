@@ -169,7 +169,7 @@
       <div class="controls">
         <label for="fig-planet-target">Target position</label>
         <div class="slider labeled">
-          <input type="range" id="fig-planet-target" min="3.5" max="2600" step="0.1" value="3.5">
+          <input type="range" id="fig-planet-target" min="3.5" max="193.2" step="0.1" value="3.5">
           <div class="marker" id="fig-planet-actual" title="Actual position"></div>
         </div>
         <output for="fig-planet-target" id="fig-planet-target-out">3.5</output>
@@ -261,7 +261,7 @@
     import { scenarios } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
     import { clockId, sunId, sunDiameter } from '../js/object-types.js';
-    import { flyToX } from './pilots.js';
+    import { flyToX, pushAlongX } from './pilots.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
@@ -293,18 +293,26 @@
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
+      let pushDir = 1; // with a slider, the direction the pointer last pushed the ship along x
       let flown = false; // whether the ship was flown since the start (or the last reset)
 
       // A figure with a target slider is flown by the autopilot, to the slider's x position (see flyToX), once the
       // slider is released ('change'; with the keyboard, each step); the slider's marker shows the ship's position.
-      // Otherwise, by the pointer.
+      // It can also be pushed by the pointer, along x only (away from the pointer, see pushAlongX): then the
+      // autopilot lets go (`target` is null) and the ship coasts after, the slider following it (at its ends,
+      // beyond them) until it's moved again. Without a slider, the ship is flown by the pointer.
       const slider = el('target');
       let target = slider ? +slider.value : null;
+      let sliding = false; // the slider being moved, not following the ship
       const showTarget = () => show(`${prefix}-target-out`, (+slider.value).toFixed(1));
       if (slider) {
-        slider.addEventListener('input', showTarget);
+        slider.addEventListener('input', () => {
+          sliding = true;
+          showTarget();
+        });
         slider.addEventListener('change', () => {
           target = +slider.value;
+          sliding = false;
           flown = true;
         });
       }
@@ -315,7 +323,7 @@
         const r = canvas.getBoundingClientRect();
         pointer = [ev.clientX - r.left, r.bottom - ev.clientY];
       };
-      if (!slider) canvas.addEventListener('pointerdown', ev => {
+      canvas.addEventListener('pointerdown', ev => {
         canvas.setPointerCapture(ev.pointerId);
         track(ev);
         flown = true;
@@ -334,10 +342,26 @@
       const state = {...setup, ship, objects, viewportSize: 4.5 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         if (slider) {
-          const control = flyToX(sim.world, target, dt, sim.world.thrust, maxSpeed);
+          throttle = Math.min(1, Math.max(0, throttle + (pointer ? dt : -dt) / rampTime));
+          if (pointer) target = null;
+          let control = {};
+          if (target != null) {
+            control = flyToX(sim.world, target, dt, sim.world.thrust, maxSpeed);
+          } else if (throttle > 0) {
+            // away from the pointer (while held; the engine ramps down after), along x: from where the ship is in
+            // the view (see World.viewOffset)
+            const shipX = (0.5 + sim.world.viewOffset[0]) * canvas.clientWidth;
+            if (pointer) pushDir = pointer[0] < shipX ? 1 : -1;
+            control = pushAlongX(sim.world, pushDir, dt, sim.world.thrust * throttle, maxSpeed);
+          }
           accel = control.accel ?? 0;
           sim.step(dt, control);
-          el('actual').style.setProperty('--at', (sim.world.obsvX[1] - slider.min) / (slider.max - slider.min));
+          const x = sim.world.obsvX[1], at = (x - slider.min) / (slider.max - slider.min);
+          el('actual').style.setProperty('--at', Math.min(1, Math.max(0, at)));
+          if (target == null && !sliding) {
+            slider.value = Math.min(slider.max, Math.max(slider.min, x));
+            showTarget();
+          }
         } else {
           const dim = [canvas.clientWidth, canvas.clientHeight];
           // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
@@ -377,6 +401,7 @@
         throttle = accel = 0;
         if (slider) {
           slider.value = target = startPosition[0];
+          sliding = false;
           showTarget();
         }
       });
@@ -386,13 +411,14 @@
     velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
     velocityFigure('fig-light-cone', {startSpeed: 0});
     // The Sun at rest (its gravity disregarded), at its real size (in light seconds). The ship starts at rest at
-    // x = 3.5 (about 1.5 solar radii from its center), where the slider's range starts; it reaches out to 2600, about
-    // Jupiter's orbit. Seen from there, the Sun's light is 2600 s old, so the objects' history reaches back further,
-    // in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun is there since 3000 s before the start.
+    // x = 3.5 (about 1.5 solar radii from its center), where the slider's range starts; it reaches out to Mercury's
+    // orbit, 193.2 (the ship pushed by the pointer can go further). The Sun's light seen from far away is old, so the
+    // objects' history reaches back further, in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun
+    // is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
-    // The inset, as fractions of the 4:3 view: a square 1/2 of its height, in its upper left corner, 4% of its height
+    // The inset, as fractions of the 4:3 view: a square 1/2 of its height, in its upper left corner, 2% of its height
     // away from the top and left edges; its frame and label are placed over it.
-    const insetSide = 1 / 2, insetMargin = 0.04, aspect = 4 / 3;
+    const insetSide = 1 / 2, insetMargin = 0.02, aspect = 4 / 3;
     const sunInset = {left: insetMargin / aspect, bottom: 1 - insetMargin - insetSide,
       width: insetSide / aspect, height: insetSide};
     Object.assign(document.getElementById('fig-planet-inset').style, {
@@ -410,12 +436,9 @@
       const k = (wx * dx + wy * dy) / (g + 1) - dt;
       return [dx + wx * k, dy + wy * k];
     };
-    // Above the slider, the planets' orbits (their semi-major axes, in light seconds) out to Jupiter's, as letters;
+    // Above the slider, the planets' orbits within its range (their semi-major axes, in light seconds), as letters;
     // the planets aren't in the simulation (at their real sizes, they'd be too small to see).
-    const orbits = [
-      ['M', 'Mercury', 57.909e6], ['V', 'Venus', 108.209e6], ['E', 'Earth', 149.598e6], ['M', 'Mars', 227.939e6],
-      ['J', 'Jupiter', 778.479e6],
-    ];
+    const orbits = [['M', 'Mercury', 57.909e6]];
     {
       const slider = document.getElementById('fig-planet-target');
       for (const [letter, name, km] of orbits) {
@@ -432,10 +455,11 @@
       // right of the middle, clear of the inset; the inset centered on the Sun, where the ship sees it (6 across, the
       // whole Sun). The ship's top speed is 0.99999 c.
       startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, maxSpeed: 0.99999, historyDt: 3,
+      viewOffset: [0.2, 0],
       // testing: space filled with radiation at 270 K (the CMB at redshift 98), glowing ahead of the ship above ~0.96 c
       backgroundTemperature: 270,
       views: world => [
-        {left: 0, bottom: 0, width: 1, height: 1, viewportSize: 4.5, viewOffset: [0.2, 0]},
+        {left: 0, bottom: 0, width: 1, height: 1, viewportSize: 4.5, viewOffset: world.viewOffset},
         {...sunInset, viewportSize: 6, center: seenFromShip(world, [0, 0])},
       ],
       objects: [
