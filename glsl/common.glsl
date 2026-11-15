@@ -29,6 +29,10 @@ vec3 coord_delta(vec3 a, vec3 b);
 // The position x in a flat plane, for culling boxes (toPlane in js/metric.js).
 vec2 chart_plane(vec3 x);
 
+// The conserved energy of a ray with momentum p at x: its energy at infinity
+// (measured by an observer at rest there), the same all along the ray.
+float ray_energy(vec3 x, vec3 p);
+
 #define RAY_REACHED 0       // traced to the end
 #define RAY_HORIZON 1       // went where it can't be followed (e.g. the black hole's shadow)
 #define RAY_OUT_OF_STEPS 2  // ran out of solver steps
