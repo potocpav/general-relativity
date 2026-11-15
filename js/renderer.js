@@ -16,11 +16,13 @@ export class Renderer {
     }
     this.surfaceProgram = null;
     this.target = null;
-    // The views drawn side by side, each a vertical strip of the canvas, all of the same ship's view (its past light
-    // cone), centered and zoomed differently: null for one view filling the canvas, as the world's viewportSize and
-    // viewOffset say; or [{from, to, viewportSize, center}], with `from` and `to` the strip's edges as fractions of
-    // the canvas's width, `viewportSize` as World's, and `center` the viewport vector (see screenToViewport in
-    // js/world.js: the offset from the ship in its rest frame) at the strip's center.
+    // The views drawn, in order (later ones over earlier ones, e.g. an inset), each a rectangle of the canvas, all of
+    // the same ship's view (its past light cone), centered and zoomed differently: null for one view filling the
+    // canvas, as the world's viewportSize and viewOffset say; or [{left, bottom, width, height, viewportSize,
+    // viewOffset or center}], with the rectangle as fractions of the canvas's width and height, `viewportSize` and
+    // `viewOffset` as World's, or instead of `viewOffset`, `center`: the viewport vector (see screenToViewport in
+    // js/world.js: the offset from the ship in its rest frame) at the view's center. Together, they must cover the
+    // canvas.
     this.views = null;
   }
 
@@ -153,14 +155,17 @@ export class Renderer {
     // the raytracing shader, into the target, once per view (together, they cover all of it: no clear needed)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
     const uniforms = surface.uniformsCache;
-    for (const view of this.views ?? [{from: 0, to: 1, viewportSize: this.world.viewportSize}]) {
-      const x0 = Math.round(view.from * this.width), w = Math.round(view.to * this.width) - x0, h = this.height;
+    const views = this.views ?? [{left: 0, bottom: 0, width: 1, height: 1,
+      viewportSize: this.world.viewportSize, viewOffset: this.world.viewOffset}];
+    for (const view of views) {
+      const x0 = Math.round(view.left * this.width), w = Math.round((view.left + view.width) * this.width) - x0;
+      const y0 = Math.round(view.bottom * this.height), h = Math.round((view.bottom + view.height) * this.height) - y0;
       // the ship's place in the view, as fractions of its width and height (see view_offset)
       const span = [w, h].map(d => d / ((w + h) / 2) * view.viewportSize);
-      const offset = view.center ? view.center.map((c, i) => -c / span[i]) : this.world.viewOffset;
-      gl.viewport(x0, 0, w, h);
+      const offset = view.center ? view.center.map((c, i) => -c / span[i]) : view.viewOffset;
+      gl.viewport(x0, y0, w, h);
       gl.uniform2f(uniforms['resolution'], w, h);
-      gl.uniform2f(uniforms['view_origin'], x0, 0);
+      gl.uniform2f(uniforms['view_origin'], x0, y0);
       gl.uniform1f(uniforms['viewport_size'], view.viewportSize);
       gl.uniform2f(uniforms['view_offset'], ...offset);
       gl.drawArrays(gl.TRIANGLES, 0, 6);

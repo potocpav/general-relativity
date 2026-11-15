@@ -141,19 +141,10 @@ figcaption b {
   background: #000;
 }
 
-/* A view split in two, side by side (see Renderer.views), with a line between them. */
-.view.split {
-  aspect-ratio: 2 / 1;
-}
-
-.view.split::after {
-  content: "";
+/* The frame of an inset view (see Renderer.views), placed over it by the figure's script. */
+.view .inset {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  background: var(--outline);
+  outline: 1px solid var(--outline);
   pointer-events: none;
 }
 

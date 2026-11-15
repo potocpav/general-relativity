@@ -15,7 +15,7 @@ uniform bool show_ship_clock; // a clock above the ship, showing its proper time
 
 uniform float viewport_size;
 uniform vec2 view_offset; // where the ship is on the screen: from its center, as fractions of its width and height
-uniform vec2 view_origin; // the view's lower left corner in the canvas [px] (several views can share it, see Renderer.views)
+uniform vec2 view_origin; // the view's lower left corner in the canvas [px] (it can have several views, see Renderer.views)
 uniform bool show_photon_sphere;
 uniform bool show_event_horizon;
 uniform bool show_interior; // otherwise, the black hole's shadow is black
