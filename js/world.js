@@ -27,9 +27,7 @@ export class World {
     this.showEventHorizon = true;
     this.showInterior = false;
     this.showRedshift = true;
-    // [K] of the radiation filling space, at rest at infinity (0: none): invisible at rest, glowing ahead of the
-    // ship above ~0.9 c (like the cosmic microwave background at redshift 180)
-    this.backgroundTemperature = 500;
+    this.backgroundTemperature = 0; // [K] of the radiation filling space, glowing when blueshifted (0: none)
     this.shipScale = 1; // the ship's size relative to its normal size
     this.showShipClock = false; // a clock above the ship, showing its proper time
     this.viewMode = VIEW_SEEN;

@@ -22,10 +22,6 @@ vec2 chart_plane(vec3 x) {
 	return x.yz;
 }
 
-float ray_energy(vec3 x, vec3 p) {
-	return p.x;
-}
-
 // Light rays are straight lines: traced exactly, in one step.
 int trace_ray(vec3 x0, vec3 u0, out vec3 x, out vec3 u, out float l_end, out int steps) {
 	x = x0 + u0;

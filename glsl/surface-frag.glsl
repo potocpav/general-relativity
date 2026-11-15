@@ -441,13 +441,10 @@ void main( void ) {
 	// compute output colors; rays that didn't arrive show the black hole's shadow
 	float grid_l = show_redshift ? rshift : 1.0;
 	vec3 world_color = reached ? redshift(grid_l, grid_color(pix_x), grid_tint(grid_l)) : vec3(0.0);
-	// The radiation filling space, a blackbody of background_temperature at rest at infinity, in equilibrium
-	// with it, so the same along every ray (a shift keeps a blackbody's spectrum one): seen at
-	// background_temperature times the ray's energy seen by the ship over its energy at infinity (Doppler and
-	// gravitational shifts), added to the grid's light (linear).
+	// The radiation filling space, a blackbody seen at background_temperature / l (Doppler and gravitational
+	// shifts keep a blackbody's spectrum one), added to the grid's light (linear).
 	if (reached && background_temperature > 0.0) {
-		float shift = show_redshift && seen ? obsv_energy / max(abs(ray_energy(pix_x, pix_u)), 1e-20) : 1.0;
-		float T = background_temperature * shift;
+		float T = background_temperature / grid_l;
 		vec3 glow = blackbody_rgb(T) * blackbody_luminance(T);
 		world_color = pow(pow(world_color, vec3(2.2)) + glow, vec3(1.0 / 2.2));
 	}
