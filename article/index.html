@@ -168,7 +168,7 @@
       <div class="controls">
         <label for="fig-planet-target">Target position</label>
         <div class="slider">
-          <input type="range" id="fig-planet-target" min="3.5" max="100" step="any" value="3.5">
+          <input type="range" id="fig-planet-target" min="3.5" max="100" step="0.1" value="3.5">
           <div class="marker" id="fig-planet-actual" title="Actual position"></div>
         </div>
         <output for="fig-planet-target" id="fig-planet-target-out">3.5</output>
@@ -382,12 +382,9 @@
     velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
     velocityFigure('fig-light-cone', {startSpeed: 0});
     // The Sun at rest (its gravity disregarded), at its real size (in light seconds), there since long enough before
-    // the start to be seen from the ship as far as the history of objects reaches back. The ship starts 1.5 solar
-    // radii from its center; the slider's range starts there.
-    const sunRadius = sunDiameter / 2, shipStart = 1.5 * sunRadius;
-    const planetSlider = document.getElementById('fig-planet-target');
-    planetSlider.min = planetSlider.value = shipStart;
-    document.getElementById('fig-planet-target-out').textContent = shipStart.toFixed(1);
+    // the start to be seen from the ship as far as the history of objects reaches back. The ship starts at rest at
+    // x = 3.5 (about 1.5 solar radii from its center), where the slider's range starts.
+    const sunRadius = sunDiameter / 2, shipStart = 3.5;
     velocityFigure('fig-planet', {
       // The ship at 3/4 of the view's width, looking back at the Sun, its top speed 0.9 c, zoomed to keep the Sun's
       // center in view: at first, the Sun doesn't fit (it's taller than the view), but it does once the ship is far
