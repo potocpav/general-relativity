@@ -160,7 +160,7 @@
         </div>
       </div>
       <div class="view">
-        <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space, Jupiter and the Sun next to it, both at their real sizes; the ship is to the right of Jupiter."></canvas>
+        <canvas id="fig-planet-canvas" aria-label="The view from a spaceship in flat spacetime, the light arriving at it now, looking down on a square grid painted on space and the Sun, at its real size; the ship is to the right of the Sun, half a solar radius from its surface."></canvas>
         <div class="overlay">
           <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
@@ -168,10 +168,10 @@
       <div class="controls">
         <label for="fig-planet-target">Target position</label>
         <div class="slider">
-          <input type="range" id="fig-planet-target" min="1.5" max="10" step="0.1" value="1.5">
+          <input type="range" id="fig-planet-target" min="3.5" max="100" step="any" value="3.5">
           <div class="marker" id="fig-planet-actual" title="Actual position"></div>
         </div>
-        <output for="fig-planet-target" id="fig-planet-target-out">1.5</output>
+        <output for="fig-planet-target" id="fig-planet-target-out">3.5</output>
       </div>
       <p class="note" id="fig-planet-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>Twin paradox</figcaption>
@@ -259,7 +259,7 @@
     import { runFigure } from '../js/figure.js';
     import { scenarios } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
-    import { clockId, jupiterId, sunId, sunDiameter, jupiterDiameter } from '../js/object-types.js';
+    import { clockId, sunId, sunDiameter } from '../js/object-types.js';
     import { flyToX } from './pilots.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
@@ -283,9 +283,10 @@
     // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
-    // `zoom`: if given, the view's size (World.viewportSize) for the world's state, at every frame
+    // `zoom`: if given, the view's size (World.viewportSize) for the world's state, at every frame; `maxSpeed`: the
+    // autopilot's top speed, as a fraction of c (see flyToX)
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
-      objects = [], shipClock = false, viewOffset = [0, 0], zoom = null} = {}) {
+      objects = [], shipClock = false, viewOffset = [0, 0], zoom = null, maxSpeed = undefined} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
@@ -330,7 +331,7 @@
       const state = {...setup, ship, objects, viewportSize: 4.5 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         if (slider) {
-          const control = flyToX(sim.world, target, dt, sim.world.thrust);
+          const control = flyToX(sim.world, target, dt, sim.world.thrust, maxSpeed);
           accel = control.accel ?? 0;
           sim.step(dt, control);
           el('actual').style.setProperty('--at', (sim.world.obsvX[1] - slider.min) / (slider.max - slider.min));
@@ -380,29 +381,33 @@
     velocityFigure('fig-classical', {scale: 1e-3});
     velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
     velocityFigure('fig-light-cone', {startSpeed: 0});
-    // Jupiter and the Sun at rest (their gravity disregarded), at their real sizes (in light seconds), there since
-    // long enough before the start to be seen from the ship as far as the history of objects reaches back. The Sun
-    // is to the upper left of Jupiter, where Jupiter's light comes from, its edge 0.6 away from Jupiter's.
-    const sunCenter = (jupiterDiameter / 2 + 0.6 + sunDiameter / 2) / Math.SQRT2;
+    // The Sun at rest (its gravity disregarded), at its real size (in light seconds), there since long enough before
+    // the start to be seen from the ship as far as the history of objects reaches back. The ship starts 1.5 solar
+    // radii from its center; the slider's range starts there.
+    const sunRadius = sunDiameter / 2, shipStart = 1.5 * sunRadius;
+    const planetSlider = document.getElementById('fig-planet-target');
+    planetSlider.min = planetSlider.value = shipStart;
+    document.getElementById('fig-planet-target-out').textContent = shipStart.toFixed(1);
     velocityFigure('fig-planet', {
-      // The ship at 3/4 of the view's width, looking back at Jupiter, zoomed to keep it in view, and the Sun's near
-      // edge. The view shows the light arriving at the ship now, from where it was emitted, in the ship's rest frame:
-      // from x = -1 (past Jupiter's far edge), at the ship's distance X + 1 away, moving away at v, it appears
-      // (X + 1) sqrt((1 - v) / (1 + v)) behind the ship (the Doppler factor: closer when moving away, farther when
-      // approaching); across the motion, distances are unchanged. So the view, 3/4 of which is behind the ship,
-      // spans that, but never less than at the start, at rest at x = 1.5: (1.5 + 1) / 0.75 (it never zooms in).
-      startSpeed: 0, startPosition: [1.5, 0], shipClock: true, viewOffset: [0.25, 0],
+      // The ship at 3/4 of the view's width, looking back at the Sun, its top speed 0.9 c, zoomed to keep the Sun's
+      // center in view: at first, the Sun doesn't fit (it's taller than the view), but it does once the ship is far
+      // enough. The view shows the light arriving at the ship now, from where it was emitted, in the ship's rest
+      // frame: from the center, at the ship's distance X away, moving away at v, it appears X sqrt((1 - v) / (1 + v))
+      // behind the ship (the Doppler factor: closer when moving away, farther when approaching); across the motion,
+      // distances are unchanged. So the view, 3/4 of which is behind the ship, spans that, but never less than at
+      // the start, at rest at X = shipStart (it never zooms in).
+      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, viewOffset: [0.25, 0], maxSpeed: 0.9,
       zoom: world => {
         const [ut, ux] = world.obsvU, v = ux / ut;
-        return Math.max((1.5 + 1) / 0.75, (world.obsvX[1] + 1) * Math.sqrt((1 - v) / (1 + v)) / 0.75);
+        return Math.max(shipStart / 0.75, world.obsvX[1] * Math.sqrt((1 - v) / (1 + v)) / 0.75);
       },
       objects: [
-        {type: sunId, x: [-40, -sunCenter, sunCenter], u: [1, 0, 0]},
-        {type: jupiterId, x: [-40, 0, 0], u: [1, 0, 0]},
-        // above Jupiter, the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as high (0.38), ahead
-        // by the light travel time to the ship, so that it's seen in sync with the ship's clock (at rest, its proper
-        // time is the coordinate time)
-        {type: clockId, x: [-40, 0, 0.38], u: [1, 0, 0], size: Math.hypot(0.5, 0.2), tau: -40 + Math.hypot(1.5, 0.38)},
+        {type: sunId, x: [-40, 0, 0], u: [1, 0, 0]},
+        // on the Sun's near edge, the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as high (0.38),
+        // ahead by the light travel time to the ship, so that it's seen in sync with the ship's clock (at rest, its
+        // proper time is the coordinate time)
+        {type: clockId, x: [-40, sunRadius, 0.38], u: [1, 0, 0], size: Math.hypot(0.5, 0.2),
+          tau: -40 + Math.hypot(shipStart - sunRadius, 0.38)},
       ],
     });
   </script>

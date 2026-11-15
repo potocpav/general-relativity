@@ -6,7 +6,8 @@ import { turnRate } from '../js/world.js';
 // Fly the ship (in flat spacetime, at rest or moving along x) to x = `target`
 // and stop there, firing its engine with a proper acceleration of at most
 // `maxAccel`, over the next `dt` of its proper time. It turns only while the
-// engine is off (at turnRate), so it never fires sideways.
+// engine is off (at turnRate), so it never fires sideways. Above
+// `maxSpeed` (a fraction of c), it coasts.
 //
 // It turns towards the target and accelerates at full thrust (for short
 // distances, only up to a speed it can stop from in time). When stopping
@@ -16,7 +17,7 @@ import { turnRate } from '../js/world.js';
 // proper acceleration a, stopping from Lorentz factor γ takes the distance
 // (γ - 1) / a, so a = (γ - 1) / d; recomputed at every step, this corrects
 // itself. The last burn is cut where the ship comes to rest.
-export function flyToX(world, target, dt, maxAccel) {
+export function flyToX(world, target, dt, maxAccel, maxSpeed = 0.999) {
   const [ut, ux] = world.obsvU, gamma = ut;
   const v = Math.abs(ux / ut) < 1e-9 ? 0 : ux / ut; // numerically at rest, e.g. after a stop
   const d = target - world.obsvX[1], dir = Math.sign(d) || 1;
@@ -56,9 +57,10 @@ export function flyToX(world, target, dt, maxAccel) {
   // moving away from the target: brake first, cutting the burn at rest (to plan anew)
   if (v * dir < 0) return turnTo(towards, maxAccel, Math.atanh(Math.abs(v)) / maxAccel);
   // accelerate towards the target, up to a speed from which turning around (taking T) and stopping fits in 70%
-  // of the distance, v T + v² / 2a = 0.7 d (Newtonian: for short distances, where it matters, close enough)
+  // of the distance, v T + v² / 2a = 0.7 d (Newtonian: for short distances, where it matters, close enough), and
+  // at most maxSpeed
   const T = Math.PI / turnRate;
-  const maxSpeed = Math.min(0.999, maxAccel * (Math.sqrt(T * T + 1.4 * Math.abs(d) / maxAccel) - T));
-  const thrustTime = (Math.atanh(maxSpeed) - Math.atanh(Math.abs(v))) / maxAccel;
+  const topSpeed = Math.min(maxSpeed, maxAccel * (Math.sqrt(T * T + 1.4 * Math.abs(d) / maxAccel) - T));
+  const thrustTime = (Math.atanh(topSpeed) - Math.atanh(Math.abs(v))) / maxAccel;
   return thrustTime > 0 ? turnTo(towards, maxAccel, thrustTime) : turnTo(towards, 0);
 }
