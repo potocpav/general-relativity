@@ -14,8 +14,7 @@ uniform float ship_scale; // the ship's size relative to its normal size
 uniform bool show_ship_clock; // a clock above the ship, showing its proper time
 
 uniform float viewport_size;
-// [rendered pixels] of the grid's and overlays' lines: 1 CSS pixel times the quality factor (device pixels per
-// rendered pixel), which is the device pixel ratio (see Renderer.render)
+// [rendered pixels] of the grid's and overlays' lines: 1 CSS pixel (see Renderer.render)
 uniform float line_width;
 uniform vec2 view_offset; // where the ship is on the screen: from its center, as fractions of its width and height
 uniform vec2 view_origin; // the view's lower left corner in the canvas [px] (it can have several views, see Renderer.views)

@@ -106,6 +106,9 @@ export class Renderer {
     const gl = this.gl;
     this.width = width;
     this.height = height;
+    // The lines' width (line_width): 1 CSS pixel, in rendered pixels (from the device pixel ratio and the
+    // resolution's quality factor), the drawing buffer's width over the canvas's on the page.
+    this.cssPixel = width / (gl.canvas.clientWidth || width);
     gl.viewport(0, 0, width, height);
     if (this.target) {
       gl.deleteFramebuffer(this.target.framebuffer);
@@ -155,9 +158,7 @@ export class Renderer {
     // the raytracing shader, into the target, once per view (together, they cover all of it: no clear needed)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
     const uniforms = surface.uniformsCache;
-    // The lines' width: 1 CSS pixel times the quality factor f (device pixels per rendered pixel), so thicker at a
-    // lower resolution; at dpr / f rendered pixels per CSS pixel, that's dpr rendered pixels, whatever f is.
-    gl.uniform1f(uniforms['line_width'], window.devicePixelRatio || 1);
+    gl.uniform1f(uniforms['line_width'], this.cssPixel);
     const views = this.views ?? [{left: 0, bottom: 0, width: 1, height: 1,
       viewportSize: this.world.viewportSize, viewOffset: this.world.viewOffset}];
     for (const view of views) {
