@@ -245,29 +245,50 @@ figcaption b {
   font-size: 15px;
 }
 
-/* Buttons below a figure's view, after a label (e.g. the autopilot's targets); a pressed one is active. */
+/* Buttons below a figure's view, under a label (e.g. the autopilot's targets): each a value and, under it, a
+   smaller description; a pressed one is active. */
 .controls.targets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  align-items: stretch;
   gap: 8px;
 }
 
 .controls.targets .label {
-  margin-right: 4px;
+  grid-column: 1 / -1;
   font-size: 14px;
   color: var(--muted);
 }
 
 .controls.targets button {
-  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  text-align: center;
   cursor: pointer;
+}
+
+.controls.targets .value {
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.controls.targets .sub {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.controls.targets button[aria-pressed="true"] .sub {
+  color: var(--bg);
 }
 
 .controls.targets button:hover {

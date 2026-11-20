@@ -280,8 +280,10 @@
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
     // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `autopilot`: if given,
-    // {targets: [[label, [x, y]], ...], limits} (see flyTo), its buttons, one per target, are added to the element
-    // `${prefix}-targets`; `historyDt`: the objects' history step (see Objects);
+    // {targets: [{point: [x, y], label, sub}, ...], limits, initial}: its buttons, one per target (the label, and
+    // under it, smaller, `sub`; both HTML), are added to the element `${prefix}-targets`; the `initial` target's (an
+    // index, if given) is active at the start and after a reset; `limits`, see flyTo; `historyDt`: the objects'
+    // history step (see Objects);
     // `readouts`: if given, the figure's own readouts for the world's state, at every frame, as {name: text}, each
     // shown in the element `${prefix}-${name}`, or {name: {text, arc}}, also showing `arc` (0 to 2: two rounds) as
     // the arc `${prefix}-${name}-arc` (a circle of pathLength 1, in an svg.seconds): the first round grows it from the
@@ -297,25 +299,31 @@
 
       // The ship is flown by the pointer (see World.control), or by the autopilot (see flyTo), to the target of the
       // autopilot's button last clicked, which stays pressed while it's active, also once there (holding the ship
-      // there); taking over with the pointer turns it off at once (the ship coasts after).
+      // there, so that it shows where the ship is); taking over with the pointer turns it off at once (the ship
+      // coasts after).
       let target = null, targetButton = null;
+      const buttons = [];
       const engage = (button, point) => {
         targetButton?.setAttribute('aria-pressed', 'false');
         targetButton = button;
         target = point;
         button?.setAttribute('aria-pressed', 'true');
       };
-      for (const [label, point] of autopilot?.targets ?? []) {
+      for (const {point, label, sub} of autopilot?.targets ?? []) {
         const button = document.createElement('button');
         button.type = 'button';
-        button.innerHTML = label;
+        button.innerHTML = `<span class="value">${label}</span><span class="sub">${sub}</span>`;
         button.setAttribute('aria-pressed', 'false');
         button.addEventListener('click', () => {
           engage(button, point);
           flown = true;
         });
         el('targets').append(button);
+        buttons.push([button, point]);
       }
+      // the initial target's autopilot, active (or none)
+      const engageInitial = () => engage(...(buttons[autopilot?.initial] ?? [null, null]));
+      engageInitial();
 
       // the pointer, held down on the view: [x, y] in CSS pixels from the lower left corner, or null
       let pointer = null;
@@ -394,7 +402,7 @@
         sim.reset(state);
         flown = false;
         throttle = accel = 0;
-        engage(null, null);
+        engageInitial();
       });
     }
 
@@ -402,7 +410,7 @@
     velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
     velocityFigure('fig-light-cone', {startSpeed: 0});
     // The Sun at rest (its gravity disregarded), at its real size (in light seconds). The ship starts at rest at
-    // x = 3.5 (about 1.5 solar radii from its center), the autopilot's "Sun" target. The Sun's light seen from far
+    // x = 3.5 (about 1.5 solar radii from its center), the autopilot's first target. The Sun's light seen from far
     // away is old, so the objects' history reaches back further, in 1024 rows 3 s apart (3072 s; exact for objects at
     // rest), and the Sun is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
@@ -443,10 +451,21 @@
       // whole Sun).
       startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, historyDt: 3,
       viewOffset: [0.2, 0],
-      // the autopilot's targets, along the x axis, in solar radii from the Sun's center (the Sun's: the start); along
-      // x, it flies at up to 0.99999 c, along y, up to 0.7 c, accelerating at up to 0.5 c/s along each
+      // The autopilot's targets, along the x axis, at their distances from the Sun's center in light seconds, rounded
+      // to tenths (so that the buttons show them exactly): the start, comet ISON's perihelion (2013, 0.01244 AU,
+      // 1.86 million km), the Parker Solar Probe's (2024, 9.86 solar radii, 6.86 million km), Helios 2's (1976, the
+      // record before, 0.29 AU, 43.4 million km) and Mercury's orbit (its semi-major axis, 57.9 million km). The
+      // first is active at the start, where the ship is. Along x, it flies at up to 0.99999 c, along y, up to
+      // 0.7 c, accelerating at up to 0.5 c/s along each.
       autopilot: {
-        targets: [['Sun', [shipStart, 0]], ...[10, 20, 50].map(k => [`${k}&#x202F;R<sub>☉</sub>`, [k * sunRadius, 0]])],
+        targets: [
+          [shipStart, 'Near the Sun'],
+          [6.2, 'Comet ISON\u2019s closest approach'],
+          [22.9, 'Parker Solar Probe\u2019s closest approach'],
+          [144.9, 'Helios 2\u2019s closest approach'],
+          [193.2, 'Mercury\u2019s orbit'],
+        ].map(([x, sub]) => ({point: [x, 0], label: `${x.toFixed(1)}\u202fls`, sub})),
+        initial: 0,
         limits: {x: {accel: 0.5, speed: 0.99999}, y: {accel: 0.5, speed: 0.7}},
       },
       // the Sun's clock and the ship's, as they show (see clockTime): the Sun's as the ship sees it now, at the time its
