@@ -150,6 +150,11 @@
     <figure id="fig-planet">
       <div class="stats">
         <div class="stat">
+          <div>Speed, <math><mi>v</mi></math></div>
+          <div id="fig-planet-v">0.00&#x202F;c</div>
+          <div class="sub" id="fig-planet-v-si">0&#x202F;km/s</div>
+        </div>
+        <div class="stat">
           <div>Sun time, <math><mi>τ</mi></math></div>
           <div><span id="fig-planet-sun-time">0:00</span><svg class="seconds" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><circle cx="10" cy="10" r="8" pathLength="1" transform="rotate(-90 10 10)" id="fig-planet-sun-time-arc"/></svg></div>
           <div class="sub">as seen from the spaceship</div>
@@ -478,9 +483,9 @@
       const s = Math.floor(tau - 3600 * Math.floor(tau / 3600));
       return {text: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, arc: tau - 2 * Math.floor(tau / 2)};
     };
-    // The inset, as fractions of the 4:3 view: a square 1/2 of its height, in its upper left corner, 2% of its height
+    // The inset, as fractions of the 4:3 view: a square 3/8 of its height, in its upper left corner, 2% of its height
     // away from the top and left edges; its frame and label are placed over it.
-    const insetSide = 1 / 2, insetMargin = 0.02, aspect = 4 / 3;
+    const insetSide = 3 / 8, insetMargin = 0.02, aspect = 4 / 3;
     const sunInset = {left: insetMargin / aspect, bottom: 1 - insetMargin - insetSide,
       width: insetSide / aspect, height: insetSide};
     Object.assign(document.getElementById('fig-planet-inset').style, {
