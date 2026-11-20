@@ -178,77 +178,65 @@
       <figcaption>Twin paradox</figcaption>
     </figure>
 
-    <p class="wip">The following text is a placeholder for now.</p>
+    <h2 id="black-holes">Black holes</h2>
 
     <p>
-      To keep things simple, the simulated universe is flat in one more sense: space has only two dimensions. The ship
-      moves in a plane, and so does light. We look down on that plane with the ship in the center. Each point around
-      it shows where the light arriving at the ship <i>right now</i> came from. Its direction is the direction the
-      light came from, and its distance from the ship is how far the light traveled, which is also how long ago it
-      left. A grid is painted on space so you can see how it moves and distorts.
-    </p>
-
-    <h2 id="flat-space">Moving through flat space</h2>
-    <p>
-      Start without gravity, in the flat spacetime of special relativity. The speed of light is the same for everyone,
-      and nothing goes faster.
-    </p>
-    <p>
-      <b>Lengths contract.</b> An object moving past you at speed <math><mi>v</mi></math> is shorter along its
-      direction of motion, by the Lorentz factor
-      <math><mi>γ</mi><mo>=</mo><mfrac><mn>1</mn><msqrt><mn>1</mn><mo>−</mo><msup><mi>v</mi><mn>2</mn></msup><mo>/</mo><msup><mi>c</mi><mn>2</mn></msup></msqrt></mfrac></math>.
-      At 90% of the speed of light, <math><mi>γ</mi><mo>≈</mo><mn>2.3</mn></math>. This is not an optical illusion.
-      Measuring a length means marking both ends <i>at the same moment</i>, and observers moving relative to each
-      other disagree on which moments are simultaneous. Seen from a moving ship, the grid really is shorter along the
-      direction of motion.
-    </p>
-    <p>
-      <b>But that's not what you see.</b> Your eyes, or your camera, catch light that left different parts of an object
-      at different times. The grid ahead of you is rushing toward you, so light from its far parts set out earlier,
-      when they were even farther away. That stretches the view ahead. Behind you it's the other way around, and the
-      view is squeezed. Together with the contraction, things straight ahead look longer by a factor
-      <math><msqrt><mfrac><mrow><mn>1</mn><mo>+</mo><mi>β</mi></mrow><mrow><mn>1</mn><mo>−</mo><mi>β</mi></mrow></mfrac></msqrt></math>,
-      where <math><mi>β</mi><mo>=</mo><mi>v</mi><mo>/</mo><mi>c</mi></math>, and things straight behind look shorter
-      by the same factor. At 90% of light speed, that's a factor of about 4.4 either way.
-    </p>
-    <p>
-      <b>Light piles up ahead.</b> Light from the sides appears to come from farther ahead, like rain hitting the
-      windshield of a moving car. This is called aberration. The view of the world around you crowds into a cone in
-      front of you, and behind you it thins out. The light ahead is also Doppler-shifted to higher energies: you run
-      into the waves faster. Both effects make the view ahead much brighter and bluer, and the view behind dimmer and
-      redder. This is called relativistic beaming. In the simulation, the grid glows like a warm white light source.
-      Its color and brightness follow the shift: bluish ahead, orange behind.
+      So far, spacetime has been flat. Gravity changes that: in general relativity, mass bends spacetime, and
+      everything—even light—follows the bends. A black hole is the most extreme case. So much mass is squeezed into so
+      little space that nothing can get out from within a boundary around it, the <i>event horizon</i>—not even light.
     </p>
 
     <p>
-      To see what relativity changes, start with a world without it. In figure 1, light travels infinitely fast, and
-      the ship sees everything around it as it is right now. Figure 2 shows the same flight in flat spacetime.
+      Here, the spaceship is in a circular orbit around a black hole. You can fly it just like before, and zoom out
+      to see more.
     </p>
 
-    <h2 id="black-hole">Black hole</h2>
-    <p>
-      Two months after Einstein published general relativity in 1915, Karl Schwarzschild found the first exact
-      solution of its equations: <a href="https://en.wikipedia.org/wiki/Schwarzschild_metric">the spacetime around a
-        single, non-rotating mass</a>. If that mass is squeezed within the Schwarzschild radius
-      <math><msub><mi>r</mi><mi>s</mi></msub><mo>=</mo><mn>2</mn><mi>G</mi><mi>M</mi><mo>/</mo><msup><mi>c</mi><mn>2</mn></msup></math>,
-      it becomes a black hole. The sphere at <math><msub><mi>r</mi><mi>s</mi></msub></math> is its event horizon, and
-      nothing that crosses it can ever get out. In the figure below, the ship falls in from rest far away. Nothing
-      special happens locally as it crosses the horizon, yet from there it reaches the singularity at the center in a
-      finite time of its own. The simulation uses
-      <a href="https://en.wikipedia.org/wiki/Gullstrand%E2%80%93Painlev%C3%A9_coordinates">Gullstrand–Painlevé
-        coordinates</a>. In them, space can be pictured as flowing into the black hole like a river, faster and faster,
-      reaching the speed of light at the horizon, and the falling ship is carried along with it.
-    </p>
-
-    <figure id="fig-black-hole">
+    <figure id="fig-orbit">
       <div class="view">
-        <div class="placeholder">Interactive figure coming soon</div>
+        <canvas id="fig-orbit-canvas" aria-label="The view from a spaceship orbiting a black hole, the light arriving at it now, looking down on a square grid painted on space, bent around the black hole, which shows as a dark wedge behind it; the ship is in the center."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-orbit-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
       </div>
-      <figcaption>
-        A spaceship falling into a black hole from rest far away. Drag the slider to move along its
-        journey, from 3 <math><msub><mi>r</mi><mi>s</mi></msub></math> to 0.1
-        <math><msub><mi>r</mi><mi>s</mi></msub></math>.
-      </figcaption>
+      <p class="note" id="fig-orbit-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>Orbiting a black hole</figcaption>
+    </figure>
+
+    <p>
+      The black hole doesn't look like a black disk. It's a black wedge, starting at the hole and widening all the
+      way to the edge of the view. Remember what the view shows: each point is where the light arriving at the ship
+      came from—its direction, and how far it traveled. Light that would reach the ship from directions behind the
+      black hole would have to come out of it, and nothing does. So all the directions within some angle around the
+      black hole are dark, however far you look, and a range of directions, drawn like this, is a wedge. (In three
+      dimensions, the same range of directions makes the round, dark shadow in the famous pictures of black holes.)
+      Just outside the wedge, light swings around the black hole before reaching the ship. That's why the grid there
+      looks so bent: you're seeing parts of space that are beside or behind the black hole, some of them more than
+      once.
+    </p>
+
+    <p>
+      What happens when you fall in? Below, the spaceship falls into a bigger black hole, so that the trip takes long
+      enough to watch. It's already moving at 71% of the speed of light when it starts, at twice the horizon's radius,
+      and crosses the horizon about 9 seconds later. Nothing special happens there—there's no wall or surface, and
+      the crew wouldn't notice crossing it. But there's no way back. Inside, every path leads to the center, even for
+      light pointing outward, and the ship reaches it about 5 seconds later.
+    </p>
+
+    <p>
+      Someone watching from far away would never see the ship cross the horizon. Its light would take longer and
+      longer to climb out, so the ship would seem to slow down, redden and fade, frozen just above the horizon. The
+      ship itself keeps seeing the universe outside all the way in: light from outside keeps falling in after it.
+    </p>
+
+    <figure id="fig-fall">
+      <div class="view">
+        <canvas id="fig-fall-canvas" aria-label="The view from a spaceship falling into a black hole, the light arriving at it now, looking down on a square grid painted on space, bent around the black hole; the ship is in the center."></canvas>
+        <div class="overlay">
+          <button type="button" id="fig-fall-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
+        </div>
+      </div>
+      <p class="note" id="fig-fall-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
+      <figcaption>Falling into a black hole</figcaption>
     </figure>
   </main>
 
@@ -281,8 +269,10 @@
     const show = (id, text) => { document.getElementById(id).textContent = text; };
 
     // `scale`: the size and speed of the flight (see above); `viewMode`: what the figure shows, what the ship sees or
-    // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
-    // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
+    // what is there now (see VIEW_SEEN); `scenarioId`: if given, the figure starts as the app's scenario of that id
+    // does (see js/scenarios.js), in its spacetime; otherwise, in flat spacetime, `startSpeed` and `startPosition`:
+    // the ship's speed (as a fraction of c) and position (x, y) at the start; `objects`: the objects around it, as in
+    // a scenario's state (by default, the scenario's, or none); `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
     // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `autopilot`: if given,
     // {targets: [{point: [x, y], label, sub}, ...], limits, initial}: its buttons, one per target (the label, and
@@ -295,7 +285,7 @@
     // top clockwise into a full circle, the second shrinks it from the top the same way (its start following); the
     // speed, γ and acceleration are shown where the figure has them
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
-      objects = [], shipClock = false, viewOffset = [0, 0], views = null, autopilot = null,
+      scenarioId = null, objects = null, shipClock = false, viewOffset = [0, 0], views = null, autopilot = null,
       historyDt = undefined, readouts = null} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
@@ -394,13 +384,19 @@
       // a long press (on Android, or a right click) steers too, rather than opening the context menu
       canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
-      const scenario = scenarios.find(sc => sc.id == 'flat');
+      const scenario = scenarios.find(sc => sc.id == (scenarioId ?? 'flat'));
       const metric = new scenario.metric(scenario.params);
-      // the ship starts out coasting at `startSpeed` diagonally, along (1, 2)
-      const [vx, vy] = [1, 2].map(c => c / Math.sqrt(5) * startSpeed * scale), g = 1 / Math.sqrt(1 - vx * vx - vy * vy);
       const setup = scenario.setup(metric);
-      const ship = {...setup.ship, x: [setup.ship.x[0], ...startPosition], u: [g, g * vx, g * vy]};
-      const state = {...setup, ship, objects, viewportSize: 4.5 * scale};
+      let state;
+      if (scenarioId) {
+        // as the app's scenario starts (its objects, unless given)
+        state = {...setup, objects: objects ?? setup.objects};
+      } else {
+        // in flat spacetime, the ship starts out coasting at `startSpeed` diagonally, along (1, 2)
+        const [vx, vy] = [1, 2].map(c => c / Math.sqrt(5) * startSpeed * scale), g = 1 / Math.sqrt(1 - vx * vx - vy * vy);
+        const ship = {...setup.ship, x: [setup.ship.x[0], ...startPosition], u: [g, g * vx, g * vy]};
+        state = {...setup, ship, objects: objects ?? [], viewportSize: 4.5 * scale};
+      }
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
         if (target) {
           const control = flyTo(sim.world, target, dt, autopilot.limits);
@@ -437,7 +433,8 @@
             }
           }
         }
-        el('reset').hidden = !flown;
+        // (also once the ship can't go on: it reached the singularity)
+        el('reset').hidden = !flown && !sim.world.crashed;
         if (views) sim.renderer.views = views(sim.world);
       }, {historyDt});
       if (!sim) {
@@ -545,6 +542,12 @@
           tau: sunSince + sunClockAhead},
       ],
     });
+    // The black hole figures start as the app's scenarios do: a circular orbit at 10 rs (without the scenario's
+    // falling planet), and a fall from 2 rs, at the speed of a fall from rest far away, into a black hole 25 times as
+    // heavy, so that it takes longer: 9 s to the horizon, then 5 s to the singularity (where it stops; reset to
+    // start again).
+    velocityFigure('fig-orbit', {scenarioId: 'free', objects: []});
+    velocityFigure('fig-fall', {scenarioId: 'fall-in'});
   </script>
 </body>
 
