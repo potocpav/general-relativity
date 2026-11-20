@@ -150,13 +150,13 @@
     <figure id="fig-planet">
       <div class="stats">
         <div class="stat">
-          <div>Speed, <math><mi>v</mi></math></div>
-          <div id="fig-planet-v">0.00&#x202F;c</div>
-          <div class="sub" id="fig-planet-v-si">0&#x202F;km/s</div>
+          <div>Sun time, <math><mi>τ</mi></math></div>
+          <div id="fig-planet-sun-time">0:00</div>
+          <div class="sub">as seen from the spaceship</div>
         </div>
         <div class="stat">
-          <div>Lorentz factor, <math><mi>γ</mi></math></div>
-          <div id="fig-planet-gamma">1.00</div>
+          <div>Spaceship time, <math><mi>τ</mi></math></div>
+          <div id="fig-planet-ship-time">0:00</div>
         </div>
       </div>
       <div class="view">
@@ -285,10 +285,12 @@
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
     // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `maxSpeed`: the
-    // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects)
+    // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects);
+    // `readouts`: if given, the figure's own readouts for the world's state, at every frame, as {name: text}, each
+    // shown in the element `${prefix}-${name}` (the speed, γ and acceleration are shown where the figure has them)
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
       objects = [], shipClock = false, viewOffset = [0, 0], views = null, maxSpeed = undefined,
-      historyDt = undefined} = {}) {
+      historyDt = undefined, readouts = null} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
@@ -371,14 +373,19 @@
         }
         const [ut, ux, uy] = sim.world.obsvU, v = Math.hypot(ux, uy) / ut / scale;
         // the speed (without relativity, scaled down, it can pass c)
-        show(`${prefix}-v`, scale == 1 ? lightSpeedFraction(v) : speed(v));
-        show(`${prefix}-v-si`, kmPerS(v));
+        if (el('v')) {
+          show(`${prefix}-v`, scale == 1 ? lightSpeedFraction(v) : speed(v));
+          show(`${prefix}-v-si`, kmPerS(v));
+        }
         // and either the engine's acceleration (in c per second of the figure's time), or γ
         if (el('a')) {
           show(`${prefix}-a`, `${(accel / scale).toFixed(1)}\u202fc/s`);
           show(`${prefix}-a-si`, inG(accel / scale));
-        } else {
+        } else if (el('gamma')) {
           show(`${prefix}-gamma`, ut.toFixed(2));
+        }
+        if (readouts) {
+          for (const [name, text] of Object.entries(readouts(sim.world))) show(`${prefix}-${name}`, text);
         }
         el('reset').hidden = !flown;
         if (views) sim.renderer.views = views(sim.world);
@@ -414,6 +421,16 @@
     // objects' history reaches back further, in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun
     // is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
+    // The Sun's clock, on its near edge at the height of the ship's clock (0.38), ahead by the light travel time to
+    // the ship at the start, so that it's seen in sync with the ship's clock (both 0:00 at the start)
+    const sunClock = [sunRadius, 0.38], sunClockAhead = Math.hypot(shipStart - sunClock[0], sunClock[1]);
+    // a proper time as the clocks show it (see render_clock in glsl/surface-frag.glsl): minutes:seconds, wrapping
+    // after 59:59 (a microsecond is added, so that rounding errors at a whole second don't show the one before)
+    const clockTime = tau => {
+      tau += 1e-6;
+      const s = Math.floor(tau - 3600 * Math.floor(tau / 3600));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
     // The inset, as fractions of the 4:3 view: a square 1/2 of its height, in its upper left corner, 2% of its height
     // away from the top and left edges; its frame and label are placed over it.
     const insetSide = 1 / 2, insetMargin = 0.02, aspect = 4 / 3;
@@ -454,6 +471,13 @@
       // whole Sun). The ship's top speed is 0.99999 c.
       startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, maxSpeed: 0.99999, historyDt: 3,
       viewOffset: [0.2, 0],
+      // the Sun's clock and the ship's, as they show (see clockTime): the Sun's as the ship sees it now, at the time its
+      // light left it (the Sun's clock at rest, its proper time is the coordinate time, plus sunClockAhead)
+      readouts: world => {
+        const [t, x, y] = world.obsvX;
+        const emitted = t - Math.hypot(x - sunClock[0], y - sunClock[1]);
+        return {'sun-time': clockTime(emitted + sunClockAhead), 'ship-time': clockTime(world.time)};
+      },
       views: world => [
         {left: 0, bottom: 0, width: 1, height: 1, viewportSize: 4.5, viewOffset: world.viewOffset},
         {...sunInset, viewportSize: 6, center: seenFromShip(world, [0, 0])},
@@ -463,8 +487,8 @@
         // on the Sun's near edge, the size of the ship's clock (0.5 by 0.2, so a diagonal of 0.54) and as high (0.38),
         // ahead by the light travel time to the ship, so that it's seen in sync with the ship's clock (at rest, its
         // proper time is the coordinate time)
-        {type: clockId, x: [sunSince, sunRadius, 0.38], u: [1, 0, 0], size: Math.hypot(0.5, 0.2),
-          tau: sunSince + Math.hypot(shipStart - sunRadius, 0.38)},
+        {type: clockId, x: [sunSince, ...sunClock], u: [1, 0, 0], size: Math.hypot(0.5, 0.2),
+          tau: sunSince + sunClockAhead},
       ],
     });
   </script>
