@@ -131,7 +131,8 @@ figcaption b {
   font-variant-numeric: tabular-nums;
 }
 
-/* The fraction of a second, next to a time: an arc clockwise from the top, over a faint full circle. */
+/* The fraction of a second, next to a time: an arc clockwise from the top, over a faint full circle; every second
+   round, the other way around (a faint arc over the full circle), so that it never flips at once. */
 .stat .seconds {
   width: 0.8em;
   height: 0.8em;
@@ -148,6 +149,14 @@ figcaption b {
 .stat .seconds circle:last-child {
   stroke: currentColor;
   stroke-dasharray: 0 1;
+}
+
+.stat .seconds.second-round circle:first-child {
+  stroke: currentColor;
+}
+
+.stat .seconds.second-round circle:last-child {
+  stroke: var(--line);
 }
 
 /* The simulation's view. */

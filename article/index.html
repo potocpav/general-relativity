@@ -287,9 +287,10 @@
     // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `maxSpeed`: the
     // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects);
     // `readouts`: if given, the figure's own readouts for the world's state, at every frame, as {name: text}, each
-    // shown in the element `${prefix}-${name}`, or {name: {text, arc}}, also showing the fraction `arc` (0 to 1) as
-    // the arc `${prefix}-${name}-arc` (a circle of pathLength 1); the speed, γ and acceleration are shown where the
-    // figure has them
+    // shown in the element `${prefix}-${name}`, or {name: {text, arc}}, also showing `arc` (0 to 2: two rounds) as
+    // the arc `${prefix}-${name}-arc` (a circle of pathLength 1, in an svg.seconds): the first round fills the circle,
+    // the second empties it, filling it with the circle's color (the svg's class `second-round`, see style.css); the
+    // speed, γ and acceleration are shown where the figure has them
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
       objects = [], shipClock = false, viewOffset = [0, 0], views = null, maxSpeed = undefined,
       historyDt = undefined, readouts = null} = {}) {
@@ -389,7 +390,11 @@
         if (readouts) {
           for (const [name, value] of Object.entries(readouts(sim.world))) {
             show(`${prefix}-${name}`, value.text ?? value);
-            if (value.arc != null) el(`${name}-arc`).style.strokeDasharray = `${value.arc} 1`;
+            if (value.arc != null) {
+              const arc = el(`${name}-arc`);
+              arc.parentNode.classList.toggle('second-round', value.arc >= 1);
+              arc.style.strokeDasharray = `${value.arc % 1} 1`;
+            }
           }
         }
         el('reset').hidden = !flown;
@@ -430,12 +435,12 @@
     // the ship at the start, so that it's seen in sync with the ship's clock (both 0:00 at the start)
     const sunClock = [sunRadius, 0.38], sunClockAhead = Math.hypot(shipStart - sunClock[0], sunClock[1]);
     // a proper time as the clocks show it (see render_clock in glsl/surface-frag.glsl): minutes:seconds, wrapping
-    // after 59:59, and the fraction of the second as an arc (a microsecond is added, so that rounding errors at a
-    // whole second don't show the one before)
+    // after 59:59, and the fraction of the second as an arc, filling and emptying in turns (two rounds, every two
+    // seconds; a microsecond is added, so that rounding errors at a whole second don't show the one before)
     const clockTime = tau => {
       tau += 1e-6;
       const s = Math.floor(tau - 3600 * Math.floor(tau / 3600));
-      return {text: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, arc: tau - Math.floor(tau)};
+      return {text: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, arc: tau - 2 * Math.floor(tau / 2)};
     };
     // The inset, as fractions of the 4:3 view: a square 1/2 of its height, in its upper left corner, 2% of its height
     // away from the top and left edges; its frame and label are placed over it.
