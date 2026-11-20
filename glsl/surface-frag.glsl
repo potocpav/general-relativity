@@ -470,8 +470,9 @@ void main( void ) {
 
 	// The ship as seen by itself: in its rest frame, whose axes are the
 	// screen's, where the viewport vector is the pixel's offset from it (light
-	// travel across the ship is negligible), so it is never contracted.
-	float pixel_size = 4.0 * viewport_size / (resolution.x + resolution.y); // twice a pixel, as in render_obj
+	// travel across the ship is negligible), so it is never contracted. Nor
+	// distorted: its edges (and its clock's) are smoothed over exactly a pixel.
+	float pixel_size = 2.0 * viewport_size / (resolution.x + resolution.y);
 	vec4 obsv_color = render_ship(obsv_thrusting, time,
 		rot(obsv_o) * screen_to_frame(obsv_x, pix_cartesian) / ship_scale, pixel_size / ship_scale);
 
