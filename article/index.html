@@ -229,6 +229,18 @@
     </p>
 
     <figure id="fig-fall">
+      <div class="stats">
+        <div class="stat">
+          <div>Distance from the center, <math><mi>r</mi></math></div>
+          <div id="fig-fall-r">2.00&#x202F;rₛ</div>
+          <div class="sub" id="fig-fall-r-where">outside the horizon</div>
+        </div>
+        <div class="stat">
+          <div>Speed, <math><mi>v</mi></math></div>
+          <div id="fig-fall-speed">0.71&#x202F;c</div>
+          <div class="sub">by the clocks far away</div>
+        </div>
+      </div>
       <div class="view">
         <canvas id="fig-fall-canvas" aria-label="The view from a spaceship falling into a black hole, the light arriving at it now, looking down on a square grid painted on space, bent around the black hole; the ship is in the center."></canvas>
         <div class="overlay">
@@ -547,7 +559,22 @@
     // heavy, so that it takes longer: 9 s to the horizon, then 5 s to the singularity (where it stops; reset to
     // start again).
     velocityFigure('fig-orbit', {scenarioId: 'free', objects: []});
-    velocityFigure('fig-fall', {scenarioId: 'fall-in'});
+    // Its distance from the center, in units of rs, and its speed by the clocks far away: in Gullstrand–Painlevé
+    // coordinates (T, r, phi), space at a moment T is flat, with r and r phi its distances, and T is the time of
+    // clocks at rest far away (and of the ship falling from rest there). So the speed is the distance on that flat
+    // space covered per unit T, |(u^r, r u^phi)| / u^T: for the falling ship, sqrt(rs / r), the speed at which
+    // space falls in in the river picture; c at the horizon, faster inside (no observer measures it locally).
+    velocityFigure('fig-fall', {
+      scenarioId: 'fall-in',
+      readouts: world => {
+        const rs = world.metric.rs, [, r] = world.obsvX, [ut, ur, uphi] = world.obsvU;
+        return {
+          'r': `${(r / rs).toFixed(2)}\u202fr\u209b`,
+          'r-where': r > rs ? 'outside the horizon' : 'inside the horizon',
+          'speed': `${(Math.hypot(ur, r * uphi) / ut).toFixed(2)}\u202fc`,
+        };
+      },
+    });
   </script>
 </body>
 
