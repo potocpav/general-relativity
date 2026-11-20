@@ -98,14 +98,14 @@ const gpScenarios = [
   {
     id: 'free',
     name: 'Free play',
-    description: 'A circular orbit at 10 rs, with a planet falling past. ' +
+    description: 'A circular orbit at 7 rs, with a planet falling past. ' +
       'Boost with the mouse or the arrow keys, spawn planets and clocks, and explore.',
     setup: metric => {
       const rs = metric.rs;
       const planet = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
       return {
         ...defaults,
-        ship: ship(circularOrbit(metric, 10 * rs, 0)),
+        ship: ship(circularOrbit(metric, 7 * rs, 0)),
         // started in the past, so that the planet is visible right away
         objects: [object(planetId, backwards(metric, planet, 40))],
       };
