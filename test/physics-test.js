@@ -178,32 +178,36 @@ function checkSpecialRelativityJs() {
 
 // The article's autopilot (flyTo, in flat spacetime): from any position and
 // velocity, flown to a target point, the ship comes to rest there and stays,
-// within the speed limits on each axis (once below them); also with the
-// target changed mid-flight.
+// its engine off (no corrections back and forth), within the speed limits on
+// each axis (once below them); also with the target changed mid-flight.
 function checkFlyToPilotJs() {
   const errors = [], dt = 1 / 60;
   const limits = {x: {accel: 0.5, speed: 0.99999}, y: {accel: 0.5, speed: 0.7}};
   const world = new World(null, new Minkowski());
-  // fly to `target` for `seconds`; returns the most it then moved away from the target after first arriving, and
-  // the most it went over the y speed limit once below it
+  // fly to `target` for `seconds`; returns how far it then moved after first being at rest at the target, the
+  // number of burns after that, and the most it went over the y speed limit once below it
   const fly = (target, seconds) => {
-    let arrived = false, drift = 0, over = 0, below = false;
+    let rest = null, drift = 0, burns = 0, over = 0, below = false;
     for (let t = 0; t < seconds; t += dt) {
-      world.step(dt, flyTo(world, target, dt, limits));
+      const control = flyTo(world, target, dt, limits);
+      if (rest && control.accel > 0) burns++;
+      world.step(dt, control);
       const [ut, ux, uy] = world.obsvU, vy = Math.abs(uy / ut);
-      const d = Math.hypot(world.obsvX[1] - target[0], world.obsvX[2] - target[1]);
-      if (arrived) drift = Math.max(drift, d);
-      else arrived = d < 1e-3 && Math.hypot(ux, uy) < 1e-3;
+      if (rest) drift = Math.max(drift, Math.hypot(world.obsvX[1] - rest[0], world.obsvX[2] - rest[1]));
+      else if (Math.hypot(world.obsvX[1] - target[0], world.obsvX[2] - target[1]) < 1e-3 && Math.hypot(ux, uy) < 1e-9) {
+        rest = world.obsvX.slice(1);
+      }
       if (below) over = Math.max(over, vy - limits.y.speed);
       below ||= vy <= limits.y.speed;
     }
-    return {drift, over};
+    return {drift, burns, over};
   };
-  const check = (label, target, {drift, over}) => {
+  const check = (label, target, {drift, burns, over}) => {
     const d = Math.hypot(world.obsvX[1] - target[0], world.obsvX[2] - target[1]);
     const w = Math.hypot(world.obsvU[1], world.obsvU[2]);
-    if (!(d < 1e-3 && w < 1e-3)) errors.push(`${label}: ${d.toExponential(1)} away, proper speed ${w.toExponential(1)}`);
-    if (drift > 1e-3) errors.push(`${label}: drifted ${drift.toExponential(1)} away after arriving`);
+    if (!(d < 1e-3 && w < 1e-9)) errors.push(`${label}: ${d.toExponential(1)} away, proper speed ${w.toExponential(1)}`);
+    if (drift > 1e-6) errors.push(`${label}: drifted ${drift.toExponential(1)} after coming to rest`);
+    if (burns > 0) errors.push(`${label}: fired ${burns} times after coming to rest`);
     // (within a step's error: the acceleration is constant in the ship's rest frame over a step, not on each axis)
     if (over > 1e-4) errors.push(`${label}: over the y speed limit by ${over.toExponential(1)}`);
   };
@@ -220,7 +224,7 @@ function checkFlyToPilotJs() {
   fly([116, 0], 10);
   check('retargeted', [23.2, 0], fly([23.2, 0], 100));
   return {ok: errors.length == 0, message: errors.length ? errors.slice(0, 5).join('; ') :
-    'comes to rest at its targets from random starts, and stays, within the speed limits'};
+    'comes to rest at its targets from random starts, and stays there, engine off, within the speed limits'};
 }
 
 // The reference and static frames are orthonormal, and T, Tinv are inverses.
