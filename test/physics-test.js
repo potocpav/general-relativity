@@ -13,7 +13,7 @@ import { scenarios, velocity3 } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { World } from '../js/world.js';
 import { planetId, objectRadius } from '../js/object-types.js';
-import { flyToX } from '../article/pilots.js';
+import { flyTo } from '../article/pilots.js';
 
 const root = '../';
 const nSamples = 64;
@@ -176,34 +176,51 @@ function checkSpecialRelativityJs() {
     `straight lines to ${maxError.toExponential(1)}; aberration and Doppler factor match`};
 }
 
-// The article's autopilot (flyToX, in flat spacetime): flown to a target x,
-// the ship stops exactly there, without overshooting and without moving
-// sideways; also for tiny moves, and with the target changed mid-flight.
-function checkFlyToXPilotJs() {
-  const errors = [], dt = 1 / 60, accel = 0.5;
+// The article's autopilot (flyTo, in flat spacetime): from any position and
+// velocity, flown to a target point, the ship comes to rest there and stays,
+// within the speed limits on each axis (once below them); also with the
+// target changed mid-flight.
+function checkFlyToPilotJs() {
+  const errors = [], dt = 1 / 60;
+  const limits = {x: {accel: 0.5, speed: 0.99999}, y: {accel: 0.5, speed: 0.7}};
   const world = new World(null, new Minkowski());
-  world.reset([0, 1.5, 0], [1, 0, 0], Math.PI / 2);
+  // fly to `target` for `seconds`; returns the most it then moved away from the target after first arriving, and
+  // the most it went over the y speed limit once below it
   const fly = (target, seconds) => {
-    const dir = Math.sign(target - world.obsvX[1]);
-    let overshoot = 0;
+    let arrived = false, drift = 0, over = 0, below = false;
     for (let t = 0; t < seconds; t += dt) {
-      world.step(dt, flyToX(world, target, dt, accel));
-      overshoot = Math.max(overshoot, dir * (world.obsvX[1] - target));
+      world.step(dt, flyTo(world, target, dt, limits));
+      const [ut, ux, uy] = world.obsvU, vy = Math.abs(uy / ut);
+      const d = Math.hypot(world.obsvX[1] - target[0], world.obsvX[2] - target[1]);
+      if (arrived) drift = Math.max(drift, d);
+      else arrived = d < 1e-3 && Math.hypot(ux, uy) < 1e-3;
+      if (below) over = Math.max(over, vy - limits.y.speed);
+      below ||= vy <= limits.y.speed;
     }
-    return overshoot;
+    return {drift, over};
   };
-  const check = (label, target, overshoot = 0) => {
-    const x = world.obsvX[1], v = world.obsvU[1] / world.obsvU[0];
-    if (!(Math.abs(x - target) < 1e-3 && Math.abs(v) < 1e-9)) errors.push(`${label}: x = ${x.toFixed(4)}, v = ${v.toExponential(1)}`);
-    if (overshoot > 1e-3) errors.push(`${label}: overshot by ${overshoot.toFixed(4)}`);
-    if (Math.abs(world.obsvU[2]) > 1e-9) errors.push(`${label}: moving sideways`);
+  const check = (label, target, {drift, over}) => {
+    const d = Math.hypot(world.obsvX[1] - target[0], world.obsvX[2] - target[1]);
+    const w = Math.hypot(world.obsvU[1], world.obsvU[2]);
+    if (!(d < 1e-3 && w < 1e-3)) errors.push(`${label}: ${d.toExponential(1)} away, proper speed ${w.toExponential(1)}`);
+    if (drift > 1e-3) errors.push(`${label}: drifted ${drift.toExponential(1)} away after arriving`);
+    // (within a step's error: the acceleration is constant in the ship's rest frame over a step, not on each axis)
+    if (over > 1e-4) errors.push(`${label}: over the y speed limit by ${over.toExponential(1)}`);
   };
-  for (const target of [10, 1.5, 5, 4.8, 4.79, 9, 2]) check(`to ${target}`, target, fly(target, 20));
-  // a new target mid-flight, which the ship may be too fast to stop at (so no overshoot check): it comes back
-  fly(10, 5);
-  fly(6, 30);
-  check('retargeted', 6);
-  return {ok: errors.length == 0, message: errors.length ? errors.slice(0, 5).join('; ') : 'stops exactly at its targets, without overshooting'};
+  const targets = [[3.5, 0], [23.2, 0], [46.4, 0], [116, 0]];
+  for (let i = 0; i < 8; i++) {
+    const v = randomVector2(0.95), g = 1 / Math.sqrt(1 - v[0] ** 2 - v[1] ** 2);
+    world.reset([0, uniform(-50, 50), uniform(-50, 50)], [g, g * v[0], g * v[1]], uniform(0, 2 * Math.PI));
+    const target = targets[i % targets.length];
+    check(`from (${world.obsvX[1].toFixed(1)}, ${world.obsvX[2].toFixed(1)}) at (${v.map(c => c.toFixed(2))}) to ${target}`,
+      target, fly(target, 150));
+  }
+  // a new target mid-flight, which the ship is too fast to stop at: it comes back
+  world.reset([0, 3.5, 0], [1, 0, 0]);
+  fly([116, 0], 10);
+  check('retargeted', [23.2, 0], fly([23.2, 0], 100));
+  return {ok: errors.length == 0, message: errors.length ? errors.slice(0, 5).join('; ') :
+    'comes to rest at its targets from random starts, and stays, within the speed limits'};
 }
 
 // The reference and static frames are orthonormal, and T, Tinv are inverses.
@@ -1097,7 +1114,7 @@ async function main() {
   };
   await run('metric parameters (JS)', async () => checkMetricParamsJs());
   await run('scenarios (JS)', async () => checkScenariosJs());
-  await run("article: the autopilot (JS)", async () => checkFlyToXPilotJs());
+  await run("article: the autopilot (JS)", async () => checkFlyToPilotJs());
   for (const type of metricTypes) {
     metric = new type({rs});
     random = prng(42);

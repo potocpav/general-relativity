@@ -166,13 +166,8 @@
           <button type="button" id="fig-planet-reset" aria-label="Reset" title="Reset" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7.75.75 0 1 1 1.4.5A4 4 0 1 0 8 4h-.6l1.1 1.1a.75.75 0 0 1-1 1L5.2 3.8a.75.75 0 0 1 0-1.1L7.5.5a.75.75 0 0 1 1 1L7.4 2.5z"/></svg></button>
         </div>
       </div>
-      <div class="controls">
-        <label for="fig-planet-target">Target position</label>
-        <div class="slider labeled">
-          <input type="range" id="fig-planet-target" min="3.5" max="193.2" step="0.1" value="3.5">
-          <div class="marker" id="fig-planet-actual" title="Actual position"></div>
-        </div>
-        <output for="fig-planet-target" id="fig-planet-target-out">3.5</output>
+      <div class="controls targets" id="fig-planet-targets">
+        <span class="label">Autopilot</span>
       </div>
       <p class="note" id="fig-planet-note" hidden>This figure needs WebGL 2, which this browser does not provide.</p>
       <figcaption>Twin paradox</figcaption>
@@ -261,7 +256,7 @@
     import { scenarios } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
     import { clockId, sunId, sunDiameter } from '../js/object-types.js';
-    import { flyToX, pushAlongX } from './pilots.js';
+    import { flyTo } from './pilots.js';
 
     // a speed as a fraction of the speed of light, e.g. 0.80 c
     const speed = v => `${v.toFixed(2)}\u202fc`;
@@ -284,41 +279,42 @@
     // what is there now (see VIEW_SEEN); `startSpeed` and `startPosition`: the ship's speed (as a fraction of c) and
     // position (x, y) at the start; `objects`: the objects around it, as in a scenario's state; `shipClock`: whether
     // a clock above the ship shows its proper time; `viewOffset`: where the ship is in the view (see World.viewOffset);
-    // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `maxSpeed`: the
-    // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects);
+    // `views`: if given, the views (see Renderer.views) for the world's state, at every frame; `autopilot`: if given,
+    // {targets: [[label, [x, y]], ...], limits} (see flyTo), its buttons, one per target, are added to the element
+    // `${prefix}-targets`; `historyDt`: the objects' history step (see Objects);
     // `readouts`: if given, the figure's own readouts for the world's state, at every frame, as {name: text}, each
     // shown in the element `${prefix}-${name}`, or {name: {text, arc}}, also showing `arc` (0 to 2: two rounds) as
     // the arc `${prefix}-${name}-arc` (a circle of pathLength 1, in an svg.seconds): the first round grows it from the
     // top clockwise into a full circle, the second shrinks it from the top the same way (its start following); the
     // speed, γ and acceleration are shown where the figure has them
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
-      objects = [], shipClock = false, viewOffset = [0, 0], views = null, maxSpeed = undefined,
+      objects = [], shipClock = false, viewOffset = [0, 0], views = null, autopilot = null,
       historyDt = undefined, readouts = null} = {}) {
       const el = name => document.getElementById(`${prefix}-${name}`);
       const canvas = el('canvas');
       let throttle = 0, accel = 0; // the engine's throttle (0 to 1) and acceleration
-      let pushDir = 1; // with a slider, the direction the pointer last pushed the ship along x
       let flown = false; // whether the ship was flown since the start (or the last reset)
 
-      // A figure with a target slider is flown by the autopilot, to the slider's x position (see flyToX), once the
-      // slider is released ('change'; with the keyboard, each step); the slider's marker shows the ship's position.
-      // It can also be pushed by the pointer, along x only (away from the pointer, see pushAlongX): then the
-      // autopilot lets go (`target` is null) and the ship coasts after, the slider following it (at its ends,
-      // beyond them) until it's moved again. Without a slider, the ship is flown by the pointer.
-      const slider = el('target');
-      let target = slider ? +slider.value : null;
-      let sliding = false; // the slider being moved, not following the ship
-      const showTarget = () => show(`${prefix}-target-out`, (+slider.value).toFixed(1));
-      if (slider) {
-        slider.addEventListener('input', () => {
-          sliding = true;
-          showTarget();
-        });
-        slider.addEventListener('change', () => {
-          target = +slider.value;
-          sliding = false;
+      // The ship is flown by the pointer (see World.control), or by the autopilot (see flyTo), to the target of the
+      // autopilot's button last clicked, which stays pressed while it's active, also once there (holding the ship
+      // there); taking over with the pointer turns it off at once (the ship coasts after).
+      let target = null, targetButton = null;
+      const engage = (button, point) => {
+        targetButton?.setAttribute('aria-pressed', 'false');
+        targetButton = button;
+        target = point;
+        button?.setAttribute('aria-pressed', 'true');
+      };
+      for (const [label, point] of autopilot?.targets ?? []) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.innerHTML = label;
+        button.setAttribute('aria-pressed', 'false');
+        button.addEventListener('click', () => {
+          engage(button, point);
           flown = true;
         });
+        el('targets').append(button);
       }
 
       // the pointer, held down on the view: [x, y] in CSS pixels from the lower left corner, or null
@@ -330,6 +326,7 @@
       canvas.addEventListener('pointerdown', ev => {
         canvas.setPointerCapture(ev.pointerId);
         track(ev);
+        engage(null, null);
         flown = true;
       });
       canvas.addEventListener('pointermove', ev => { if (pointer) track(ev); });
@@ -345,27 +342,10 @@
       const ship = {...setup.ship, x: [setup.ship.x[0], ...startPosition], u: [g, g * vx, g * vy]};
       const state = {...setup, ship, objects, viewportSize: 4.5 * scale};
       const sim = await runFigure(canvas, metric, state, (sim, dt) => {
-        if (slider) {
-          throttle = Math.min(1, Math.max(0, throttle + (pointer ? dt : -dt) / rampTime));
-          if (pointer) target = null;
-          let control = {};
-          if (target != null) {
-            control = flyToX(sim.world, target, dt, sim.world.thrust, maxSpeed);
-          } else if (throttle > 0) {
-            // away from the pointer (while held; the engine ramps down after), along x: from where the ship is in
-            // the view (see World.viewOffset)
-            const shipX = (0.5 + sim.world.viewOffset[0]) * canvas.clientWidth;
-            if (pointer) pushDir = pointer[0] < shipX ? 1 : -1;
-            control = pushAlongX(sim.world, pushDir, dt, sim.world.thrust * throttle, maxSpeed);
-          }
+        if (target) {
+          const control = flyTo(sim.world, target, dt, autopilot.limits);
           accel = control.accel ?? 0;
           sim.step(dt, control);
-          const x = sim.world.obsvX[1], at = (x - slider.min) / (slider.max - slider.min);
-          el('actual').style.setProperty('--at', Math.min(1, Math.max(0, at)));
-          if (target == null && !sliding) {
-            slider.value = Math.min(slider.max, Math.max(slider.min, x));
-            showTarget();
-          }
         } else {
           const dim = [canvas.clientWidth, canvas.clientHeight];
           // the engine ramps up while the pointer is held, and down after; the heading follows the pointer
@@ -414,11 +394,7 @@
         sim.reset(state);
         flown = false;
         throttle = accel = 0;
-        if (slider) {
-          slider.value = target = startPosition[0];
-          sliding = false;
-          showTarget();
-        }
+        engage(null, null);
       });
     }
 
@@ -426,10 +402,9 @@
     velocityFigure('fig-relativistic', {viewMode: VIEW_NOW});
     velocityFigure('fig-light-cone', {startSpeed: 0});
     // The Sun at rest (its gravity disregarded), at its real size (in light seconds). The ship starts at rest at
-    // x = 3.5 (about 1.5 solar radii from its center), where the slider's range starts; it reaches out to Mercury's
-    // orbit, 193.2 (the ship pushed by the pointer can go further). The Sun's light seen from far away is old, so the
-    // objects' history reaches back further, in 1024 rows 3 s apart (3072 s; exact for objects at rest), and the Sun
-    // is there since 3000 s before the start.
+    // x = 3.5 (about 1.5 solar radii from its center), the autopilot's "Sun" target. The Sun's light seen from far
+    // away is old, so the objects' history reaches back further, in 1024 rows 3 s apart (3072 s; exact for objects at
+    // rest), and the Sun is there since 3000 s before the start.
     const sunRadius = sunDiameter / 2, shipStart = 3.5, sunSince = -3000;
     // The Sun's clock, on its near edge at the height of the ship's clock (0.38), ahead by the light travel time to
     // the ship at the start, so that it's seen in sync with the ship's clock (both 0:00 at the start)
@@ -462,26 +437,18 @@
       const k = (wx * dx + wy * dy) / (g + 1) - dt;
       return [dx + wx * k, dy + wy * k];
     };
-    // Above the slider, the planets' orbits within its range (their semi-major axes, in light seconds), as letters;
-    // the planets aren't in the simulation (at their real sizes, they'd be too small to see).
-    const orbits = [['M', 'Mercury', 57.909e6]];
-    {
-      const slider = document.getElementById('fig-planet-target');
-      for (const [letter, name, km] of orbits) {
-        const label = document.createElement('div');
-        label.className = 'label';
-        label.textContent = letter;
-        label.title = `${name}'s orbit, ${Math.round(km / 299792.458)} light seconds from the Sun`;
-        label.style.setProperty('--at', (km / 299792.458 - slider.min) / (slider.max - slider.min));
-        slider.before(label);
-      }
-    }
     velocityFigure('fig-planet', {
       // The light arriving at the ship now, at fixed zooms: the main view on the ship (4.5 light seconds across),
       // right of the middle, clear of the inset; the inset centered on the Sun, where the ship sees it (6 across, the
-      // whole Sun). The ship's top speed is 0.99999 c.
-      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, maxSpeed: 0.99999, historyDt: 3,
+      // whole Sun).
+      startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, historyDt: 3,
       viewOffset: [0.2, 0],
+      // the autopilot's targets, along the x axis, in solar radii from the Sun's center (the Sun's: the start); along
+      // x, it flies at up to 0.99999 c, along y, up to 0.7 c, accelerating at up to 0.5 c/s along each
+      autopilot: {
+        targets: [['Sun', [shipStart, 0]], ...[10, 20, 50].map(k => [`${k}&#x202F;R<sub>☉</sub>`, [k * sunRadius, 0]])],
+        limits: {x: {accel: 0.5, speed: 0.99999}, y: {accel: 0.5, speed: 0.7}},
+      },
       // the Sun's clock and the ship's, as they show (see clockTime): the Sun's as the ship sees it now, at the time its
       // light left it (the Sun's clock at rest, its proper time is the coordinate time, plus sunClockAhead)
       readouts: world => {

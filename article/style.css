@@ -245,6 +245,41 @@ figcaption b {
   font-size: 15px;
 }
 
+/* Buttons below a figure's view, after a label (e.g. the autopilot's targets); a pressed one is active. */
+.controls.targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls.targets .label {
+  margin-right: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.controls.targets button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.controls.targets button:hover {
+  border-color: var(--muted);
+}
+
+.controls.targets button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
 /* Sliders below a figure's view: a label, the slider and its value. */
 .controls {
   display: grid;
@@ -311,22 +346,6 @@ input[type=range]::-moz-range-thumb {
 .slider {
   position: relative;
   margin-top: 16px; /* room for the marker */
-}
-
-/* Labels above the marker (e.g. the planets' orbits along a distance slider), positioned by --at like it. */
-.slider.labeled {
-  margin-top: 34px; /* room for the labels and the marker */
-}
-
-.slider .label {
-  position: absolute;
-  bottom: calc(100% + 18px);
-  left: calc(9px + (100% - 18px) * var(--at, 0.5));
-  transform: translateX(-50%);
-  font-size: 12px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: default;
 }
 
 /* A small triangle above the track, pointing down at the value. */
