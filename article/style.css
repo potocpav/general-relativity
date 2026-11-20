@@ -131,6 +131,25 @@ figcaption b {
   font-variant-numeric: tabular-nums;
 }
 
+/* The fraction of a second, next to a time: an arc clockwise from the top, over a faint full circle. */
+.stat .seconds {
+  width: 0.8em;
+  height: 0.8em;
+  margin-left: 0.3em;
+  vertical-align: -0.05em;
+  fill: none;
+  stroke-width: 3;
+}
+
+.stat .seconds circle:first-child {
+  stroke: var(--line);
+}
+
+.stat .seconds circle:last-child {
+  stroke: currentColor;
+  stroke-dasharray: 0 1;
+}
+
 /* The simulation's view. */
 .view {
   position: relative;
