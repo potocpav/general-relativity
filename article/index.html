@@ -238,7 +238,7 @@
         <div class="stat">
           <div>Speed, <math><mi>v</mi></math></div>
           <div id="fig-fall-speed">0.71&#x202F;c</div>
-          <div class="sub">by the clocks far away</div>
+          <div class="sub">per second of a falling clock</div>
         </div>
       </div>
       <div class="view">
@@ -559,11 +559,12 @@
     // heavy, so that it takes longer: 9 s to the horizon, then 5 s to the singularity (where it stops; reset to
     // start again).
     velocityFigure('fig-orbit', {scenarioId: 'free', objects: []});
-    // Its distance from the center, in units of rs, and its speed by the clocks far away: in Gullstrand–Painlevé
-    // coordinates (T, r, phi), space at a moment T is flat, with r and r phi its distances, and T is the time of
-    // clocks at rest far away (and of the ship falling from rest there). So the speed is the distance on that flat
-    // space covered per unit T, |(u^r, r u^phi)| / u^T: for the falling ship, sqrt(rs / r), the speed at which
-    // space falls in in the river picture; c at the horizon, faster inside (no observer measures it locally).
+    // Its distance from the center, in units of rs, and its speed per second of a falling clock: in
+    // Gullstrand–Painlevé coordinates (T, r, phi), T is the time of clocks falling from rest far away (synchronized;
+    // the ship is one of them, unless flown), whose "now", a moment T, is flat space, with r and r phi its
+    // distances. So the speed is the distance on that flat space covered per unit T, |(u^r, r u^phi)| / u^T: for the
+    // falling ship, sqrt(rs / r), the speed at which space falls in in the river picture; c at the horizon, faster
+    // inside (no observer measures it locally).
     velocityFigure('fig-fall', {
       scenarioId: 'fall-in',
       readouts: world => {
