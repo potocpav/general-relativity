@@ -6,7 +6,7 @@ import htm from 'https://esm.sh/htm@3.1.1';
 import * as math from './math.js';
 import { Simulation } from './simulation.js';
 import { planetId, clockId, projectileId } from './object-types.js';
-import { scenarios, scenariosOf } from './scenarios.js';
+import { scenarios, scenariosOf, scenarioSettings, scenarioParams } from './scenarios.js';
 import { AdaptiveResolution } from './adaptive-resolution.js';
 import { localVelocity3, staticGamma, referenceGamma, metricTypes } from './metric.js';
 
@@ -52,13 +52,34 @@ if (quality_levels.includes(savedSettings.quality)) quality = savedSettings.qual
 // The initial scenario: from the URL (?scenario=<id>, set when a scenario is
 // chosen, so that it can be linked), else the last one chosen, else the first.
 const findScenario = id => scenarios.find(sc => sc.id == id && sc.setup);
-const initialScenario = findScenario(new URLSearchParams(location.search).get('scenario'))
+const urlParams = new URLSearchParams(location.search);
+const initialScenario = findScenario(urlParams.get('scenario'))
   ?? findScenario(savedSettings.scenario) ?? scenarios[0];
+// A scenario's settings (see scenarioSettings) as last chosen, remembered per scenario
+const savedScenarioSettings = id => loadSettings().scenarioSettings?.[id] ?? {};
+// The initial scenario's settings: from the URL (?<name>=<value>, set when they
+// are chosen), else as last chosen, else the defaults.
+const initialSettings = scenarioSettings(initialScenario,
+  {...savedScenarioSettings(initialScenario.id), ...Object.fromEntries(urlParams)});
+
+// Puts the scenario and its settings into the URL (only once chosen), so that it can be linked.
+function scenarioToUrl(scenario, settings) {
+  const url = new URL(location.href);
+  url.searchParams.set('scenario', scenario.id);
+  for (const sc of scenarios) for (const name in sc.settings ?? {}) url.searchParams.delete(name);
+  for (const [name, value] of Object.entries(settings)) url.searchParams.set(name, value);
+  history.replaceState(null, '', url);
+}
+
+// A setting's slider position (0 to 1; on a log scale, if the setting's is) and back, rounded to its digits.
+const settingToSlider = (s, v) => s.log ? Math.log(v / s.min) / Math.log(s.max / s.min) : (v - s.min) / (s.max - s.min);
+const sliderToSetting = (s, t) => +(s.log ? s.min * (s.max / s.min) ** t : s.min + t * (s.max - s.min)).toFixed(s.digits);
+const settingUnit = unit => unit == 'rs' ? 'r\u209b' : unit;
 
 const uiUpdateInterval = 200; // ms between refreshes of the textual UI
 
 // set by the scenario (its metric class and parameters), see loadScenario
-var metric = new initialScenario.metric(initialScenario.params);
+var metric = new initialScenario.metric(scenarioParams(initialScenario, initialSettings));
 
 // projectiles fired with Space: speed in the ship's rest frame, and how many
 // are kept (the oldest are dropped)
@@ -138,6 +159,8 @@ class App extends Component {
     showDisplayOptions: false,
     pause: false,
     scenario: initialScenario.id,
+    settings: initialSettings, // the scenario's (see scenarioSettings)
+    settingsDraft: initialSettings, // the same, while a slider is being dragged (applied when released)
     showDescription: true,
     tau: null,
     obsvX: null,
@@ -428,14 +451,14 @@ class App extends Component {
   activateSpawn = _ => this.setTool('spawn');
 
   // Reset the world to the initial state of `scenario`, in its metric.
-  async loadScenario(scenario) {
-    const type = scenario.metric;
-    if (type !== metric.constructor || !metric.sameParams(scenario.params)) {
-      const next = new type(scenario.params);
+  async loadScenario(scenario, settings = this.state.settings) {
+    const type = scenario.metric, params = scenarioParams(scenario, settings);
+    if (type !== metric.constructor || !metric.sameParams(params)) {
+      const next = new type(params);
       await sim.setMetric(next);
       metric = next;
     }
-    const state = scenario.setup(metric);
+    const state = scenario.setup(metric, settings);
     sim.reset(state);
     saveSettings({scenario: scenario.id});
     this.setState({
@@ -464,11 +487,22 @@ class App extends Component {
 
   startScenario(scenario) {
     if (!scenario.setup) return;
-    // put it into the URL (only once chosen), so that it can be linked
-    const url = new URL(location.href);
-    url.searchParams.set('scenario', scenario.id);
-    history.replaceState(null, '', url);
-    this.setState({scenario: scenario.id}, this.reset);
+    const settings = scenarioSettings(scenario, savedScenarioSettings(scenario.id));
+    scenarioToUrl(scenario, settings);
+    this.setState({scenario: scenario.id, settings, settingsDraft: settings}, this.reset);
+  }
+
+  // A setting's slider being dragged: shown, applied once released (commitSettings).
+  draftSetting(name, value) {
+    this.setState({settingsDraft: {...this.state.settingsDraft, [name]: value}});
+  }
+
+  // Restart the scenario with the settings chosen; remember them, and put them into the URL.
+  commitSettings = _ => {
+    const scenario = this.currentScenario(), settings = scenarioSettings(scenario, this.state.settingsDraft);
+    saveSettings({scenarioSettings: {...loadSettings().scenarioSettings, [scenario.id]: settings}});
+    scenarioToUrl(scenario, settings);
+    this.setState({settings, settingsDraft: settings}, this.reset);
   }
 
   hideDescription = _ => this.setState({showDescription: false});
@@ -584,6 +618,16 @@ class App extends Component {
           ${scenariosOf(metric.constructor).map(sc => html`<option disabled=${!sc.setup} selected=${sc.id == this.state.scenario}>${sc.name}${sc.setup ? '' : ' (coming later)'}</option>`)}
           </select>
         </div>
+        ${Object.entries(this.currentScenario().settings ?? {}).map(([name, s]) => html`
+        <div>
+          <input type="range" class="setting" min="0" max="1" step="0.001"
+            value=${settingToSlider(s, this.state.settingsDraft[name])}
+            onInput=${ev => this.draftSetting(name, sliderToSetting(s, Number(ev.target.value)))}
+            onChange=${this.commitSettings}
+            title=${`${s.label}: ${s.min} to ${s.max} ${settingUnit(s.unit)} (restarts the scenario)`} />
+          <span class="label">${s.label} ${this.state.settingsDraft[name].toFixed(s.digits)} ${settingUnit(s.unit)}</span>
+        </div>
+        `)}
         ${this.state.showDescription && html`
         <div>
           <button class="description" title="Hide" onClick=${this.hideDescription}>${this.currentScenario().description} ✕</button>

@@ -144,6 +144,12 @@ button.description {
   font-size: smaller;
 }
 
+/* a scenario's setting (see scenarioSettings in js/scenarios.js) */
+input.setting {
+  width: 10em;
+  vertical-align: middle;
+}
+
 #time_slider {
   width: 16em;
   vertical-align: text-bottom;

@@ -7,6 +7,11 @@
 // given an instance of that class, returns the initial state:
 //   {ship: {x, u, heading}, objects: [{type, x, u}], viewportSize,
 //    timeScale (negative runs backwards), paused}
+// It may have settings the user can change (restarting it): `settings` =
+// {name: {label, min, max, default, log (a slider on a log scale), digits
+// (decimals kept), unit}}; then `params` may be a function of them, and
+// `setup` gets them too: setup(metric, settings). See scenarioSettings and
+// scenarioParams.
 // Scenarios without `setup` are placeholders, shown disabled. Ids are unique
 // across all metrics (they are used in links, ?scenario=<id>).
 
@@ -79,13 +84,6 @@ const raindrop = (metric, r, phi) => {
   return [x, localVelocity3(metric, x, [-v * Math.cos(phi), -v * Math.sin(phi)])];
 };
 
-// free-fall state `tau` proper time before (x, u): geodesics are
-// time-reversible, so integrate forward with the velocity reversed
-function backwards(metric, [x, u], tau) {
-  const {xu} = math.integrate(metric, math.geo_f(metric), [...x, ...math.scale(u, -1)], tau, 0.02);
-  return [xu.slice(0, 3), math.scale(xu.slice(3, 6), -1)];
-}
-
 const ship = ([x, u], heading = Math.PI / 2) => ({x, u, heading});
 const object = (type, [x, u]) => ({type, x, u});
 
@@ -98,16 +96,22 @@ const gpScenarios = [
   {
     id: 'free',
     name: 'Free play',
-    description: 'A circular orbit at 7 rs, with a planet falling past. ' +
+    description: 'A circular orbit around a black hole, both of a size you choose. ' +
       'Boost with the mouse or the arrow keys, spawn planets and clocks, and explore.',
-    setup: metric => {
-      const rs = metric.rs;
-      const planet = [[0, 25 * rs, 0], velocity3(metric, [0, 25 * rs, 0], [0, -0.12])];
+    // circular orbits exist down to the photon sphere, 1.5 rs (stable down to 3 rs)
+    settings: {
+      rs: {label: 'Black hole r\u209b', min: 0.05, max: 5, default: 0.3, log: true, digits: 2, unit: 'ls'},
+      orbit: {label: 'Orbit', min: 1.6, max: 50, default: 7, log: true, digits: 1, unit: 'rs'},
+    },
+    params: settings => ({rs: settings.rs}),
+    setup: (metric, settings) => {
+      const r = settings.orbit * metric.rs;
       return {
         ...defaults,
-        ship: ship(circularOrbit(metric, 7 * rs, 0)),
-        // started in the past, so that the planet is visible right away
-        objects: [object(planetId, backwards(metric, planet, 40))],
+        // 10 light seconds across for the default orbit (2.1), in proportion for others, but at least 4
+        viewportSize: Math.max(4, 10 * r / 2.1),
+        ship: ship(circularOrbit(metric, r, 0)),
+        objects: [],
       };
     },
   },
@@ -259,6 +263,20 @@ const minkowskiScenarios = [
     }),
   },
 ];
+
+// A scenario's settings: the values `given` ({name: value}, e.g. from a URL),
+// rounded to their digits, where they're within the settings' ranges, and
+// the defaults for the rest. ({} without settings.)
+export function scenarioSettings(scenario, given = {}) {
+  return Object.fromEntries(Object.entries(scenario.settings ?? {}).map(([name, s]) => {
+    const v = Number(given[name]);
+    return [name, Number.isFinite(v) && v >= s.min && v <= s.max ? +v.toFixed(s.digits) : s.default];
+  }));
+}
+
+// A scenario's metric parameters, with `settings` (see scenarioSettings).
+export const scenarioParams = (scenario, settings) =>
+  typeof scenario.params == 'function' ? scenario.params(settings) : scenario.params;
 
 export const scenarios = [
   ...gpScenarios.map(sc => ({...sc, metric: GullstrandPainleve})),

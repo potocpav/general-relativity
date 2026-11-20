@@ -9,7 +9,7 @@ import { fetchText, physicsFragmentShader } from '../js/shaders.js';
 import { GullstrandPainleve, Minkowski, metricTypes, localVelocity3 } from '../js/metric.js';
 import { screenRay, screenToViewport } from '../js/world.js';
 import * as math from '../js/math.js';
-import { scenarios, velocity3 } from '../js/scenarios.js';
+import { scenarios, velocity3, scenarioSettings, scenarioParams } from '../js/scenarios.js';
 import { Objects, integrateToTime } from '../js/objects.js';
 import { World } from '../js/world.js';
 import { planetId, objectRadius } from '../js/object-types.js';
@@ -787,8 +787,9 @@ function checkScenariosJs() {
     return {fell: false, rMin, rMax, periapsisPhis, xu};
   };
   for (const sc of scenarios.filter(sc => sc.setup)) {
-    const m = new sc.metric(sc.params);
-    const st = sc.setup(m);
+    const settings = scenarioSettings(sc);
+    const m = new sc.metric(scenarioParams(sc, settings));
+    const st = sc.setup(m, settings);
     for (const body of [st.ship, ...st.objects]) {
       const norm = math.dot(body.u, math.matVec(m.g(body.x), body.u));
       check(Math.abs(norm + 1) < 1e-9 && m.canFollow([...body.x, ...body.u]), `${sc.id}: invalid initial state`);
@@ -821,6 +822,21 @@ function checkScenariosJs() {
       check(burn(back, 4.9) === null, 'isco: a burn against the motion did not send it in');
       check(burn(math.scale(back, -1), 30) !== null, 'isco: a burn forwards sent it in');
       check(Math.abs(ship.heading - Math.PI / 2) < 1e-12, 'isco: the ship does not point in the direction of motion');
+    }
+    if (sc.id == 'free') {
+      // at the ends of its settings' ranges (and the defaults), a valid circular orbit: r stays put over half an
+      // orbit where it's stable (from 3 rs), and the scenario's metric has the chosen size
+      for (const rs of [0.05, 0.3, 5]) for (const orbit of [3, 7, 50]) {
+        const given = scenarioSettings(sc, {rs, orbit});
+        const gm = new sc.metric(scenarioParams(sc, given)), g = sc.setup(gm, given).ship;
+        const r = orbit * rs, half = Math.PI * r / Math.sqrt(rs / (2 * r));
+        const o = follow(gm, g.x, g.u, Math.min(half, 200));
+        check(gm.rs == rs && Math.abs(g.x[1] - r) < 1e-12 && !o.fell && o.rMin > r * (1 - 1e-3) && o.rMax < r * (1 + 1e-3),
+          `free (rs ${rs}, orbit ${orbit} rs): r between ${(o.rMin / r).toFixed(4)} and ${(o.rMax / r).toFixed(4)} of the orbit`);
+      }
+      // out-of-range settings fall back to the defaults
+      check(scenarioSettings(sc, {rs: 100, orbit: 1}).rs == 0.3 && scenarioSettings(sc, {rs: 'x'}).orbit == 7,
+        'free: out-of-range settings not replaced by the defaults');
     }
     if (sc.id == 'zoom-whirl') {
       const o = follow(m, ship.x, ship.u, 300);

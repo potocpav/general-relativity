@@ -258,7 +258,7 @@
     // relativity: the same flight, scaled down by `scale` in size (the view and the ship) and speed (and
     // acceleration, so it takes as long), where relativistic effects are too small to see.
     import { runFigure } from '../js/figure.js';
-    import { scenarios } from '../js/scenarios.js';
+    import { scenarios, scenarioSettings, scenarioParams } from '../js/scenarios.js';
     import { thrust, VIEW_SEEN, VIEW_NOW } from '../js/world.js';
     import { clockId, sunId, sunDiameter } from '../js/object-types.js';
     import { flyTo } from './pilots.js';
@@ -397,8 +397,9 @@
       canvas.addEventListener('contextmenu', ev => ev.preventDefault());
 
       const scenario = scenarios.find(sc => sc.id == (scenarioId ?? 'flat'));
-      const metric = new scenario.metric(scenario.params);
-      const setup = scenario.setup(metric);
+      const settings = scenarioSettings(scenario); // (its defaults)
+      const metric = new scenario.metric(scenarioParams(scenario, settings));
+      const setup = scenario.setup(metric, settings);
       let state;
       if (scenarioId) {
         // as the app's scenario starts (its objects, unless given)
@@ -554,11 +555,10 @@
           tau: sunSince + sunClockAhead},
       ],
     });
-    // The black hole figures start as the app's scenarios do: a circular orbit at 7 rs (without the scenario's
-    // falling planet), and a fall from 2 rs, at the speed of a fall from rest far away, into a black hole 25 times as
-    // heavy, so that it takes longer: 9 s to the horizon, then 5 s to the singularity (where it stops; reset to
-    // start again).
-    velocityFigure('fig-orbit', {scenarioId: 'free', objects: []});
+    // The black hole figures start as the app's scenarios do (with their default settings): a circular orbit at
+    // 7 rs, and a fall from 2 rs, at the speed of a fall from rest far away, into a black hole 25 times as heavy, so
+    // that it takes longer: 9 s to the horizon, then 5 s to the singularity (where it stops; reset to start again).
+    velocityFigure('fig-orbit', {scenarioId: 'free'});
     // Its distance from the center, in units of rs, and its speed per second of a falling clock: in
     // Gullstrand–Painlevé coordinates (T, r, phi), T is the time of clocks falling from rest far away (synchronized;
     // the ship is one of them, unless flown), whose "now", a moment T, is flat space, with r and r phi its
