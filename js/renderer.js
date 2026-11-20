@@ -52,7 +52,7 @@ export class Renderer {
   async setMetric(metric) {
     const program = this.compileProgram(this.surfaceVert,
       await physicsFragmentShader(this.surfaceFragMain, metric, this.root));
-    for (const name of ['resolution', 'view_origin', 'viewport_size', 'view_offset']) {
+    for (const name of ['resolution', 'view_origin', 'viewport_size', 'view_offset', 'line_width']) {
       this.cacheUniformLocation(program, name);
     }
     this.world.compile(program);
@@ -155,6 +155,9 @@ export class Renderer {
     // the raytracing shader, into the target, once per view (together, they cover all of it: no clear needed)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
     const uniforms = surface.uniformsCache;
+    // The lines' width: 1 CSS pixel times the quality factor f (device pixels per rendered pixel), so thicker at a
+    // lower resolution; at dpr / f rendered pixels per CSS pixel, that's dpr rendered pixels, whatever f is.
+    gl.uniform1f(uniforms['line_width'], window.devicePixelRatio || 1);
     const views = this.views ?? [{left: 0, bottom: 0, width: 1, height: 1,
       viewportSize: this.world.viewportSize, viewOffset: this.world.viewOffset}];
     for (const view of views) {

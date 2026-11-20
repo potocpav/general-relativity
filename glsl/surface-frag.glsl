@@ -14,6 +14,9 @@ uniform float ship_scale; // the ship's size relative to its normal size
 uniform bool show_ship_clock; // a clock above the ship, showing its proper time
 
 uniform float viewport_size;
+// [rendered pixels] of the grid's and overlays' lines: 1 CSS pixel times the quality factor (device pixels per
+// rendered pixel), which is the device pixel ratio (see Renderer.render)
+uniform float line_width;
 uniform vec2 view_offset; // where the ship is on the screen: from its center, as fractions of its width and height
 uniform vec2 view_origin; // the view's lower left corner in the canvas [px] (it can have several views, see Renderer.views)
 uniform bool show_photon_sphere;
@@ -59,10 +62,9 @@ vec3 grid_color(vec3 pos) {
 	vec3 pixel = 2.0 * pos_pixel / stride;
 	vec3 pixel2 = 2.0 * pixel; // for the fine grid
 
-	// Lines are a fixed width in rendered pixels (no lines of constant t).
-	const float width = 2.0; // [rendered pixels]
+	// Lines are line_width wide, in rendered pixels (no lines of constant t).
 	const vec3 has_lines = vec3(0.0, 1.0, 1.0);
-	vec3 half_width = has_lines * 0.5 * width * pixel;
+	vec3 half_width = has_lines * 0.5 * line_width * pixel;
 	vec3 half_width2 = 2.0 * half_width;
 	// Their brightness is scaled so that the mean brightness of the grid doesn't
 	// depend on how dense it is on screen (where lensing squeezes or stretches
@@ -93,13 +95,12 @@ vec3 grid_color(vec3 pos) {
 // Overlays of the black hole.
 
 // Coverage of an antialiased line where the per-pixel radius `r` equals
-// `radius`, of a fixed width in rendered pixels; `fwidth` is the change of r
+// `radius`, line_width wide (in rendered pixels); `fwidth` is the change of r
 // across one pixel. `continuous` must be false where neighbouring pixels' `r`
 // aren't comparable. Must be called in uniform control flow, because of `fwidth`.
 float radius_line(float r, float radius, bool continuous) {
-	const float width = 2.0; // [rendered pixels]
 	float d = abs(r - radius);
-	float w = fwidth(r) * width / 2.0;
+	float w = fwidth(r) * line_width / 2.0;
 	float a = 1.0 - smoothstep(0.5 * w, 1.5 * w, d);
 	// Where neighbouring rays end far apart (around extreme lensing), `w` is
 	// meaningless and would smear the line. The threshold grows with the world
