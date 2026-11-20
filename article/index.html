@@ -325,22 +325,69 @@
       const engageInitial = () => engage(...(buttons[autopilot?.initial] ?? [null, null]));
       engageInitial();
 
-      // the pointer, held down on the view: [x, y] in CSS pixels from the lower left corner, or null
-      let pointer = null;
-      const track = ev => {
+      // The pointers held down on the view (id -> [clientX, clientY]). One flies the ship; two pinch to zoom (as does
+      // the wheel), and flying stops until all are up again. A touch takes over the ship (turning the autopilot off)
+      // only once held for `touchDelay` without a second one, so that starting a pinch doesn't; the mouse at once.
+      const touchDelay = 120; // [ms]
+      const touches = new Map();
+      let pointer = null; // the flying pointer's position: [x, y] in CSS pixels from the lower left corner, or null
+      let flyingId = null, takeOver = null; // the pointer flying (or about to), and the timer of its takeover
+      let pinch = null; // while pinching: the distance between the fingers (it stays non-null until all are up)
+      let zoomBy = () => {}; // multiply the zoom (World.viewportSize) by a factor; set once the simulation runs
+      const toCanvas = ([cx, cy]) => {
         const r = canvas.getBoundingClientRect();
-        pointer = [ev.clientX - r.left, r.bottom - ev.clientY];
+        return [cx - r.left, r.bottom - cy];
+      };
+      const fingerDistance = () => {
+        const [a, b] = touches.values();
+        return Math.hypot(a[0] - b[0], a[1] - b[1]);
+      };
+      const startFlying = () => {
+        takeOver = null;
+        pointer = toCanvas(touches.get(flyingId));
+        engage(null, null);
+        flown = true;
+      };
+      const stopFlying = () => {
+        clearTimeout(takeOver);
+        takeOver = flyingId = pointer = null;
       };
       canvas.addEventListener('pointerdown', ev => {
         canvas.setPointerCapture(ev.pointerId);
-        track(ev);
-        engage(null, null);
-        flown = true;
+        touches.set(ev.pointerId, [ev.clientX, ev.clientY]);
+        if (touches.size >= 2) {
+          stopFlying();
+          pinch = fingerDistance();
+        } else if (pinch == null) {
+          flyingId = ev.pointerId;
+          if (ev.pointerType == 'touch') takeOver = setTimeout(startFlying, touchDelay);
+          else startFlying();
+        }
       });
-      canvas.addEventListener('pointermove', ev => { if (pointer) track(ev); });
+      canvas.addEventListener('pointermove', ev => {
+        if (!touches.has(ev.pointerId)) return;
+        touches.set(ev.pointerId, [ev.clientX, ev.clientY]);
+        if (pinch != null && touches.size >= 2) {
+          const d = fingerDistance();
+          if (d > 0) zoomBy(pinch / d);
+          pinch = d;
+        } else if (pointer && ev.pointerId == flyingId) {
+          pointer = toCanvas(touches.get(flyingId));
+        }
+      });
+      for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, ev => {
+        touches.delete(ev.pointerId);
+        if (ev.pointerId == flyingId) stopFlying();
+        if (touches.size == 0) pinch = null;
+      });
+      // the wheel zooms (also a touchpad's pinch, which arrives as the wheel with ctrl), rather than scrolling the
+      // page; its delta in pixels (from lines or pages)
+      canvas.addEventListener('wheel', ev => {
+        ev.preventDefault();
+        zoomBy(Math.exp(ev.deltaY * [1, 16, canvas.clientHeight][ev.deltaMode] / 500));
+      }, {passive: false});
       // a long press (on Android, or a right click) steers too, rather than opening the context menu
       canvas.addEventListener('contextmenu', ev => ev.preventDefault());
-      for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, () => { pointer = null; });
 
       const scenario = scenarios.find(sc => sc.id == 'flat');
       const metric = new scenario.metric(scenario.params);
@@ -397,6 +444,12 @@
       sim.world.viewMode = viewMode;
       sim.world.showShipClock = shipClock;
       sim.world.viewOffset = viewOffset;
+      // zoomed within 1/20 to 1000 times the initial view's size (a reset restores it, from `state`)
+      zoomBy = factor => {
+        const size = state.viewportSize;
+        sim.world.viewportSize = Math.min(1000 * size, Math.max(size / 20, sim.world.viewportSize * factor));
+        flown = true;
+      };
       // the reset button puts the ship back to its initial state at once
       el('reset').addEventListener('click', () => {
         sim.reset(state);
@@ -446,9 +499,9 @@
       return [dx + wx * k, dy + wy * k];
     };
     velocityFigure('fig-planet', {
-      // The light arriving at the ship now, at fixed zooms: the main view on the ship (4.5 light seconds across),
+      // The light arriving at the ship now: the main view on the ship (4.5 light seconds across, zoomable),
       // right of the middle, clear of the inset; the inset centered on the Sun, where the ship sees it (6 across, the
-      // whole Sun).
+      // whole Sun; fixed, not zoomed).
       startSpeed: 0, startPosition: [shipStart, 0], shipClock: true, historyDt: 3,
       viewOffset: [0.2, 0],
       // The autopilot's targets, along the x axis, at their distances from the Sun's center in light seconds, rounded
@@ -476,7 +529,7 @@
         return {'sun-time': clockTime(emitted + sunClockAhead), 'ship-time': clockTime(world.time)};
       },
       views: world => [
-        {left: 0, bottom: 0, width: 1, height: 1, viewportSize: 4.5, viewOffset: world.viewOffset},
+        {left: 0, bottom: 0, width: 1, height: 1, viewportSize: world.viewportSize, viewOffset: world.viewOffset},
         {...sunInset, viewportSize: 6, center: seenFromShip(world, [0, 0])},
       ],
       objects: [
