@@ -288,8 +288,8 @@
     // autopilot's top speed, as a fraction of c (see flyToX); `historyDt`: the objects' history step (see Objects);
     // `readouts`: if given, the figure's own readouts for the world's state, at every frame, as {name: text}, each
     // shown in the element `${prefix}-${name}`, or {name: {text, arc}}, also showing `arc` (0 to 2: two rounds) as
-    // the arc `${prefix}-${name}-arc` (a circle of pathLength 1, in an svg.seconds): the first round fills the circle,
-    // the second empties it, filling it with the circle's color (the svg's class `second-round`, see style.css); the
+    // the arc `${prefix}-${name}-arc` (a circle of pathLength 1, in an svg.seconds): the first round grows it from the
+    // top clockwise into a full circle, the second shrinks it from the top the same way (its start following); the
     // speed, γ and acceleration are shown where the figure has them
     async function velocityFigure(prefix, {scale = 1, viewMode = VIEW_SEEN, startSpeed = 0.3, startPosition = [0, 0],
       objects = [], shipClock = false, viewOffset = [0, 0], views = null, maxSpeed = undefined,
@@ -391,9 +391,9 @@
           for (const [name, value] of Object.entries(readouts(sim.world))) {
             show(`${prefix}-${name}`, value.text ?? value);
             if (value.arc != null) {
-              const arc = el(`${name}-arc`);
-              arc.parentNode.classList.toggle('second-round', value.arc >= 1);
-              arc.style.strokeDasharray = `${value.arc % 1} 1`;
+              const arc = el(`${name}-arc`), f = value.arc % 1, second = value.arc >= 1;
+              arc.style.strokeDasharray = second ? `${1 - f} 1` : `${f} 1`;
+              arc.style.strokeDashoffset = second ? -f : 0;
             }
           }
         }
